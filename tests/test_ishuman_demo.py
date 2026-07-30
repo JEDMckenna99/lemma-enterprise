@@ -341,7 +341,7 @@ def test_ishuman_demo_page_never_shows_retired_network_revoke(
 
 
 def test_ishuman_idv_popup_page_loads(ishuman_demo_client):
-    resp = ishuman_demo_client.get("/wallet/ishuman-idv?origin=https%3A%2F%2Fexample.com&site_id=tickets-demo.lemma.id")
+    resp = ishuman_demo_client.get("/verify?origin=https%3A%2F%2Fexample.com&site_id=tickets-demo.lemma.id")
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
@@ -399,11 +399,21 @@ def test_ishuman_ui_states_gallery_loads_all_preview_scenes(ishuman_demo_client)
     assert resp.headers["Cache-Control"] == "no-cache, no-store, must-revalidate"
 
 
+def test_legacy_wallet_ishuman_idv_redirects_to_verify(ishuman_demo_client):
+    resp = ishuman_demo_client.get(
+        "/wallet/ishuman-idv?origin=https%3A%2F%2Fexample.com&site_id=tickets-demo.lemma.id",
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    assert resp.headers["Location"].startswith("/verify?")
+    assert "site_id=tickets-demo.lemma.id" in resp.headers["Location"]
+
+
 def test_ishuman_idv_preview_allows_only_same_origin_framing(ishuman_demo_client):
     preview = ishuman_demo_client.get(
-        "/wallet/ishuman-idv?preview_type=fresh_passkey&preview_state=ready"
+        "/verify?preview_type=fresh_passkey&preview_state=ready"
     )
-    live = ishuman_demo_client.get("/wallet/ishuman-idv")
+    live = ishuman_demo_client.get("/verify")
 
     assert preview.headers["X-Frame-Options"] == "SAMEORIGIN"
     assert "X-Frame-Options" not in live.headers
@@ -420,7 +430,7 @@ def test_ishuman_idv_popup_does_not_enable_test_verify_on_production(
     monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_QR_IDV_ENABLED", "true")
 
     resp = ishuman_demo_client.get(
-        "/wallet/ishuman-idv?origin=https%3A%2F%2Fexample.com&site_id=trials-demo.lemma.id"
+        "/verify?origin=https%3A%2F%2Fexample.com&site_id=trials-demo.lemma.id"
     )
     body = resp.get_data(as_text=True)
 
@@ -430,7 +440,7 @@ def test_ishuman_idv_popup_does_not_enable_test_verify_on_production(
 
 def _passkey_site_proof_popup_url():
     return (
-        "/wallet/ishuman-idv"
+        "/verify"
         "?issue_mode=site_proof"
         "&required_assurance=passkey"
         "&session_nonce=test-session-nonce"

@@ -108,10 +108,10 @@
             margin-bottom: 10px;
             transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
         }
-        .btn-primary { background: var(--lemma-primary); color: #fff; }
+        .btn-primary { background: #1A1A24; color: #fff; }
         .btn-primary:hover:not(:disabled) {
-            background: var(--lemma-primary-dark);
-            box-shadow: 0 2px 8px rgba(78, 61, 143, 0.24);
+            background: #32313F;
+            box-shadow: 0 2px 8px rgba(26, 26, 36, 0.2);
         }
         .btn-secondary {
             background: var(--lemma-surface);
@@ -1640,7 +1640,7 @@
                 origin: openerOrigin !== '*' ? openerOrigin : window.location.origin,
                 site_id: requestingSite,
             });
-            const returnUrl = `${window.location.origin}/wallet/ishuman-idv?${returnParams.toString()}`;
+            const returnUrl = `${window.location.origin}/verify?${returnParams.toString()}`;
 
             setStatus('Preparing demo verification…', 'loading');
             const prepare = await requestJson('/api/demo/ishuman/qr-demo-idv-flow', {
@@ -1722,7 +1722,7 @@
         }
 
         async function verifyOnceTestMode() {
-            const returnUrl = `${window.location.origin}/wallet/ishuman-idv?${params.toString()}&verification_return=true`;
+            const returnUrl = `${window.location.origin}/verify?${params.toString()}&verification_return=true`;
             const walletAssertion = await wallet.buildWalletAssertion(['return_url'], { return_url: returnUrl });
             const endpoint = skeletonIdvEnabled
                 ? '/api/demo/ishuman/skeleton-idv-flow'
@@ -2031,7 +2031,7 @@
                 }
             }
 
-            const returnUrl = `${window.location.origin}/wallet/ishuman-idv?${returnParams.toString()}`;
+            const returnUrl = `${window.location.origin}/verify?${returnParams.toString()}`;
             let handoffMkFingerprint = null;
             if (pendingHandoff) {
                 handoffMkFingerprint = await wallet.handoffMkFingerprint(pendingHandoff.mk);

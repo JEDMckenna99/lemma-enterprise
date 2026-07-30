@@ -873,7 +873,7 @@ function createWallet(triggerButton = null) {
     btn.textContent = 'Opening verification...';
     btn.disabled = true;
 
-    const popupUrl = new URL('/wallet/ishuman-idv', window.location.origin);
+    const popupUrl = new URL('/verify', window.location.origin);
     popupUrl.searchParams.set('origin', window.location.origin);
     popupUrl.searchParams.set('site_id', 'lemma.id');
 

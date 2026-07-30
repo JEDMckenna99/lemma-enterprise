@@ -8,8 +8,8 @@ isHuman integration flow in three concepts: **Create**, **Verify**, **Enforce**:
 When one-PPID assurance flags are enabled on staging:
 
 - **Create**: passkey wallet + provisional person root (no IDV required to start).
-- **Verify**: `verifyForBackend({ requiredAssurance: 'passkey' })` derives distinct site PPIDs; Heroku demo sites POST signed `presentation` to `/api/demo/action` for offline `verify()`.
-- **Enforce**: set assurance (`passkey` → `ishuman`), site doubt, and site ban via `/api/demo/ishuman/*`. After Didit IDV, re-verify with `requiredAssurance: 'ishuman'`: **same PPID**, assurance flips to `ishuman`.
+- **Verify**: hub derives distinct site PPIDs via `verifyForBackend`; Heroku demo sites use **Sign in with lemma.id** → `POST /api/login` → site session cookie; soft actions verify locally until fresh passkey step-up (presale claim).
+- **Enforce**: set assurance (`passkey` → `ishuman`), site doubt, and site ban via `/api/demo/ishuman/*`. Hub Enforce attaches the last verified site `presentation`; mutations are allowed when the presentation PPID matches the target (**self-scoped**) or the caller is **SiteAdmin / platform operator** for `site_demo_*`. After Didit IDV, re-verify with `requiredAssurance: 'ishuman'`: **same PPID**, assurance flips to `ishuman`.
 
 Legacy IDV-first copy remains when `assurance_demo_mode` is false (flags off).
 
@@ -24,9 +24,10 @@ Legacy IDV-first copy remains when `assurance_demo_mode` is false (flags off).
 | Free-trial relying site | https://lemma-demo-trials-7090f46cae0d.herokuapp.com |
 | Custom domains (when configured) | `tickets-demo.lemma.id`, `trials-demo.lemma.id` |
 
-Both relying sites load the hosted verifier from your configured `LEMMA_ORIGIN`
-and call `verifyForBackend` with env-driven `LEMMA_DEMO_REQUIRED_ASSURANCE`
-(default `passkey`).
+Both relying sites load the hosted verifier from your configured `LEMMA_ORIGIN`.
+Sign-in uses `verifyForBackend` once, then the site issues an HttpOnly session cookie.
+High-value presale claim still uses `requireFreshPasskey: true`. Site policy defaults
+from `LEMMA_DEMO_REQUIRED_ASSURANCE` (default `passkey`).
 
 > **Agent Ops demo** (proof-constrained authorization with runtime kill/revoke)
 > lives separately at `/demo/firewall` and is operator-only, not the public

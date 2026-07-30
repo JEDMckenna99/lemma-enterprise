@@ -107,6 +107,7 @@ def test_csp_includes_report_uri():
     ("/unlock", "unlock_idv"),
     ("/wallet/unlock", "unlock_idv"),
     ("/wallet/popup", "unlock_idv"),
+    ("/verify", "unlock_idv"),
     ("/wallet/ishuman-idv", "unlock_idv"),
     ("/link", "link_qr"),
     ("/link/send", "link_qr"),
@@ -172,7 +173,7 @@ def test_ishuman_idv_page_uses_no_referrer_policy():
     client = app.test_client()
 
     home = client.get("/")
-    idv = client.get("/wallet/ishuman-idv")
+    idv = client.get("/verify")
 
     assert home.headers.get("Referrer-Policy") == "strict-origin-when-cross-origin"
     assert idv.headers.get("Referrer-Policy") == "no-referrer"

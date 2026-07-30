@@ -436,7 +436,7 @@ Developer page                Lemma popup              Developer backend
 Steps:
 
 1. Client calls `verify({ autoProvision: true })` before a protected action.
-2. If no proof exists, popup at `/wallet/ishuman-idv` runs wallet unlock + live IDV.
+2. If no proof exists, popup at `/verify` runs wallet unlock + live IDV (`/wallet/ishuman-idv` redirects to the same page).
 3. lemma.id issues master + site-bound credential for `siteId`.
 4. SDK validates signature, expiry, revocation locally.
 5. Client sends `presentation` or stamp to **your** backend; backend verifies cryptographically.

@@ -1643,7 +1643,7 @@
     const popupToken = randomPopupToken();
     broadcastIdvPopupSupersede(demoQr ? 'demo_qr' : 'idv', popupToken);
 
-    const popupUrl = new URL(`${window.location.origin}/wallet/ishuman-idv`);
+    const popupUrl = new URL(`${window.location.origin}/verify`);
     popupUrl.searchParams.set('origin', window.location.origin);
     popupUrl.searchParams.set('site_id', 'lemma.id');
     popupUrl.searchParams.set('popup_token', popupToken);

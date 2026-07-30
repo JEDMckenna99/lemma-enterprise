@@ -243,7 +243,7 @@
             }
 
             // No wallet yet (or wallet without platform membership): Sign In
-            // opens the lemma.id manager. Get Started stays the docs CTA.
+            // opens the platform login card. Get Started stays the docs CTA.
             if (signInLink) signInLink.style.display = 'inline-flex';
             if (getStartedLink) getStartedLink.style.display = 'inline-flex';
         }
@@ -296,25 +296,9 @@
                 const unlockButton = document.getElementById('nav-unlock-link');
                 if (unlockButton && !unlockButton.dataset.bound) {
                     unlockButton.dataset.bound = '1';
-                    unlockButton.addEventListener('click', async (event) => {
+                    unlockButton.addEventListener('click', (event) => {
                         event.preventDefault();
-                        unlockButton.disabled = true;
-                        const original = unlockButton.textContent;
-                        unlockButton.textContent = 'Unlocking…';
-                        try {
-                            await unlockPlatformWallet(wallet);
-                            // Manager-only for now: unlock → /app (not developer hub).
-                            window.location.href = '/app';
-                            return;
-                        } catch (err) {
-                            console.warn('[platform-auth-cta] unlock failed:', err?.message || err);
-                            unlockButton.textContent = original;
-                        } finally {
-                            unlockButton.disabled = false;
-                            if (unlockButton.textContent === 'Unlocking…') {
-                                unlockButton.textContent = original;
-                            }
-                        }
+                        window.location.href = '/login';
                     });
                 }
             } catch (err) {

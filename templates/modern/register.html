@@ -464,7 +464,7 @@
         const REGISTER_ERROR_KEY = 'lemma_register_error_v1';
 
         function buildPlatformIdvUrl({ redirect = false } = {}) {
-            const url = new URL('/wallet/ishuman-idv', window.location.origin);
+            const url = new URL('/verify', window.location.origin);
             url.searchParams.set('origin', window.location.origin);
             url.searchParams.set('site_id', 'lemma.id');
             if (redirect) {

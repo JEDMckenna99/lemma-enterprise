@@ -26,10 +26,38 @@ def fixture_ishuman_demo_client(fake_ishuman_db_session_factory, monkeypatch):
         yield client
 
 
+@pytest.fixture(name="demo_control_auth")
+def fixture_demo_control_auth(monkeypatch):
+    def _fake(site_domain, presentation):
+        if isinstance(presentation, dict):
+            ppid = presentation.get("_test_ppid")
+            if ppid:
+                return str(ppid), None
+        return None, "presentation_missing"
+
+    monkeypatch.setattr("api.ishuman_demo._verified_ppid_from_presentation", _fake)
+
+
+def _demo_control_body(slug: str, ppid: str, **extra) -> dict:
+    presentation = {"credential": {"id": "test-control"}, "_test_ppid": ppid}
+    body = {
+        "site_slug": slug,
+        "ppid": ppid,
+        "presentation": presentation,
+        "presentations": {
+            "tickets": presentation,
+            "trials": presentation,
+        },
+    }
+    body.update(extra)
+    return body
+
+
 def test_demo_lifecycle_site_block_unblock_and_escalation(
     ishuman_demo_client,
     fake_ishuman_db_session_factory,
     monkeypatch,
+    demo_control_auth,
 ):
     from api.database import Site, SiteBlock, SiteDoubt
 
@@ -69,7 +97,7 @@ def test_demo_lifecycle_site_block_unblock_and_escalation(
 
     block = ishuman_demo_client.post(
         "/api/demo/ishuman/site-block",
-        json={"site_slug": "tickets", "ppid": ppid, "reason": "smoke test block"},
+        json=_demo_control_body("tickets", ppid, reason="smoke test block"),
     ).get_json()
     assert block["success"] is True
     assert block["site_id"] == "site_demo_tickets"

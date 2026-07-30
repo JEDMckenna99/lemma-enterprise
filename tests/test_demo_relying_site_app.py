@@ -73,7 +73,80 @@ def test_relying_site_action_denies_missing_presentation(relying_site_client):
 
     assert resp.status_code == 403
     assert payload["success"] is False
-    assert payload["reason"] == "presentation_missing"
+    assert payload["reason"] == "auth_required"
+
+
+def test_relying_site_login_sets_session_cookie(relying_site_client, monkeypatch):
+    client, mod = relying_site_client
+    mod._VERIFY_CTX = None
+
+    class _FakeResult:
+        ok = True
+        ppid = "ppid_demo_session"
+        assurance = "passkey"
+        reason = "session_valid"
+        credential_id = "cred-1"
+        issuer_did = "did:lemma:test"
+        bound_site_id = "tickets-demo.lemma.id"
+
+    monkeypatch.setattr(mod.VerificationContext, "verify", lambda self, _p: _FakeResult())
+
+    resp = client.post(
+        "/api/login",
+        json={"presentation": {"credential": {"id": "cred-1"}}},
+    )
+    payload = resp.get_json()
+
+    assert resp.status_code == 200
+    assert payload["success"] is True
+    assert payload["ppid"] == "ppid_demo_session"
+    assert mod.SESSION_COOKIE in resp.headers.get("Set-Cookie", "")
+
+
+def test_relying_site_me_requires_session(relying_site_client):
+    client, mod = relying_site_client
+    resp = client.get("/api/me")
+    assert resp.status_code == 401
+
+    cookie = mod._sign_session("ppid_demo_me", "passkey")
+    client.set_cookie(mod.SESSION_COOKIE, cookie)
+    authed = client.get("/api/me")
+    payload = authed.get_json()
+    assert authed.status_code == 200
+    assert payload["success"] is True
+    assert payload["ppid"] == "ppid_demo_me"
+
+
+def test_relying_site_action_accepts_session_cookie(relying_site_client):
+    client, mod = relying_site_client
+    mod.ACTION_LOG.clear()
+    cookie = mod._sign_session("ppid_demo_action", "passkey")
+    client.set_cookie(mod.SESSION_COOKIE, cookie)
+    resp = client.post(
+        "/api/demo/action",
+        json={"action": "reserve_tickets", "email": "fan@example.com"},
+    )
+    payload = resp.get_json()
+
+    assert resp.status_code == 200
+    assert payload["success"] is True
+    assert payload["ppid"] == "ppid_demo_action"
+    assert payload["reason"] == "session_valid"
+
+
+def test_relying_site_policy_mutation_requires_self_session(relying_site_client):
+    client, mod = relying_site_client
+    denied = client.post("/api/demo/policy/doubt", json={"ppid": "ppid_other"})
+    assert denied.status_code == 403
+
+    cookie = mod._sign_session("ppid_self", "passkey")
+    client.set_cookie(mod.SESSION_COOKIE, cookie)
+    allowed = client.post(
+        "/api/demo/policy/doubt",
+        json={"ppid": "ppid_self"},
+    )
+    assert allowed.status_code == 200
+    assert allowed.get_json()["doubt_required"] is True
 
 
 def test_relying_site_action_verifies_presentation(relying_site_client, monkeypatch):
@@ -142,6 +215,7 @@ def test_relying_site_index_loads_verifier_script(relying_site_client):
     assert 'class="site-icon"' in body
     assert 'stroke="#d97706"' in body
     assert "IsHumanVerifier" in body
+    assert "Sign in with lemma.id" in body
     assert "stampAction" in body
     assert "claim_presale_code" in body
     assert "register_presale" in body
@@ -216,7 +290,7 @@ def test_relying_site_index_exposes_server_receipt_and_hub_return(relying_site_c
     assert "/api/demo/policy/check" in body
     assert "registration_required" in body
     assert "doubt_required" in body
-    assert "Try again with same wallet" in body
+    assert "Try again with same lemma.id" in body
     assert "/api/presale/claim-code" in body
 
 

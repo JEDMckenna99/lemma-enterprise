@@ -1,11 +1,14 @@
+import hashlib
+import hmac
+import json
 import logging
 import os
 import secrets
 import time
 from collections import deque
-from typing import Optional
+from typing import Any, Optional
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, g, jsonify, make_response, redirect, request
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +39,10 @@ PRESALE_ESCALATED_ASSURANCE = os.getenv(
     "LEMMA_PRESALE_ESCALATED_ASSURANCE", "ishuman"
 ).strip().lower()
 ISHUMAN_VERIFIER_SDK_VERSION = os.getenv("ISHUMAN_VERIFIER_SDK_VERSION", "1.9.2").strip()
+SESSION_SECRET = os.getenv("SESSION_SECRET", "lemma-demo-site-session-dev-secret")
+SESSION_COOKIE = "lemma_demo_session"
+SESSION_MAX_AGE = int(os.getenv("LEMMA_DEMO_SESSION_MAX_AGE", "86400"))
+DEMO_CONTROL_SECRET = os.getenv("LEMMA_DEMO_CONTROL_SECRET", "").strip()
 
 TICKETING_ICON_SVG = """<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
   <rect x="6.8" y="3.4" width="13.6" height="8.4" rx="1.4" stroke="#d97706" stroke-width="1.6" opacity="0.5" transform="rotate(8 13.6 7.6)"/>
@@ -65,6 +72,127 @@ _PRESALE_REGISTRATIONS, _PRESALE_LEDGER = create_presale_stores()
 _NONCE_STORE = InMemoryNonceStore()
 _CHALLENGE_STORE: dict[str, dict] = {}
 _RATE_BUCKETS: dict[str, deque] = {}
+
+
+def _sign_session(ppid: str, assurance: str = "") -> str:
+    payload = {
+        "ppid": ppid,
+        "assurance": assurance or DEMO_REQUIRED_ASSURANCE,
+        "exp": int(time.time()) + SESSION_MAX_AGE,
+    }
+    raw = json.dumps(payload, separators=(",", ":")).encode().hex()
+    sig = hmac.new(SESSION_SECRET.encode(), raw.encode(), hashlib.sha256).hexdigest()
+    return f"{raw}.{sig}"
+
+
+def _read_session(token: str | None) -> Optional[dict[str, Any]]:
+    if not token or "." not in token:
+        return None
+    raw, sig = token.rsplit(".", 1)
+    expected = hmac.new(SESSION_SECRET.encode(), raw.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, sig):
+        return None
+    try:
+        payload = json.loads(bytes.fromhex(raw).decode())
+    except (ValueError, json.JSONDecodeError):
+        return None
+    if int(payload.get("exp") or 0) < int(time.time()):
+        return None
+    ppid = payload.get("ppid")
+    if not ppid:
+        return None
+    return {
+        "ppid": str(ppid),
+        "assurance": str(payload.get("assurance") or DEMO_REQUIRED_ASSURANCE),
+    }
+
+
+def _session_from_request() -> Optional[dict[str, Any]]:
+    return _read_session(request.cookies.get(SESSION_COOKIE))
+
+
+def _set_session_cookie(response, ppid: str, assurance: str = "") -> None:
+    response.set_cookie(
+        SESSION_COOKIE,
+        _sign_session(ppid, assurance),
+        httponly=True,
+        samesite="Lax",
+        secure=request.is_secure,
+        max_age=SESSION_MAX_AGE,
+    )
+
+
+def _clear_session_cookie(response) -> None:
+    response.delete_cookie(SESSION_COOKIE)
+
+
+def _apply_policy_to_result(ctx: VerificationContext, result) -> tuple:
+    if not result.ok:
+        return result, None
+    available, decision, policy_reason = _POLICY_STORE.check(result.ppid or "")
+    if not available:
+        return ctx.Result(
+            False,
+            policy_reason or "site_policy_unavailable",
+            ppid=result.ppid,
+            credential_id=result.credential_id,
+            issuer_did=result.issuer_did,
+            bound_site_id=result.bound_site_id,
+            assurance=getattr(result, "assurance", None),
+        ), "session_cleared"
+    if decision.blocked:
+        return ctx.Result(
+            False,
+            "site_blocked",
+            ppid=result.ppid,
+            credential_id=result.credential_id,
+            issuer_did=result.issuer_did,
+            bound_site_id=result.bound_site_id,
+            assurance=getattr(result, "assurance", None),
+        ), "session_cleared"
+    if decision.doubt_required:
+        return ctx.Result(
+            False,
+            "doubt_required",
+            ppid=result.ppid,
+            credential_id=result.credential_id,
+            issuer_did=result.issuer_did,
+            bound_site_id=result.bound_site_id,
+            assurance=getattr(result, "assurance", None),
+        ), None
+    return result, None
+
+
+def _verify_control_hmac(body: dict) -> bool:
+    if not DEMO_CONTROL_SECRET:
+        return False
+    signature = (request.headers.get("X-Demo-Control-Signature") or "").strip()
+    if not signature:
+        return False
+    payload = json.dumps(body or {}, separators=(",", ":"), sort_keys=True).encode()
+    expected = hmac.new(
+        DEMO_CONTROL_SECRET.encode(),
+        payload,
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(signature, expected)
+
+
+def _authorize_policy_mutation(target_ppid: str, body: dict | None = None) -> Optional[tuple]:
+    ppid = (target_ppid or "").strip()
+    if not ppid:
+        return jsonify({"success": False, "reason": "ppid_required"}), 400
+    session = _session_from_request()
+    if session and session["ppid"] == ppid:
+        return None
+    if _verify_control_hmac(body or {"ppid": ppid}):
+        return None
+    return jsonify({"success": False, "reason": "demo_policy_unauthorized"}), 403
+
+
+@app.before_request
+def load_demo_session():
+    g.demo_session = _session_from_request()
 
 
 def _client_ip() -> str:
@@ -237,10 +365,10 @@ def _content():
     return {
         "eyebrow": "Unique presale code distributor",
         "headline": "Passkey proves who you are, phone is for delivery",
-        "subhead": "Join the drop with an action-bound passkey register. Unlock your one-time code with a fresh passkey ceremony at claim time. Email and phone stay on this site for SMS and CRM, not as identity. No SMS OTP. IDV runs only when the site flags you for review.",
+        "subhead": "Join the drop with an action-bound passkey register. Unlock your one-time code with a fresh passkey ceremony at claim time. Email and phone stay on this site for SMS and CRM, not as identity. No SMS OTP. IDV runs only when the site flags you for review. This site never sees your device details — it keeps its own signals and gets a signed proof on top.",
         "register": "Step 1, Passkey register for drop",
         "claim": "Step 2, Fresh passkey unlocks unique code",
-        "retry": "Try again with same wallet",
+        "retry": "Try again with same lemma.id",
         "flag": "Simulate site risk flag",
         "clear_flag": "Clear risk flag",
         "success_register": "Registered for presale",
@@ -288,6 +416,61 @@ def _extract_presentation(body: dict) -> Optional[dict]:
     return None
 
 
+@app.get("/api/me")
+def demo_me():
+    session = getattr(g, "demo_session", None) or _session_from_request()
+    if not session:
+        return jsonify({"success": False, "error": "auth_required"}), 401
+    return jsonify({
+        "success": True,
+        "ppid": session["ppid"],
+        "assurance": session.get("assurance"),
+        "site_id": SITE_ID,
+    })
+
+
+@app.post("/api/login")
+def demo_login():
+    body = request.get_json(silent=True) or {}
+    presentation = _extract_presentation(body)
+    if not presentation:
+        return jsonify({"success": False, "reason": "presentation_missing"}), 400
+    ctx = _verify_ctx()
+    try:
+        result = ctx.verify(presentation)
+        result, clear_session = _apply_policy_to_result(ctx, result)
+    except Exception:
+        logger.exception("demo login presentation verification failed")
+        return jsonify({"success": False, "reason": "verify_error"}), 500
+    if not result.ok:
+        resp = make_response(jsonify({
+            "success": False,
+            "reason": result.reason,
+            "ppid": result.ppid,
+        }))
+        if clear_session == "session_cleared":
+            _clear_session_cookie(resp)
+        return resp, 401
+
+    assurance = getattr(result, "assurance", None) or DEMO_REQUIRED_ASSURANCE
+    resp = make_response(jsonify({
+        "success": True,
+        "ppid": result.ppid,
+        "assurance": assurance,
+        "site_id": SITE_ID,
+    }))
+    _set_session_cookie(resp, result.ppid or "", assurance)
+    return resp
+
+
+@app.post("/api/logout")
+@app.get("/api/logout")
+def demo_logout():
+    resp = make_response(jsonify({"success": True}))
+    _clear_session_cookie(resp)
+    return resp
+
+
 @app.get("/api/demo/policy/check")
 def demo_policy_check():
     ppid = (request.args.get("ppid") or "").strip()
@@ -305,6 +488,9 @@ def demo_policy_check():
 def demo_policy_block():
     body = request.get_json(silent=True) or {}
     ppid = (body.get("ppid") or "").strip()
+    denied = _authorize_policy_mutation(ppid, body)
+    if denied:
+        return denied
     if ppid:
         _POLICY_STORE.blocked.add(ppid)
     return jsonify({"success": True, "ppid": ppid, "blocked": True})
@@ -314,6 +500,9 @@ def demo_policy_block():
 def demo_policy_doubt():
     body = request.get_json(silent=True) or {}
     ppid = (body.get("ppid") or "").strip()
+    denied = _authorize_policy_mutation(ppid, body)
+    if denied:
+        return denied
     if ppid:
         _POLICY_STORE.doubted.add(ppid)
     return jsonify({"success": True, "ppid": ppid, "doubt_required": True})
@@ -323,6 +512,9 @@ def demo_policy_doubt():
 def demo_policy_clear():
     body = request.get_json(silent=True) or {}
     ppid = (body.get("ppid") or "").strip()
+    denied = _authorize_policy_mutation(ppid, body)
+    if denied:
+        return denied
     if ppid:
         _POLICY_STORE.blocked.discard(ppid)
         _POLICY_STORE.doubted.discard(ppid)
@@ -335,32 +527,11 @@ def demo_action():
     ctx = _verify_ctx()
     presentation = _extract_presentation(body)
     action_name = body.get("action") or "unknown"
-    if not presentation:
-        result = ctx.Result(False, "presentation_missing")
-    else:
+    clear_session = None
+    if presentation:
         try:
             result = ctx.verify(presentation)
-            if result.ok:
-                available, decision, policy_reason = _POLICY_STORE.check(
-                    result.ppid or ""
-                )
-                denial_reason = None
-                if not available:
-                    denial_reason = policy_reason or "site_policy_unavailable"
-                elif decision.blocked:
-                    denial_reason = "site_blocked"
-                elif decision.doubt_required:
-                    denial_reason = "doubt_required"
-                if denial_reason:
-                    result = ctx.Result(
-                        False,
-                        denial_reason,
-                        ppid=result.ppid,
-                        credential_id=result.credential_id,
-                        issuer_did=result.issuer_did,
-                        bound_site_id=result.bound_site_id,
-                        assurance=result.assurance,
-                    )
+            result, clear_session = _apply_policy_to_result(ctx, result)
         except Exception:
             logger.exception("demo_action presentation verification failed")
             return jsonify({
@@ -368,6 +539,18 @@ def demo_action():
                 "reason": "verify_error",
                 "error": "Presentation verification failed on the server",
             }), 500
+    else:
+        session = getattr(g, "demo_session", None) or _session_from_request()
+        if not session:
+            result = ctx.Result(False, "auth_required")
+        else:
+            result = ctx.Result(
+                True,
+                "session_valid",
+                ppid=session["ppid"],
+                assurance=session.get("assurance"),
+            )
+            result, clear_session = _apply_policy_to_result(ctx, result)
     entry = {
         "ok": result.ok,
         "ppid": result.ppid,
@@ -378,13 +561,16 @@ def demo_action():
     }
     ACTION_LOG.appendleft(entry)
     status = 200 if result.ok else 403
-    return jsonify({
+    resp = make_response(jsonify({
         "success": result.ok,
         "ppid": result.ppid,
         "assurance": getattr(result, "assurance", None),
         "reason": result.reason,
         "action_log": list(ACTION_LOG),
-    }), status
+    }), status)
+    if clear_session == "session_cleared":
+        _clear_session_cookie(resp)
+    return resp
 
 
 @app.get("/api/demo/action-log")
@@ -410,26 +596,44 @@ def presale_status():
     body = request.get_json(silent=True) or {}
     drop_id = (body.get("drop_id") or PRESALE_DROP_ID).strip()
     presentation = _extract_presentation(body)
-    if not presentation:
-        return jsonify({"success": False, "reason": "presentation_missing"}), 403
+    session = getattr(g, "demo_session", None) or _session_from_request()
+    if not presentation and not session:
+        return jsonify({"success": False, "reason": "auth_required"}), 403
     if not _rate_limit(f"status:{_client_ip()}", limit=20, window_seconds=60):
         return jsonify({"success": False, "reason": "rate_limited"}), 429
-    try:
-        result = _verify_ctx().verify_with_policy(
-            presentation,
+    if presentation:
+        try:
+            result = _verify_ctx().verify_with_policy(
+                presentation,
+                policy_store=_POLICY_STORE,
+                require_policy=True,
+            )
+        except Exception:
+            logger.exception("presale status verification failed")
+            return jsonify({"success": False, "reason": "verify_error"}), 500
+        if not result.ok:
+            return jsonify({"success": False, "reason": result.reason}), 403
+        ppid = result.ppid or ""
+        assurance = getattr(result, "assurance", None)
+        legacy_ppid = getattr(result, "legacy_ppid", None)
+    else:
+        ppid = session["ppid"]
+        assurance = session.get("assurance")
+        legacy_ppid = None
+        ok_policy, policy_reason, _decision = enforce_site_policy(
+            ppid=ppid,
             policy_store=_POLICY_STORE,
             require_policy=True,
         )
-    except Exception:
-        logger.exception("presale status verification failed")
-        return jsonify({"success": False, "reason": "verify_error"}), 500
-    if not result.ok:
-        return jsonify({"success": False, "reason": result.reason}), 403
-    legacy_ppid = getattr(result, "legacy_ppid", None)
-    record = _PRESALE_LEDGER.lookup(drop_id, result.ppid or "", legacy_ppid=legacy_ppid)
+        if not ok_policy:
+            resp = make_response(jsonify({"success": False, "reason": policy_reason}), 403)
+            if policy_reason in ("site_blocked", "doubt_required"):
+                _clear_session_cookie(resp)
+            return resp
+    record = _PRESALE_LEDGER.lookup(drop_id, ppid, legacy_ppid=legacy_ppid)
     registered = _PRESALE_REGISTRATIONS.is_registered(
         drop_id,
-        result.ppid or "",
+        ppid,
         legacy_ppid=legacy_ppid,
     )
     if not record:
@@ -438,7 +642,8 @@ def presale_status():
             "allocated": False,
             "registered": registered,
             "drop_id": drop_id,
-            "ppid": result.ppid,
+            "ppid": ppid,
+            "assurance": assurance,
         })
     return jsonify({
         "success": True,
@@ -448,7 +653,7 @@ def presale_status():
         "ppid": record.ppid,
         "code": record.code,
         "claimed_at": record.claimed_at,
-        "assurance": record.assurance,
+        "assurance": record.assurance or assurance,
     })
 
 
@@ -951,7 +1156,9 @@ def _generic_index():
         <p class="muted">{copy["subhead"]}</p>
         <label for="email">{copy["form"]}</label>
         <input id="email" value="{copy["placeholder"]}" aria-label="{copy["form"]}">
-        <button id="verify-btn">{copy["primary"]}</button>
+        <button type="button" id="signin-btn">Sign in with lemma.id</button>
+        <button id="verify-btn" disabled>{copy["primary"]}</button>
+        <p class="muted" id="session-copy" style="margin-top:12px;font-size:13px;">Sign in once. This site keeps a session until a fresh passkey is required.</p>
         <div class="verdict" id="decision-card">
           <strong>What happens when you click</strong>
           <p class="tiny">Passkey unlock + continuity proof only. This site accepts <code>assurance: passkey</code>, no IDV unless you later step up to human proofs.</p>
@@ -968,11 +1175,10 @@ def _generic_index():
           <dl id="server-receipt-fields"></dl>
         </div>
         <ol class="how">
-          <li>SDK checks local site proof cache first.</li>
-          <li>Missing proof → Lemma popup derives passkey assurance (no IDV yet).</li>
+          <li>Sign in with lemma.id once, server verifies presentation and sets a session cookie.</li>
+          <li>Protected actions reuse the site session until policy requires fresh passkey.</li>
           <li>Site policy may require human proof assurance → IDV step-up, same PPID.</li>
-          <li>After first site proof, later clicks reuse the cached presentation, no action-sign popup.</li>
-          <li>Server verifies your presentation with offline revocation checks.</li>
+          <li>Server verifies locally with offline revocation checks.</li>
           <li>Business never sees passport, selfie, or cross-site ID.</li>
         </ol>
         <details>
@@ -1004,8 +1210,12 @@ def _generic_index():
     const actionLogEl = document.getElementById('action-log');
     const decisionCard = document.getElementById('decision-card');
     const decisionCopy = document.getElementById('decision-copy');
+    const sessionCopy = document.getElementById('session-copy');
+    const signinBtn = document.getElementById('signin-btn');
+    const actionBtn = document.getElementById('verify-btn');
     const SITE_POLICY = '{DEMO_REQUIRED_ASSURANCE}';
     let sharedVerifier = null;
+    let siteSessionPpid = null;
     function makeVerifier(autoProvision) {{
       if (sharedVerifier && sharedVerifier.autoProvision === autoProvision) {{
         return sharedVerifier;
@@ -1052,7 +1262,7 @@ def _generic_index():
         return 'Temporary doubt, the site requires a deliberate fresh proof.';
       }}
       if (reason === 'assurance_insufficient' || reason === 'not_ishuman') {{
-        return 'Valid wallet proof, but this site policy requires stronger assurance.';
+        return 'Valid passkey proof, but this site policy requires stronger assurance.';
       }}
       if (reason === 'idv_cancelled') {{
         return 'Complete verification in the Lemma popup to continue.';
@@ -1117,7 +1327,7 @@ def _generic_index():
         return 'No lemma.id human proof yet. Click the protected action to verify once.';
       }}
       if (reason === 'wallet_locked') {{
-        return 'Your lemma.id wallet is locked. Click the protected action to unlock and verify.';
+        return 'Your lemma.id is locked. Click the protected action to unlock and verify.';
       }}
       return 'No valid human proof on this device (' + (reason || 'unknown') + '). Click the protected action to verify.';
     }}
@@ -1164,93 +1374,132 @@ def _generic_index():
       }}
     }}
 
-    async function runBackgroundCheck() {{
-      pill.textContent = 'CHECKING';
-      pill.className = 'pill checking';
+    async function refreshSessionState() {{
       try {{
-        const verifier = makeVerifier(false);
-        const response = await verifier.checkStatus();
-        if (isDemoVerified(response)) {{
-          applyVerdict(response, {{ silent: true }});
-        }} else {{
-          pill.textContent = 'NO PROOF';
-          pill.className = 'pill deny';
-          decisionCopy.textContent = formatMissingProof(response.reason);
-          if (presentationJson) presentationJson.textContent = JSON.stringify(response, null, 2);
+        const me = await fetch('/api/me', {{ credentials: 'include' }});
+        if (me.ok) {{
+          const data = await me.json();
+          siteSessionPpid = data.ppid || null;
+          if (sessionCopy) {{
+            sessionCopy.textContent = 'Signed in · PPID ' + (siteSessionPpid || '').slice(0, 24) + '…';
+          }}
+          if (actionBtn) actionBtn.disabled = false;
+          if (signinBtn) signinBtn.disabled = true;
+          pill.textContent = 'SIGNED IN';
+          pill.className = 'pill ok';
+          setAssurancePill(data.assurance || SITE_POLICY);
+          return true;
         }}
-      }} catch (err) {{
-        pill.textContent = 'READY';
-        pill.className = 'pill';
-        decisionCopy.textContent = 'Background check skipped: ' + err.message;
-      }}
+      }} catch (err) {{}}
+      siteSessionPpid = null;
+      if (sessionCopy) sessionCopy.textContent = 'Sign in once. This site keeps a session until a fresh passkey is required.';
+      if (actionBtn) actionBtn.disabled = true;
+      if (signinBtn) signinBtn.disabled = false;
+      return false;
     }}
 
-    runBackgroundCheck();
-    refreshActionLog();
-
-    document.getElementById('verify-btn').addEventListener('click', async () => {{
+    async function signInWithLemma() {{
       if (typeof IsHumanVerifier === 'undefined') {{
-        pill.textContent = 'ERROR';
-        pill.className = 'pill deny';
         decisionCopy.textContent = window.__lemmaSdkLoadError
           || 'Lemma SDK failed to load. Open this page in Safari/Chrome (not an in-app browser) and retry.';
-        return;
+        return false;
       }}
-      const button = document.getElementById('verify-btn');
-      button.disabled = true;
+      signinBtn.disabled = true;
       pill.textContent = 'CHECKING';
       pill.className = 'pill checking';
-      decisionCard.innerHTML = '<strong>Checking Lemma wallet…</strong><p class="tiny">Continuity proof only, passkey unlock, then a signed site credential. No identity check at this assurance tier.</p>';
+      decisionCard.innerHTML = '<strong>Sign in with lemma.id</strong><p class="tiny">Passkey unlock, then server verifies your signed presentation and sets a site session cookie.</p>';
       try {{
         const verifier = makeVerifier(true);
         const {{ ok, presentation, reason, timeMs }} = await verifier.verifyForBackend({{
           autoProvision: true,
           requiredAssurance: SITE_POLICY,
         }});
-        const response = {{ human: !!ok, assurance: SITE_POLICY, reason, timeMs: timeMs || 0 }};
-        if (ok) {{
-          const email = document.getElementById('email')?.value || '';
-          const requestPayload = {{
-            action: '{copy["action"]}',
-            email,
-            at: Date.now(),
-            presentation,
-          }};
-          const serverRes = await fetch('/api/demo/action', {{
-            method: 'POST',
-            headers: {{ 'Content-Type': 'application/json' }},
-            body: JSON.stringify(requestPayload),
-          }});
-          const serverRaw = await serverRes.text();
-          let serverEntry;
-          try {{
-            serverEntry = JSON.parse(serverRaw);
-          }} catch (parseErr) {{
-            throw new Error(
-              'Server returned non-JSON (HTTP ' + serverRes.status + '). '
-              + 'Redeploy the demo site app if this persists.',
-            );
-          }}
-          response.ppid = serverEntry.ppid || null;
-          response.assurance = serverEntry.assurance || SITE_POLICY;
-          await refreshActionLog();
-          applyVerdict(response, {{ requestPayload, serverEntry }});
-        }} else {{
-          applyVerdict(response);
+        if (!ok) {{
+          pill.textContent = 'DENY';
+          pill.className = 'pill deny';
+          decisionCopy.textContent = formatDenyReason(reason);
+          signinBtn.disabled = false;
+          return false;
         }}
+        const loginRes = await fetch('/api/login', {{
+          method: 'POST',
+          credentials: 'include',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ presentation }}),
+        }});
+        const loginPayload = await loginRes.json();
+        if (!loginRes.ok || !loginPayload.success) {{
+          throw new Error(loginPayload.reason || 'login_failed');
+        }}
+        siteSessionPpid = loginPayload.ppid || null;
+        await refreshSessionState();
+        decisionCard.innerHTML = '<strong>Signed in</strong><p class="tiny">Site session active · '
+          + (timeMs || 0).toFixed(0) + 'ms verify · PPID '
+          + (siteSessionPpid || '').slice(0, 24) + '…</p>';
+        if (presentationJson) presentationJson.textContent = JSON.stringify(presentation, null, 2);
+        return true;
       }} catch (err) {{
         pill.textContent = 'ERROR';
         pill.className = 'pill deny';
-        decisionCopy.textContent = 'Verification failed: ' + err.message;
-        decisionCard.innerHTML = '<strong>Verification unavailable</strong><p class="tiny">' + err.message + '</p>';
-        if (presentationJson) presentationJson.textContent = JSON.stringify({{ error: err.message }}, null, 2);
-      }} finally {{
-        button.disabled = false;
+        decisionCopy.textContent = 'Sign in failed: ' + err.message;
+        signinBtn.disabled = false;
+        return false;
       }}
-    }});
+    }}
+
+    async function runProtectedAction() {{
+      if (!siteSessionPpid) {{
+        const signedIn = await refreshSessionState();
+        if (!signedIn) {{
+          decisionCopy.textContent = 'Sign in with lemma.id first.';
+          return;
+        }}
+      }}
+      actionBtn.disabled = true;
+      pill.textContent = 'CHECKING';
+      pill.className = 'pill checking';
+      decisionCard.innerHTML = '<strong>Running protected action</strong><p class="tiny">Using your site session cookie, no new lemma.id popup unless policy requires fresh passkey.</p>';
+      try {{
+        const email = document.getElementById('email')?.value || '';
+        const requestPayload = {{
+          action: '{copy["action"]}',
+          email,
+          at: Date.now(),
+        }};
+        const serverRes = await fetch('/api/demo/action', {{
+          method: 'POST',
+          credentials: 'include',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify(requestPayload),
+        }});
+        const serverEntry = await serverRes.json();
+        const response = {{
+          human: !!serverEntry.success,
+          assurance: serverEntry.assurance || SITE_POLICY,
+          reason: serverEntry.reason,
+          timeMs: 0,
+          ppid: serverEntry.ppid || siteSessionPpid,
+        }};
+        await refreshActionLog();
+        applyVerdict(response, {{ requestPayload, serverEntry }});
+      }} catch (err) {{
+        pill.textContent = 'ERROR';
+        pill.className = 'pill deny';
+        decisionCopy.textContent = 'Action failed: ' + err.message;
+      }} finally {{
+        actionBtn.disabled = !siteSessionPpid;
+      }}
+    }}
+
+    refreshSessionState();
+    refreshActionLog();
+    signinBtn?.addEventListener('click', () => signInWithLemma());
+    actionBtn?.addEventListener('click', () => runProtectedAction());
 
     if (new URLSearchParams(window.location.search).get('lemma_ishuman_return') === '1') {{
-      document.getElementById('verify-btn')?.click();
+      signInWithLemma().then((ok) => {{
+        if (ok) runProtectedAction();
+      }});
     }}
   </script>
 </body>
@@ -1590,7 +1839,7 @@ def _presale_index():
       <ol class="tour-checklist" id="tour-checklist">
         <li data-tour-step="register" id="tour-step-register">Register with passkey, phone is delivery only</li>
         <li data-tour-step="claim" id="tour-step-claim">Unlock code, fresh passkey + server-attested action</li>
-        <li data-tour-step="retry" id="tour-step-retry">Retry same wallet, denied, one code per fan</li>
+        <li data-tour-step="retry" id="tour-step-retry">Retry with the same lemma.id, denied, one code per fan</li>
         <li data-tour-step="flag" id="tour-step-flag">Simulate risk flag, IDV penalty, then code at isHuman</li>
         <li data-tour-step="attack" id="tour-step-attack">Attack lab, replay stamp or skip Step 1</li>
       </ol>
@@ -1602,7 +1851,7 @@ def _presale_index():
         <h1>{copy["headline"]}</h1>
         <p class="muted">{copy["subhead"]}</p>
         <div class="defense-strip" id="defense-strip">
-          <div class="defense-item">Site PPID<small>passkey wallet</small></div>
+          <div class="defense-item">Site PPID<small>passkey proof</small></div>
           <div class="defense-item">Action stamp<small>bound mutation</small></div>
           <div class="defense-item">Server nonce<small>replay block</small></div>
           <div class="defense-item">Fresh passkey<small>claim ceremony</small></div>
@@ -1619,7 +1868,9 @@ def _presale_index():
         <input id="phone" value="{copy["placeholder_phone"]}" aria-label="{copy["form_phone"]}">
         <p class="contact-note">For SMS alerts and CRM, passkey proves identity.</p>
         <p class="muted" style="margin-top:12px;font-size:13px;">Drop: <code id="drop-id">{PRESALE_DROP_ID}</code></p>
-        <button id="register-btn">{copy["register"]}</button>
+        <button type="button" id="signin-btn">Sign in with lemma.id</button>
+        <p class="contact-note" id="session-copy">Sign in once. Presale register uses your site session; claim still requires a fresh passkey ceremony.</p>
+        <button id="register-btn" disabled>{copy["register"]}</button>
         <button type="button" class="btn-secondary" id="claim-btn" disabled>{copy["claim"]}</button>
         <button type="button" class="btn-secondary" id="retry-btn" disabled>{copy["retry"]}</button>
         <button type="button" class="btn-secondary btn-ghost" id="flag-btn">{copy["flag"]}</button>
@@ -1706,7 +1957,7 @@ def _presale_index():
     const TOUR_IMPACTS = {{
       register: 'Passkey binds a site-private PPID. Phone and email are delivery-only on this site.',
       claim: 'Fresh passkey ceremony proves present control, bots cannot replay cached sessions for codes.',
-      retry: 'Ledger enforces one code per verified person. Same wallet cannot farm multiple codes.',
+      retry: 'Ledger enforces one code per verified person. Same lemma.id cannot farm multiple codes.',
       flag: 'Site doubt escalates to fresh IDV, policy-driven penalty before code issuance.',
       attack: 'Attack lab shows replay and skip-step denies that bots hit in production.',
     }};
@@ -1729,6 +1980,7 @@ def _presale_index():
     const tourImpact = document.getElementById('tour-impact');
     let sharedVerifier = null;
     let lastPpid = null;
+    let siteSessionPpid = null;
     let presaleRegistered = false;
     let tourStepIndex = 0;
     let lastStampedRequest = null;
@@ -1851,6 +2103,87 @@ def _presale_index():
         email: document.getElementById('email')?.value || '',
         phone: document.getElementById('phone')?.value || '',
       }};
+    }}
+
+    async function refreshSessionState() {{
+      const sessionCopy = document.getElementById('session-copy');
+      const signinBtn = document.getElementById('signin-btn');
+      const registerBtn = document.getElementById('register-btn');
+      try {{
+        const me = await fetch('/api/me', {{ credentials: 'include' }});
+        if (me.ok) {{
+          const data = await me.json();
+          siteSessionPpid = data.ppid || null;
+          lastPpid = siteSessionPpid || lastPpid;
+          if (sessionCopy) {{
+            sessionCopy.textContent = 'Signed in · PPID ' + (siteSessionPpid || '').slice(0, 24) + '…';
+          }}
+          if (signinBtn) signinBtn.disabled = true;
+          if (registerBtn && !presaleRegistered) registerBtn.disabled = false;
+          pill.textContent = 'SIGNED IN';
+          pill.className = 'pill ok';
+          return true;
+        }}
+      }} catch (err) {{}}
+      siteSessionPpid = null;
+      if (sessionCopy) {{
+        sessionCopy.textContent = 'Sign in once. Presale register uses your site session; claim still requires a fresh passkey ceremony.';
+      }}
+      if (signinBtn) signinBtn.disabled = false;
+      if (registerBtn) registerBtn.disabled = true;
+      return false;
+    }}
+
+    async function ensureSiteSession() {{
+      if (siteSessionPpid) return true;
+      const ok = await refreshSessionState();
+      if (ok) return true;
+      decisionCopy.textContent = 'Sign in with lemma.id before running presale steps.';
+      return false;
+    }}
+
+    async function signInWithLemma() {{
+      if (typeof IsHumanVerifier === 'undefined') return false;
+      const signinBtn = document.getElementById('signin-btn');
+      signinBtn.disabled = true;
+      pill.textContent = 'CHECKING';
+      pill.className = 'pill checking';
+      decisionCard.innerHTML = '<strong>Sign in with lemma.id</strong><p class="tiny">Server verifies your signed presentation and sets a site session cookie.</p>';
+      try {{
+        const verifier = makeVerifier('passkey');
+        const {{ ok, presentation, reason }} = await verifier.verifyForBackend({{
+          autoProvision: true,
+          requiredAssurance: 'passkey',
+        }});
+        if (!ok) {{
+          pill.textContent = 'DENY';
+          pill.className = 'pill deny';
+          decisionCopy.textContent = formatDenyReason(reason);
+          signinBtn.disabled = false;
+          return false;
+        }}
+        const loginRes = await fetch('/api/login', {{
+          method: 'POST',
+          credentials: 'include',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ presentation }}),
+        }});
+        const loginPayload = await loginRes.json();
+        if (!loginRes.ok || !loginPayload.success) {{
+          throw new Error(loginPayload.reason || 'login_failed');
+        }}
+        siteSessionPpid = loginPayload.ppid || null;
+        lastPpid = siteSessionPpid;
+        await refreshSessionState();
+        decisionCopy.textContent = 'Signed in. Continue with Step 1 register or Step 2 claim.';
+        return true;
+      }} catch (err) {{
+        pill.textContent = 'ERROR';
+        pill.className = 'pill deny';
+        decisionCopy.textContent = 'Sign in failed: ' + err.message;
+        signinBtn.disabled = false;
+        return false;
+      }}
     }}
 
     function stampBody(payload) {{
@@ -2099,6 +2432,7 @@ def _presale_index():
 
     async function runRegister() {{
       if (typeof IsHumanVerifier === 'undefined') return;
+      if (!(await ensureSiteSession())) return;
       savePresaleSession({{ pendingAction: 'register', contact: contactPayload() }});
       const registerBtn = document.getElementById('register-btn');
       registerBtn.disabled = true;
@@ -2180,6 +2514,7 @@ def _presale_index():
 
     async function runClaim(assuranceOverride, depth, options) {{
       if (typeof IsHumanVerifier === 'undefined') return;
+      if (!(await ensureSiteSession())) return;
       const opts = options || {{}};
       const isRetry = !!opts.isRetry;
       if (!opts.skipStepDemo) {{
@@ -2291,7 +2626,7 @@ def _presale_index():
           }}
           decisionCopy.textContent = 'Code ' + serverEntry.code + ' bound to PPID ' + (serverEntry.ppid || '').slice(0, 24) + '…';
           decisionCard.innerHTML = '<strong>{copy["success"]}</strong><p class="tiny">Single-use code for drop '
-            + (serverEntry.drop_id || DROP_ID) + '. Try again with the same wallet to see duplicate denial.</p>';
+            + (serverEntry.drop_id || DROP_ID) + '. Try again with the same lemma.id to see duplicate denial.</p>';
           if (!isRetry) advanceTour('claim');
         }} else {{
           pill.textContent = 'DENY';
@@ -2329,6 +2664,7 @@ def _presale_index():
       setTourHighlight('flag');
       await fetch('/api/demo/policy/doubt', {{
         method: 'POST',
+        credentials: 'include',
         headers: {{ 'Content-Type': 'application/json' }},
         body: JSON.stringify({{ ppid: lastPpid }}),
       }});
@@ -2342,6 +2678,7 @@ def _presale_index():
       if (!lastPpid) return;
       await fetch('/api/demo/policy/clear', {{
         method: 'POST',
+        credentials: 'include',
         headers: {{ 'Content-Type': 'application/json' }},
         body: JSON.stringify({{ ppid: lastPpid }}),
       }});
@@ -2396,7 +2733,9 @@ def _presale_index():
       await runClaim(undefined, 0, {{ isRetry: false, skipStepDemo: true }});
     }}
 
+    refreshSessionState();
     refreshActionLog();
+    document.getElementById('signin-btn')?.addEventListener('click', () => signInWithLemma());
     document.getElementById('register-btn')?.addEventListener('click', () => runRegister());
     document.getElementById('claim-btn')?.addEventListener('click', () => runClaim());
     document.getElementById('retry-btn')?.addEventListener('click', () => runClaim(undefined, 0, {{ isRetry: true }}));

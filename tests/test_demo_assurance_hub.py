@@ -27,6 +27,7 @@ def test_demo_hub_js_gates_assurance_workflow():
     assert "async function resolveActiveDoubt(" in js
     assert "verifyFreshForBackend" in js
     assert "Undoubt" in js
+    assert "function demoControlPayload(" in js
 
 
 def test_demo_hub_template_has_three_concept_lifecycle():
@@ -52,7 +53,7 @@ def test_demo_hub_template_has_three_concept_lifecycle():
     assert "ih-enforce-rows" in html
     assert "Fresh presence" in html
     assert "Doubt humanity" in html
-    assert "Set assurance level (presale)" in html
+    assert "Set assurance, doubt a user" in html
 
 
 def test_demo_hub_css_supports_lifecycle_and_inspector():

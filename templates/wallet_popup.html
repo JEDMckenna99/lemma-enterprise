@@ -8,7 +8,7 @@
     <script nonce="{{ csp_nonce }}">
         (function redirectToUnifiedPopup() {
             const params = new URLSearchParams(window.location.search);
-            const target = new URL('/wallet/ishuman-idv', window.location.origin);
+            const target = new URL('/verify', window.location.origin);
             params.forEach((value, key) => target.searchParams.set(key, value));
             if (!target.searchParams.get('issue_mode')) {
                 target.searchParams.set('issue_mode', 'unlock');
@@ -23,7 +23,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #F4F4F7;
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -80,8 +80,11 @@
         }
         .btn:hover { transform: translateY(-2px); }
         .btn-primary {
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            background: #1A1A24;
             color: white;
+        }
+        .btn-primary:hover {
+            background: #32313F;
         }
         .btn-secondary {
             background: #f3f4f6;
@@ -102,7 +105,7 @@
             width: 24px;
             height: 24px;
             border: 3px solid #e5e7eb;
-            border-top-color: #667eea;
+            border-top-color: #1A1A24;
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin: 0 auto 16px;

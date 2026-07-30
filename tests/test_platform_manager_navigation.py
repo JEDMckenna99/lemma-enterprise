@@ -52,7 +52,7 @@ def test_brand_and_manager_creation_use_canonical_routes():
     assert ".wallet-logo.is-unlocked" in manager
     assert "#4E3D8F" in manager
     assert '<a href="/home" class="nav-link" id="nav-product">' in layout
-    assert "new URL('/wallet/ishuman-idv', window.location.origin)" in manager
+    assert "new URL('/verify', window.location.origin)" in manager
     assert "popupUrl.searchParams.set('site_id', 'lemma.id')" in manager
     assert "window.open(" in manager
     assert "async function hasCompleteLemmaId()" in manager

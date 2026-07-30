@@ -12,7 +12,7 @@ that share `lemma-wallet.js` and passkey infrastructure:
 | Surface | What it is | Typical routes / flows | Dedicated docs |
 |---------|------------|------------------------|----------------|
 | **Platform login & IAM** | Developer/admin login, passkey unlock, permissions, API keys, agent control plane | `/unlock`, `/platform`, `/register`, `developer_access` proofs | [`IAM_ONLY_INTEGRATION_GUIDE.md`](../integration/IAM_ONLY_INTEGRATION_GUIDE.md) |
-| **isHuman (proof of humanity)** | IDV + site proofs for relying sites; verifier SDK on customer origins | `/wallet/ishuman-idv`, `/api/ishuman/*`, `ishuman-verifier.js` | [`THREAT_MODEL.md`](THREAT_MODEL.md), [`ISHUMAN_LOCAL_FIRST_IMPLEMENTATION_OUTLINE.md`](ISHUMAN_LOCAL_FIRST_IMPLEMENTATION_OUTLINE.md) |
+| **isHuman (proof of humanity)** | IDV + site proofs for relying sites; verifier SDK on customer origins | `/verify` (canonical ceremony UI; `/wallet/ishuman-idv` redirects), `/api/ishuman/*`, `ishuman-verifier.js` | [`THREAT_MODEL.md`](THREAT_MODEL.md), [`ISHUMAN_LOCAL_FIRST_IMPLEMENTATION_OUTLINE.md`](ISHUMAN_LOCAL_FIRST_IMPLEMENTATION_OUTLINE.md) |
 | **Shared wallet crypto** | IndexedDB, PRF at-rest encryption, revocation bloom, device link | `lemma-wallet.js`, `/link`, `/api/v1/revocation/*` | [`ARCHITECTURE_WALLET_FIRST.md`](../architecture/ARCHITECTURE_WALLET_FIRST.md) |
 
 **What the 2026-06 hardening program mostly targeted**
@@ -195,7 +195,7 @@ Implemented in `app.py` → `build_content_security_policy()`. See
 | Profile | Routes | Extra `script-src` |
 |---------|--------|-------------------|
 | `strict` | Default (e.g. `/`, `/dashboard`) | none |
-| `unlock_idv` | `/unlock`, `/wallet/unlock` (**platform login**); `/wallet/popup`, `/wallet/ishuman-idv` (**isHuman**) | Stripe, Cloudflare Turnstile |
+| `unlock_idv` | `/unlock`, `/wallet/unlock` (**platform login**); `/wallet/popup`, `/verify` (**proof verifier ceremony**; `/wallet/ishuman-idv` legacy redirect) | Stripe, Cloudflare Turnstile |
 | `link_qr` | `/link`, `/wallet/link` | above + `unpkg.com` (html5-qrcode) |
 
 Removed from global policy: `static.cloudflareinsights.com`, `cdn.jsdelivr.net` (unused in layouts).

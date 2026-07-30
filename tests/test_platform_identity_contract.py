@@ -158,7 +158,13 @@ def test_idv_redirect_action_sign_has_flow_context_without_opener():
 def test_wallet_popup_redirects_to_unified_idv():
     popup = (ROOT / "templates" / "wallet_popup.html").read_text(encoding="utf-8")
     assert "redirectToUnifiedPopup" in popup
-    assert "/wallet/ishuman-idv" in popup
+    assert "/verify" in popup
+
+
+@pytest.mark.unit
+def test_ishuman_verifier_default_popup_path_is_verify():
+    verifier = (ROOT / "static" / "js" / "ishuman-verifier.js").read_text(encoding="utf-8")
+    assert "const IDV_POPUP_PATH = '/verify'" in verifier
 
 
 @pytest.mark.unit
@@ -278,3 +284,38 @@ def test_device_link_bundles_ishuman_credentials_and_unlock_token(wallet_js_sour
     assert "beginLinkPush" in wallet_js_source
     assert "confirmLinkPushDeposit" in wallet_js_source
     assert "2.78.0" in wallet_js_source
+
+
+@pytest.mark.unit
+def test_platform_login_page_matches_popup_twin():
+    login = (ROOT / "templates" / "modern" / "login.html").read_text(encoding="utf-8")
+    assert "platform-login-brand" in login
+    assert "atom-orbit" in login
+    assert "#4E3D8F" in login
+    assert "platform-login-btn-primary" in login
+    assert "#1A1A24" in login
+    assert "ensureIsHumanIssuanceReady" in login
+    assert "Unlock with passkey" in login
+    assert "Create a lemma.id" in login
+    assert "window.open" not in login
+    assert "/wallet/ishuman-idv" not in login
+    assert "/verify" not in login
+    assert "linear-gradient(135deg, #667eea" not in login
+
+
+@pytest.mark.unit
+def test_nav_sign_in_points_to_login_page():
+    layout = (ROOT / "templates" / "modern" / "layout.html").read_text(encoding="utf-8")
+    assert 'id="nav-sign-in-link"' in layout
+    assert 'href="/login"' in layout
+    assert 'href="/app" class="btn btn-secondary" id="nav-sign-in-link"' not in layout
+
+
+@pytest.mark.unit
+def test_nav_unlock_routes_to_login_page():
+    cta = (ROOT / "templates" / "modern" / "includes" / "platform_auth_cta_script.html").read_text(
+        encoding="utf-8"
+    )
+    unlock_block = cta.split("getElementById('nav-unlock-link')", 1)[1]
+    assert "window.location.href = '/login'" in unlock_block
+    assert "await unlockPlatformWallet(wallet)" not in unlock_block

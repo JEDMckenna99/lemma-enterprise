@@ -69,7 +69,7 @@ const BROWSER_CANONICAL_V2 = 'browser_canonical_v2';
 const DEFAULT_NETWORK_ROOT_PUBKEYS_HEX = [
     '3782cf10beea1dcc9a88127a5dbb71c6cba30c1c8c63327a83b8f09867d6a6c2',
 ];
-const IDV_POPUP_PATH = '/wallet/ishuman-idv';
+const IDV_POPUP_PATH = '/verify';
 const UNLOCK_POPUP_PATH = '/wallet/popup';
 const IDV_POPUP_TIMEOUT_MS = 10 * 60 * 1000;
 const UNLOCK_POPUP_TIMEOUT_MS = 5 * 60 * 1000;
@@ -730,7 +730,7 @@ class ProofVerifier {
      *        from their own backend state rather than exposing a site API key.
      * @param {boolean} [config.autoProvision], open Lemma IDV popup when no master proof exists.
      * @param {string}  [config.requiredAssurance], minimum assurance: ``passkey`` or ``ishuman`` (default).
-     * @param {string}  [config.idvPopupPath], override popup path (default /wallet/ishuman-idv).
+     * @param {string}  [config.idvPopupPath], override popup path (default /verify).
      */
     constructor(config = {}) {
         const rawSiteId = config.siteId || (typeof window !== 'undefined' ? window.location.hostname : '');

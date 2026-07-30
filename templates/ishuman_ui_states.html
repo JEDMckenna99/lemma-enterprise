@@ -276,7 +276,7 @@
         let activeState = 'all';
 
         function previewUrl(scene, state) {
-            const url = new URL('/wallet/ishuman-idv', window.location.origin);
+            const url = new URL('/verify', window.location.origin);
             url.searchParams.set('preview_type', scene.id);
             url.searchParams.set('preview_state', state);
             url.searchParams.set('site_id', 'example.com');

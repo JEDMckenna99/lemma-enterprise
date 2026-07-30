@@ -1,7 +1,8 @@
 {% extends "modern/layout.html" %}
+{% set is_public_page = true %}
 
 {% block title %}Sign In - lemma.id | Passkey Authentication{% endblock %}
-{% block description %}Access the Lemma developer platform with passkey authentication. No passwords, no emails - just your device biometrics.{% endblock %}
+{% block description %}Sign in with your passkey to open your lemma.id manager. No passwords, no emails — just your device biometrics.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -10,329 +11,289 @@
             window.Rocketloader = {load: function(){}};
         }
     </script>
-    
     <style>
-        .login-container {
-            max-width: 520px;
-            margin: var(--space-12) auto;
-            padding: 0 var(--space-6);
-        }
-
-        .login-card {
-            background: var(--white);
-            border: 1px solid var(--gray-200);
-            border-radius: 24px;
-            padding: var(--space-12);
-            box-shadow: 
-                0 4px 6px -1px rgba(0, 0, 0, 0.1),
-                0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            position: relative;
-        }
-
-        .login-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border-radius: 24px 24px 0 0;
-        }
-
-        .login-header {
-            text-align: center;
-            margin-bottom: var(--space-10);
-        }
-
-        .login-logo {
-            margin: 0 auto var(--space-6);
-            display: block;
-        }
-
-        .login-title {
-            font-size: var(--font-size-3xl);
-            font-weight: 800;
-            color: var(--gray-900);
-            margin-bottom: var(--space-3);
-        }
-
-        .login-subtitle {
-            color: var(--gray-600);
-            font-size: var(--font-size-lg);
-            line-height: 1.6;
-        }
-
-        .passkey-button {
-            width: 100%;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            border: none;
-            border-radius: 16px;
-            padding: var(--space-6);
-            font-size: var(--font-size-xl);
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+        .platform-login-page {
+            min-height: calc(100vh - 76px);
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: var(--space-3);
+            padding: 32px 20px 48px;
+            background: #F4F4F7;
         }
 
-        .passkey-button:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 16px 40px rgba(102, 126, 234, 0.4);
-            background: linear-gradient(135deg, #5a67d8, #6b46c1);
+        .platform-login-card {
+            background: #FFFFFF;
+            color: #1A1A24;
+            border: 1px solid #E8E8EE;
+            border-radius: 8px;
+            padding: 32px 28px;
+            max-width: 420px;
+            width: 100%;
+            box-shadow: 0 8px 24px rgba(18, 18, 26, 0.1);
         }
 
-        .passkey-button:disabled {
-            opacity: 0.7;
+        .platform-login-brand {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 16px;
+            color: #4E3D8F;
+            transition: color 0.2s ease;
+        }
+
+        .platform-login-brand.is-unlocked {
+            color: #1F7A4C;
+        }
+
+        .platform-login-brand.is-working .atom-orbit {
+            animation: platform-login-orbit 1.8s ease-in-out infinite;
+            transform-origin: 60px 60px;
+        }
+
+        .platform-login-brand.is-working .atom-orbit:nth-child(2) { animation-delay: -0.45s; }
+        .platform-login-brand.is-working .atom-orbit:nth-child(3) { animation-delay: -0.9s; }
+        .platform-login-brand.is-working .atom-orbit:nth-child(4) { animation-delay: -1.35s; }
+
+        @keyframes platform-login-orbit {
+            0%, 100% { transform: scale(0.94); }
+            50% { transform: scale(1.08); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .platform-login-brand.is-working .atom-orbit { animation: none; }
+        }
+
+        .platform-login-brand svg {
+            width: 124px;
+            height: 124px;
+            display: block;
+        }
+
+        .platform-login-status {
+            padding: 14px;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 0.88rem;
+            line-height: 1.45;
+            color: #5E5E70;
+        }
+
+        .platform-login-status.success {
+            background: #ECFDF3;
+            border-color: #A7F3D0;
+            color: #1F7A4C;
+        }
+
+        .platform-login-status.error {
+            background: #FEF2F2;
+            border-color: #FECACA;
+            color: #C0392B;
+        }
+
+        .platform-login-btn {
+            display: block;
+            width: 100%;
+            padding: 14px 18px;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 10px;
+            transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .platform-login-btn-primary {
+            background: #1A1A24;
+            color: #fff;
+        }
+
+        .platform-login-btn-primary:hover:not(:disabled) {
+            background: #32313F;
+            box-shadow: 0 2px 8px rgba(26, 26, 36, 0.2);
+        }
+
+        .platform-login-btn-secondary {
+            background: #FFFFFF;
+            border-color: #E8E8EE;
+            color: #1A1A24;
+        }
+
+        .platform-login-btn-secondary:hover:not(:disabled) {
+            background: #F4F4F7;
+        }
+
+        .platform-login-btn:disabled {
+            opacity: 0.65;
             cursor: not-allowed;
         }
 
-        .passkey-icon {
-            font-size: 28px;
-        }
-
-        .status-message {
-            padding: var(--space-4);
-            border-radius: 12px;
-            margin-top: var(--space-4);
-            text-align: center;
-            display: none;
-        }
-
-        .status-message.show {
-            display: block;
-        }
-
-        .status-message.success {
-            background: #ecfdf5;
-            border: 2px solid #10b981;
-            color: #065f46;
-        }
-
-        .status-message.error {
-            background: #fef2f2;
-            border: 2px solid #ef4444;
-            color: #991b1b;
-        }
-
-        .status-message.info {
-            background: #eff6ff;
-            border: 2px solid #3b82f6;
-            color: #1e40af;
-        }
-
-        .loading-spinner {
-            display: inline-block;
-            width: 24px;
-            height: 24px;
-            border: 3px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top-color: white;
-            animation: spin 1s ease-in-out infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .wallet-status {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: var(--space-2);
-            padding: var(--space-3);
-            background: var(--gray-50);
-            border-radius: 8px;
-            margin-bottom: var(--space-6);
-            font-size: var(--font-size-sm);
-            color: var(--gray-600);
-        }
-
-        .wallet-status.ready {
-            background: #ecfdf5;
-            color: #065f46;
-        }
-
-        .wallet-status.locked {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .register-link {
-            text-align: center;
-            margin-top: var(--space-6);
-            color: var(--gray-600);
-            font-size: var(--font-size-sm);
-        }
-
-        .register-link a {
-            color: #667eea;
-            font-weight: 600;
-            text-decoration: none;
-        }
-
-        .register-link a:hover {
-            text-decoration: underline;
+        .platform-login-hidden {
+            display: none !important;
         }
     </style>
 {% endblock %}
 
 {% block content %}
-    <div class="login-container">
-        <div class="login-card">
-            <div class="login-header">
-                <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="Lemma.id" class="login-logo" width="80" height="80">
-                <h1 class="login-title">Sign In</h1>
-                <p class="login-subtitle">
-                    Sign in with your passkey to open your lemma.id manager.
-                </p>
+    <div class="platform-login-page">
+        <div class="platform-login-card" id="platform-login-card">
+            <div class="platform-login-brand" id="platform-login-brand" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 120 120" focusable="false">
+                    <g stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <g class="atom-orbit"><ellipse cx="60" cy="60" rx="38" ry="14"/></g>
+                        <g class="atom-orbit"><ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(90 60 60)"/></g>
+                        <g class="atom-orbit"><ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(45 60 60)"/></g>
+                        <g class="atom-orbit"><ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(-45 60 60)"/></g>
+                    </g>
+                </svg>
             </div>
 
-            <div class="wallet-status" id="walletStatus">
-                <span>🔍</span> Checking wallet status...
-            </div>
+            <div id="platform-login-status" class="platform-login-status">Checking lemma.id…</div>
 
-            <button class="passkey-button" id="signInButton" disabled>
-                <span class="passkey-icon">👆</span>
-                <span id="buttonText">Loading...</span>
-            </button>
-
-            <div class="status-message" id="statusMessage"></div>
-
-            <div class="register-link">
-                New to lemma.id? <a href="/app">Create your lemma.id</a>
+            <div id="platform-login-actions">
+                <button id="platform-login-primary" class="platform-login-btn platform-login-btn-primary platform-login-hidden" type="button">
+                    Continue
+                </button>
+                <button id="platform-login-cancel" class="platform-login-btn platform-login-btn-secondary" type="button">
+                    Not now
+                </button>
             </div>
         </div>
     </div>
 
     <script nonce="{{ csp_nonce }}">
-        // ============================================
-        // PLATFORM SIGN-IN (registered developers only)
-        // ============================================
-        
-        let wallet = null;
-        let walletInfo = null;
+        (function () {
+            let wallet = null;
+            let platformAuth = null;
+            let currentAction = 'continue';
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const redirectUrl = urlParams.get('redirect') || '/app';
+            const urlParams = new URLSearchParams(window.location.search);
+            const redirectUrl = urlParams.get('redirect') || '/app';
 
-        function updateStatus(type, message) {
-            const el = document.getElementById('statusMessage');
-            el.className = 'status-message show ' + type;
-            el.innerHTML = message;
-        }
+            const brandEl = document.getElementById('platform-login-brand');
+            const statusEl = document.getElementById('platform-login-status');
+            const primaryBtn = document.getElementById('platform-login-primary');
+            const cancelBtn = document.getElementById('platform-login-cancel');
 
-        function updateButton(text, enabled = true, loading = false) {
-            const btn = document.getElementById('signInButton');
-            const textEl = document.getElementById('buttonText');
-            btn.disabled = !enabled;
-
-            if (loading) {
-                textEl.innerHTML = '<span class="loading-spinner"></span> ' + text;
-            } else {
-                textEl.textContent = text;
+            function setBrandWorking(working) {
+                if (!brandEl) return;
+                brandEl.classList.toggle('is-working', !!working);
             }
-        }
 
-        async function waitForPlatformAuth() {
-            let attempts = 0;
-            while (!window.LemmaPlatformAuth && attempts < 50) {
-                await new Promise((resolve) => setTimeout(resolve, 100));
-                attempts++;
+            function setBrandUnlocked(unlocked) {
+                if (!brandEl) return;
+                brandEl.classList.toggle('is-unlocked', !!unlocked);
             }
-            return window.LemmaPlatformAuth || null;
-        }
 
-        async function initializeWallet() {
-            try {
+            function setStatus(message, tone) {
+                if (!statusEl) return;
+                statusEl.textContent = message;
+                statusEl.className = 'platform-login-status';
+                if (tone === 'success') statusEl.classList.add('success');
+                if (tone === 'error') statusEl.classList.add('error');
+            }
+
+            function setPrimary(label, visible, disabled) {
+                if (!primaryBtn) return;
+                primaryBtn.textContent = label;
+                primaryBtn.classList.toggle('platform-login-hidden', !visible);
+                primaryBtn.disabled = !!disabled;
+            }
+
+            function goToManager() {
+                window.location.href = redirectUrl || '/app';
+            }
+
+            function cancelLogin() {
+                if (window.history.length > 1) {
+                    window.history.back();
+                    return;
+                }
+                window.location.href = '/';
+            }
+
+            async function waitForPlatformAuth() {
                 let attempts = 0;
-                while (!window.globalLemmaWallet && attempts < 30) {
-                    await new Promise(r => setTimeout(r, 100));
+                while (!window.LemmaPlatformAuth && attempts < 50) {
+                    await new Promise((resolve) => setTimeout(resolve, 100));
                     attempts++;
                 }
-
-                wallet = window.globalLemmaWallet || new LemmaWallet();
-                await wallet.init();
-                walletInfo = await wallet.getWalletInfo();
-                return true;
-            } catch (e) {
-                console.error('Failed to init wallet:', e);
-                return false;
-            }
-        }
-
-        function updateWalletStatus(state) {
-            const el = document.getElementById('walletStatus');
-            if (!el) return;
-
-            if (state.mode === 'none') {
-                el.className = 'wallet-status';
-                el.innerHTML = 'No wallet yet. Open the manager to create your lemma.id.';
-            } else if (state.mode === 'locked') {
-                el.className = 'wallet-status locked';
-                el.innerHTML = 'Wallet found. Unlock with your passkey to continue.';
-            } else if (state.mode === 'ready_signin') {
-                el.className = 'wallet-status ready';
-                el.innerHTML = 'lemma.id ready. Opening your manager…';
-            } else {
-                el.className = 'wallet-status';
-                el.innerHTML = 'Continue in the lemma.id manager.';
-            }
-        }
-
-        function goToManager() {
-            window.location.href = redirectUrl || '/app';
-        }
-
-        function configurePrimaryButton(state) {
-            if (state.mode === 'none' || state.mode === 'get_started') {
-                updateButton('Open lemma.id manager', true);
-                return 'manager';
-            }
-            if (state.mode === 'locked') {
-                updateButton('Unlock lemma.id', true);
-                return 'unlock';
-            }
-            updateButton('Signing in…', false, true);
-            return 'signin';
-        }
-
-        async function handlePrimaryAction(action, platformAuth, state) {
-            if (action === 'manager') {
-                goToManager();
-                return;
+                return window.LemmaPlatformAuth || null;
             }
 
-            if (action === 'unlock') {
-                try {
-                    updateButton('Unlocking…', false, true);
-                    updateStatus('info', 'Authenticate with your passkey to unlock lemma.id.');
-                    await platformAuth.unlock(wallet);
-                    walletInfo = await wallet.getWalletInfo();
-                    updateStatus('info', 'Unlocked. Opening your lemma.id manager…');
-                    goToManager();
-                    return;
-                } catch (e) {
-                    updateStatus('error', e.message || 'Passkey unlock failed.');
-                    updateButton('Unlock lemma.id', true);
+            async function initializeWallet() {
+                let attempts = 0;
+                while (!window.LemmaWallet && attempts < 50) {
+                    await new Promise((resolve) => setTimeout(resolve, 100));
+                    attempts++;
                 }
-                return;
-            }
-        }
+                if (!window.LemmaWallet) {
+                    throw new Error('Wallet SDK failed to load.');
+                }
 
-        async function completeSignIn(platformAuth) {
-            try {
-                updateButton('Signing in…', false, true);
-                updateStatus('info', 'Opening your lemma.id manager…');
-                // Prefer a platform session when membership exists; always land on /app.
+                wallet = window.globalLemmaWallet || new LemmaWallet({
+                    debug: false,
+                    enableDeviceSync: true,
+                    enableAdvancedFeatures: true,
+                });
+                await wallet.init();
+                if (!window.globalLemmaWallet) {
+                    window.globalLemmaWallet = wallet;
+                }
+                return wallet;
+            }
+
+            async function performPasskeyCeremony() {
+                setBrandWorking(true);
+                setPrimary(primaryBtn.textContent, true, true);
+                try {
+                    const result = await wallet.ensureIsHumanIssuanceReady({ isHumanIssuance: true });
+                    if (!result || !result.ready) {
+                        throw new Error('Passkey unlock failed. Complete the prompt or try again.');
+                    }
+                    if (typeof wallet.isUnlocked === 'function' && !wallet.isUnlocked()) {
+                        throw new Error('Passkey unlock failed. Complete the prompt or try again.');
+                    }
+                    return result;
+                } finally {
+                    setBrandWorking(false);
+                }
+            }
+
+            function configureUi(state) {
+                setBrandUnlocked(state.mode === 'ready_signin' || state.mode === 'get_started');
+
+                if (state.mode === 'none') {
+                    setStatus('Create a passkey-protected lemma.id on this device.', null);
+                    setPrimary('Create a lemma.id', true, false);
+                    currentAction = 'create';
+                    return;
+                }
+
+                if (state.mode === 'locked') {
+                    setStatus('Enter your passkey to unlock.', null);
+                    setPrimary('Unlock with passkey', true, false);
+                    currentAction = 'unlock';
+                    return;
+                }
+
+                if (state.mode === 'get_started') {
+                    setStatus('Unlock your lemma.id to continue.', null);
+                    setPrimary('Continue', true, false);
+                    currentAction = 'continue';
+                    return;
+                }
+
+                setStatus('lemma.id ready. Opening your manager…', 'success');
+                setPrimary('Continue', false, true);
+                currentAction = 'signin';
+            }
+
+            async function completeSignIn() {
+                setPrimary('Continue', true, true);
+                setStatus('Opening your lemma.id manager…', null);
                 try {
                     await platformAuth.signIn(wallet, { redirectUrl });
-                    return;
                 } catch (e) {
                     if (e.code === 'platform_membership_required' || e.message === 'platform_membership_required') {
                         goToManager();
@@ -340,41 +301,64 @@
                     }
                     throw e;
                 }
-            } catch (e) {
-                updateStatus('error', e.message || 'Sign in failed.');
+            }
+
+            async function handlePrimaryAction() {
                 const state = await platformAuth.assess(wallet);
-                configurePrimaryButton(state);
-            }
-        }
 
-        document.addEventListener('DOMContentLoaded', async function() {
-            const btn = document.getElementById('signInButton');
-            const platformAuth = await waitForPlatformAuth();
-            const walletReady = await initializeWallet();
-
-            if (!walletReady || !platformAuth) {
-                updateStatus('error', 'Failed to initialize wallet. Please refresh the page.');
-                return;
-            }
-
-            const state = await platformAuth.assess(wallet);
-            updateWalletStatus(state);
-
-            if (state.mode === 'ready_signin') {
-                await completeSignIn(platformAuth);
-                return;
-            }
-
-            configurePrimaryButton(state);
-            btn.addEventListener('click', async () => {
-                const currentState = await platformAuth.assess(wallet);
-                if (currentState.mode === 'ready_signin') {
-                    await completeSignIn(platformAuth);
+                if (state.mode === 'ready_signin') {
+                    await completeSignIn();
                     return;
                 }
-                const action = configurePrimaryButton(currentState);
-                await handlePrimaryAction(action, platformAuth, currentState);
+
+                if (currentAction === 'create' || currentAction === 'unlock' || currentAction === 'continue') {
+                    try {
+                        if (currentAction === 'create') {
+                            setStatus('Creating your lemma.id…', null);
+                        } else {
+                            setStatus('Unlocking with your passkey…', null);
+                        }
+                        await performPasskeyCeremony();
+                        const nextState = await platformAuth.assess(wallet);
+                        setBrandUnlocked(true);
+                        if (window.LemmaPlatformAuth && typeof window.LemmaPlatformAuth.setNavLogoUnlocked === 'function') {
+                            window.LemmaPlatformAuth.setNavLogoUnlocked(true);
+                        }
+                        setStatus('lemma.id ready. Opening your manager…', 'success');
+                        if (nextState.mode === 'ready_signin') {
+                            await completeSignIn();
+                            return;
+                        }
+                        goToManager();
+                    } catch (e) {
+                        setStatus(e.message || 'Passkey action failed.', 'error');
+                        configureUi(await platformAuth.assess(wallet));
+                    }
+                    return;
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', async function () {
+                cancelBtn.addEventListener('click', cancelLogin);
+                primaryBtn.addEventListener('click', handlePrimaryAction);
+
+                try {
+                    platformAuth = await waitForPlatformAuth();
+                    if (!platformAuth) {
+                        throw new Error('Platform auth failed to initialize.');
+                    }
+                    await initializeWallet();
+                    const state = await platformAuth.assess(wallet);
+                    configureUi(state);
+
+                    if (state.mode === 'ready_signin') {
+                        await completeSignIn();
+                    }
+                } catch (e) {
+                    setStatus(e.message || 'Failed to initialize sign in. Please refresh.', 'error');
+                    setPrimary('Continue', false, true);
+                }
             });
-        });
+        })();
     </script>
 {% endblock %}

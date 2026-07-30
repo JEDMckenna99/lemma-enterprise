@@ -67,11 +67,14 @@ if DATABASE_URL and DATABASE_URL.startswith("postgresql"):
             "max_overflow": int(os.getenv("LEMMA_SQLALCHEMY_MAX_OVERFLOW", "2")),
         }
     )
-engine = (
-    create_engine(DATABASE_URL, **_engine_kwargs)
-    if DATABASE_URL
-    else create_engine("sqlite:///:memory:", echo=False)
-)
+elif not DATABASE_URL:
+    # Local dev default: file-backed SQLite so tables persist across restarts
+    # and Flask's threaded server can share connections safely.
+    _repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    DATABASE_URL = "sqlite:///" + os.path.join(_repo_root, "lemma_dev.db").replace("\\", "/")
+if DATABASE_URL.startswith("sqlite"):
+    _engine_kwargs["connect_args"] = {"check_same_thread": False}
+engine = create_engine(DATABASE_URL, **_engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

@@ -21,6 +21,7 @@ _CSP_UNLOCK_IDV_PREFIXES = (
     '/unlock',
     '/wallet/unlock',
     '/wallet/popup',
+    '/verify',
     '/wallet/ishuman-idv',
 )
 _CSP_LINK_QR_PREFIXES = (
@@ -101,6 +102,14 @@ def create_app():
 
     app.config['SECRET_KEY'] = get_secrets().flask_secret
     app.config['DEBUG'] = os.environ.get('FLASK_ENV') == 'development'
+
+    if app.config['DEBUG'] or not os.environ.get('DATABASE_URL'):
+        try:
+            from api.database import init_database
+
+            init_database()
+        except Exception as exc:
+            logger.warning("Database auto-init skipped: %s", exc)
     
     # CRITICAL: Disable template caching (fixes stale HTML on Heroku)
     app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -126,6 +135,29 @@ def create_app():
         """Generate a unique nonce for each request to allow inline scripts securely."""
         g.csp_nonce = secrets.token_urlsafe(16)
         g.csp_profile = resolve_csp_profile(request.path or '/')
+
+    @app.before_request
+    def redirect_loopback_ip_to_localhost():
+        """Chrome WebAuthn works on http://localhost, not http://127.0.0.1.
+
+        Redirect browser navigations so local passkey create/unlock succeeds.
+        API/XHR keep working on either host.
+        """
+        host = (request.host or '').split(':')[0].lower()
+        if host != '127.0.0.1':
+            return None
+        if request.method not in ('GET', 'HEAD'):
+            return None
+        # Leave JSON/API and static assets alone (fetch/XHR, SW, SDK).
+        path = request.path or '/'
+        if path.startswith('/api/') or path.startswith('/static/') or path.startswith('/sdk/'):
+            return None
+        accept = (request.headers.get('Accept') or '').lower()
+        if 'text/html' not in accept and not path.startswith(('/demo', '/wallet', '/app', '/unlock', '/link')):
+            return None
+        port = request.host.split(':')[1] if ':' in (request.host or '') else None
+        target_host = f'localhost:{port}' if port else 'localhost'
+        return redirect(f'{request.scheme}://{target_host}{request.full_path}', code=302)
 
     @app.before_request
     def capture_request_telemetry():
@@ -208,7 +240,7 @@ def create_app():
         
         # Referrer Policy - Don't leak URLs to third parties (routes may override, e.g. bridge)
         path = request.path or '/'
-        if _path_matches_prefix(path, ('/wallet/ishuman-idv',)):
+        if _path_matches_prefix(path, ('/verify', '/wallet/ishuman-idv')):
             # Mobile IDV return URLs carry handoff secrets in query params; never forward them.
             response.headers['Referrer-Policy'] = 'no-referrer'
         elif 'Referrer-Policy' not in response.headers:

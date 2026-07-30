@@ -8,7 +8,7 @@ Global pages use the `strict` profile (`'self'` + per-request nonce only).
 | Profile | Routes | Extra `script-src` origins |
 |---------|--------|----------------------------|
 | `strict` | All routes by default | *(none)* |
-| `unlock_idv` | `/unlock`, `/wallet/unlock`, `/wallet/popup`, `/wallet/ishuman-idv` | `js.stripe.com`, `challenges.cloudflare.com`, `cdn.jsdelivr.net/npm/` (@noble ESM) |
+| `unlock_idv` | `/unlock`, `/wallet/unlock`, `/wallet/popup`, `/verify` (canonical); `/wallet/ishuman-idv` (legacy redirect) | `js.stripe.com`, `challenges.cloudflare.com`, `cdn.jsdelivr.net/npm/` (@noble ESM) |
 | `link_qr` | `/link`, `/wallet/link` | `unlock_idv` origins + `unpkg.com` (html5-qrcode) |
 
 `connect-src`, `frame-src`, and `form-action` expand on `unlock_idv` / `link_qr` for Stripe and Turnstile.

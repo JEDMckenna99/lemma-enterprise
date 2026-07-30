@@ -397,7 +397,7 @@ SDK.verify():
   1. Check ishuman_site_vc:v1:<siteId> localStorage cache → if valid, return
   2. Check Bloom + trust list (local cache or refresh)
   3. If no cache hit:
-        Open popup at /wallet/ishuman-idv?issue_mode=site_proof&...
+        Open popup at /verify?issue_mode=site_proof&... (/wallet/ishuman-idv redirects)
         Popup runs ensureIsHumanIssuanceReady, derives site proof, returns
      If user has no master yet: popup runs IDV first (Didit or test mode)
   4. Verify the returned credential locally (browser-canonical Ed25519)

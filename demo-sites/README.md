@@ -27,6 +27,8 @@ Each app serves one page that loads:
 
 Low-friction passkey proof by default; fresh IDV only when the site flags a fan.
 
+**Sign-in session:** both demo sites use Sign in with lemma.id → `POST /api/login` (verify presentation) → HttpOnly `lemma_demo_session` cookie. Soft actions (`/api/demo/action`, presale register/status) reuse that cookie until policy requires a fresh passkey ceremony at claim time.
+
 **Guided tour:** `/?tour=presale`
 
 **Step 0, Server challenge**
@@ -48,9 +50,9 @@ Low-friction passkey proof by default; fresh IDV only when the site flags a fan.
 3. Server verifies action stamp + `fresh_passkey_attestation`, enforces policy, requires prior registration, then claims against the site-local ledger keyed by `(drop_id, ppid)`.
 4. First claim returns an 8-digit code; a second claim with the same PPID is denied with `allocation_already_claimed`.
 
-**Status lookup (presentation-protected)**
+**Status lookup (session or presentation)**
 
-- `POST /api/presale/status` with signed presentation, no GET leak of codes.
+- `POST /api/presale/status` with site session cookie or signed presentation (no GET leak of codes).
 
 **Risk flag escalation (demo penalty path)**
 
@@ -62,7 +64,13 @@ Low-friction passkey proof by default; fresh IDV only when the site flags a fan.
 Copy-paste modules:
 
 - [`presale_allocation.py`](presale_allocation.py), registration store + in-memory `(drop_id, ppid)` ledger
-- [`relying_site_app.py`](relying_site_app.py), presale challenge, register, claim, and status APIs
+- [`relying_site_app.py`](relying_site_app.py), sign-in session, presale challenge/register/claim/status APIs
+
+Session endpoints:
+
+- `POST /api/login` — verify presentation, set HttpOnly `lemma_demo_session` cookie
+- `GET /api/me` / `POST /api/logout` — session introspection and logout
+- `POST /api/demo/action` — soft action via session cookie or presentation
 
 Sales script: [`docs/demo/PRESALE_DEMO_SCRIPT.md`](../docs/demo/PRESALE_DEMO_SCRIPT.md)
 

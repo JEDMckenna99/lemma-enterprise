@@ -134,6 +134,83 @@ def _site_for_slug(slug: str):
         db.close()
 
 
+def _presentation_for_slug(body: dict, slug: str | None = None) -> dict | None:
+    presentations = body.get("presentations")
+    if slug and isinstance(presentations, dict):
+        candidate = presentations.get(slug)
+        if isinstance(candidate, dict):
+            return candidate
+    presentation = body.get("presentation")
+    if isinstance(presentation, dict):
+        if not slug:
+            return presentation
+        body_slug = str(body.get("site_slug") or "").strip().lower()
+        if not body_slug or body_slug == slug:
+            return presentation
+    return None
+
+
+def _verified_ppid_from_presentation(site_domain: str, presentation: dict | None) -> tuple[str | None, str | None]:
+    if not isinstance(presentation, dict):
+        return None, "presentation_missing"
+    try:
+        import sys
+        from pathlib import Path
+
+        pkg = Path(__file__).resolve().parents[1] / "packages" / "proof-verifier-py"
+        if str(pkg) not in sys.path:
+            sys.path.insert(0, str(pkg))
+        from lemma_proof_verifier import VerificationContext
+
+        ctx = VerificationContext(
+            site_id=site_domain,
+            required_assurance="passkey",
+            nonce_store_mode="optional",
+        )
+        result = ctx.verify(presentation)
+        if not result.ok:
+            return None, result.reason or "presentation_invalid"
+        return str(result.ppid or ""), None
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Demo control presentation verify failed for %s", site_domain)
+        return None, f"presentation_verify_error:{exc}"
+
+
+def _authorize_demo_site_control(site, target_ppid: str, body: dict, *, slug: str | None = None):
+    """Return None when authorized, else (response, status)."""
+    target = (target_ppid or "").strip()
+    if not target:
+        return jsonify({"success": False, "error": "ppid required"}), 400
+
+    presentation = _presentation_for_slug(body or {}, slug)
+    caller_ppid, verify_reason = _verified_ppid_from_presentation(
+        site.site_domain,
+        presentation,
+    )
+    if not caller_ppid:
+        return jsonify({
+            "success": False,
+            "error": "demo_control_unauthorized",
+            "code": "demo_control_unauthorized",
+            "reason": verify_reason or "presentation_missing",
+        }), 403
+
+    from api.site_access import is_platform_operator_ppid, verify_site_ownership
+
+    if verify_site_ownership(site.site_id, caller_ppid) or is_platform_operator_ppid(caller_ppid):
+        return None
+
+    if caller_ppid == target:
+        return None
+
+    return jsonify({
+        "success": False,
+        "error": "demo_control_unauthorized",
+        "code": "demo_control_unauthorized",
+        "reason": "presentation_ppid_mismatch",
+    }), 403
+
+
 def _public_record(record) -> dict:
     if not record:
         return {}
@@ -197,10 +274,9 @@ def ishuman_demo_page_legacy_redirect():
     return redirect("/demo", code=301)
 
 
-@ishuman_demo_bp.route("/wallet/ishuman-idv")
-def ishuman_idv_popup():
-    """Popup flow: unlock wallet + complete IDV when a customer site has no master proof."""
-    from api.config import one_ppid_assurance_model_enabled, passkey_assurance_enabled
+def _render_verify_ceremony_page():
+    """Shared proof-verifier ceremony UI (unlock, site proof, IDV, action sign)."""
+    from api.config import passkey_assurance_enabled
 
     ctx = _demo_page_context()
     headers = {
@@ -220,6 +296,21 @@ def ishuman_idv_popup():
         qr_demo_idv_enabled=ctx["qr_demo_idv_enabled"],
         passkey_assurance_enabled=passkey_assurance_enabled(),
     ), 200, headers
+
+
+@ishuman_demo_bp.route("/verify")
+def lemma_verify_ceremony():
+    """Canonical public URL for the shared lemma.id verification ceremony."""
+    return _render_verify_ceremony_page()
+
+
+@ishuman_demo_bp.route("/wallet/ishuman-idv")
+def ishuman_idv_popup():
+    """Legacy alias; redirects to /verify with query string preserved."""
+    target = "/verify"
+    if request.query_string:
+        target = f"{target}?{request.query_string.decode('latin-1')}"
+    return redirect(target, code=302)
 
 
 @ishuman_demo_bp.route("/demo/ishuman/ui-states")
@@ -442,6 +533,10 @@ def ishuman_demo_site_doubt():
     if not site:
         return jsonify({"success": False, "error": "unknown demo site"}), 404
 
+    auth_err = _authorize_demo_site_control(site, ppid, body, slug=slug)
+    if auth_err:
+        return auth_err
+
     db = SessionLocal()
     try:
         doubt = db.query(SiteDoubt).filter_by(site_id=site.site_id, ppid=ppid).first()
@@ -490,6 +585,10 @@ def ishuman_demo_clear_site_doubt():
     _spec, site = _site_for_slug(slug)
     if not site:
         return jsonify({"success": False, "error": "unknown demo site"}), 404
+
+    auth_err = _authorize_demo_site_control(site, ppid, body, slug=slug)
+    if auth_err:
+        return auth_err
 
     db = SessionLocal()
     try:
@@ -625,6 +724,10 @@ def ishuman_demo_site_block():
     if not site:
         return jsonify({"success": False, "error": "unknown demo site"}), 404
 
+    auth_err = _authorize_demo_site_control(site, ppid, body, slug=slug)
+    if auth_err:
+        return auth_err
+
     db = SessionLocal()
     try:
         from api.database import SiteBlock
@@ -669,6 +772,10 @@ def ishuman_demo_site_unblock():
     _spec, site = _site_for_slug(slug)
     if not site:
         return jsonify({"success": False, "error": "unknown demo site"}), 404
+
+    auth_err = _authorize_demo_site_control(site, ppid, body, slug=slug)
+    if auth_err:
+        return auth_err
 
     db = SessionLocal()
     try:
@@ -741,6 +848,46 @@ def ishuman_demo_clear_bans():
 
     if not ppids and not clear_all:
         return jsonify({"success": False, "error": "ppids required"}), 400
+
+    ensure_demo_sites()
+    if clear_all:
+        for slug in slugs:
+            _spec, site = _site_for_slug(slug)
+            if not site:
+                continue
+            presentation = _presentation_for_slug(body, slug)
+            caller_ppid, verify_reason = _verified_ppid_from_presentation(
+                site.site_domain,
+                presentation,
+            )
+            if not caller_ppid:
+                return jsonify({
+                    "success": False,
+                    "error": "demo_control_unauthorized",
+                    "code": "demo_control_unauthorized",
+                    "reason": verify_reason or "presentation_missing",
+                }), 403
+            from api.site_access import is_platform_operator_ppid, verify_site_ownership
+
+            if verify_site_ownership(site.site_id, caller_ppid) or is_platform_operator_ppid(caller_ppid):
+                continue
+            if ppids and all(ppid == caller_ppid for ppid in ppids):
+                continue
+            return jsonify({
+                "success": False,
+                "error": "demo_control_unauthorized",
+                "code": "demo_control_unauthorized",
+                "reason": "clear_all_requires_site_owner",
+            }), 403
+    else:
+        for slug in slugs:
+            _spec, site = _site_for_slug(slug)
+            if not site:
+                continue
+            for ppid in ppids:
+                auth_err = _authorize_demo_site_control(site, ppid, body, slug=slug)
+                if auth_err:
+                    return auth_err
 
     ip_key = (request.remote_addr or "unknown").strip()
     limit = 10 if clear_all else 30
@@ -1292,7 +1439,7 @@ def ishuman_demo_skeleton_idv_flow():
             logger.exception("Skeleton handoff store failed")
             return jsonify({"success": False, "error": "skeleton_handoff_failed"}), 500
 
-        base = return_url or (request.host_url.rstrip("/") + "/wallet/ishuman-idv")
+        base = return_url or (request.host_url.rstrip("/") + "/verify")
         joiner = "&" if "?" in base else "?"
         mobile_return_url = (
             f"{base}{joiner}verification_return=true"
