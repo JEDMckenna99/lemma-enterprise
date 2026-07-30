@@ -6,7 +6,7 @@
 {% block preload_scripts %}
 <link rel="preload" href="{{ url_for('static', filename='js/lemma-keys.js') }}?v=8" as="script">
 <link rel="preload" href="{{ url_for('static', filename='js/wallet-at-rest-crypto.js') }}?v=2" as="script">
-<link rel="preload" href="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2690" as="script">
+<link rel="preload" href="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2692" as="script">
 <link rel="preload" href="{{ url_for('static', filename='js/lemma-credential-utils.js') }}?v=2" as="script">
 {% endblock %}
 
@@ -104,7 +104,7 @@
                 <strong>Recommended:</strong> on the <em>new</em> device, open
                 <a href="/link">lemma.id/link</a> and tap <strong>Show QR Code</strong>.
                 Scan that QR with this phone's Camera app. You'll confirm with your passkey to send.
-                Your wallet is encrypted to the new device only.
+                Your lemma.id is encrypted to the new device only.
             </p>
             <a href="/link" class="btn btn-primary btn-full" style="text-align: center; text-decoration: none; display: block;">
                 Open add-device page
@@ -182,7 +182,7 @@
                 Remove lemma.id
             </button>
             <p class="card-help">
-                Clears wallet data, private proofs, and lemma.id storage on this device. Your OS passkey is not deleted, so you can use it again when you return.
+                Clears lemma.id data, private proofs, and local storage on this device. Your OS passkey is not deleted, so you can use it again when you return.
             </p>
         </div>
     </div>
@@ -849,7 +849,7 @@ async function returnWithExistingPasskey() {
         updateStatusDisplay(
             false,
             'Passkey ready, verification needed',
-            'This device has a new local wallet. Create lemma.id again or add this device from another one.',
+            'This device has a new local lemma.id. Create your lemma.id again or add this device from another one.',
         );
         document.getElementById('no-wallet-msg')?.classList.remove('hidden');
     } catch (err) {
@@ -930,7 +930,7 @@ function anchorWalletIdentity(event) {
 
 // Clear all lemma.id data from this device (Safari/iOS-safe: never abort on IDB blocked)
 async function clearWallet(event) {
-    if (!confirm('Remove lemma.id from this device? This clears your wallet, human proof, passkey binding, and all lemma.id data stored here. You can verify again later from another device.')) {
+    if (!confirm('Remove lemma.id from this device? This clears your lemma.id, human proof, passkey binding, and all local lemma.id data. You can verify again later from another device.')) {
         return;
     }
 
@@ -1011,7 +1011,7 @@ async function clearWallet(event) {
     } catch (e) {
         console.error('Clear failed:', e);
         if (btn) btn.disabled = false;
-        alert('Failed to clear wallet: ' + e.message);
+        alert('Failed to clear lemma.id: ' + e.message);
     }
 }
 

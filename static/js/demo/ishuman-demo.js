@@ -57,9 +57,9 @@
     assurance_insufficient: 'Assurance too low for site policy',
     not_ishuman: 'Human proof required',
     no_credential: 'No credential on this device',
-    wallet_locked: 'Wallet locked',
+    wallet_locked: 'lemma.id locked',
     expired: 'Session expired',
-    untrusted_issuer: 'Issuer not trusted',
+    untrusted_issuer: 'Platform issuer not trusted',
   };
 
   function formatReasonLabel(reason) {
@@ -229,14 +229,20 @@
     await initWalletPassive().catch(() => {});
     await refreshWalletStatus().catch(() => {});
     if (state.walletId) {
-      try {
-        await initWallet();
-        return true;
-      } catch (err) {
-        log('Wallet unlock needed', err.message);
-        openIdvPopup({ issueMode: 'unlock' });
-        return waitForWalletId();
+      // Prefer the unified popup for unlock so the page does not run a passkey
+      // ceremony and then open a second one on failure.
+      const popup = openIdvPopup({ issueMode: 'unlock' });
+      if (!popup) {
+        try {
+          await initWallet();
+          return true;
+        } catch (err) {
+          log('Wallet unlock needed', err.message);
+          setQuickInsight('Unlock', 'Allow popups for lemma.id, then unlock with your passkey.');
+          return false;
+        }
       }
+      return waitForWalletId();
     }
     setQuickInsight('Create', 'Opening passkey setup to create your lemma.id…');
     const popup = openIdvPopup({ issueMode: 'passkey_setup' });
@@ -286,7 +292,7 @@
       await blockTickets();
       await recheckBothSitesAfterBlock();
 
-      setQuickInsight('Done', 'Ticketing banned; trials still works. Set assurance or doubt above when your policy needs stronger enforcement.');
+      setQuickInsight('Done', 'Ticketing banned; trials still works. Require a stronger proof or doubt above when your policy needs stronger enforcement.');
       setWorkflowHighlight(0);
       log('Quick demo complete');
     } catch (err) {
@@ -2069,7 +2075,7 @@
     try {
       await requestJson('/api/demo/ishuman/clear-site-doubt', {
         method: 'POST',
-        body: JSON.stringify({ site_slug: slug, ppid }),
+        body: JSON.stringify(demoControlPayload(slug, ppid)),
       });
     } catch (err) {
       // fresh_idv billing may already have cleared the server row
@@ -2475,6 +2481,21 @@
     return payload;
   }
 
+  function demoControlPayload(slug, ppid, extra = {}) {
+    const presentations = {};
+    for (const siteSlug of SITE_SLUGS) {
+      const presentation = state.results[siteSlug]?.presentation;
+      if (presentation) presentations[siteSlug] = presentation;
+    }
+    return {
+      site_slug: slug,
+      ppid,
+      presentation: state.results[slug]?.presentation || null,
+      presentations,
+      ...extra,
+    };
+  }
+
   async function blockSite(slug) {
     const ppid = await ensureSitePpid(slug);
     if (!ppid) throw new Error(`${slug} PPID unavailable`);
@@ -2482,11 +2503,9 @@
 
     const payload = await requestJson('/api/demo/ishuman/site-block', {
       method: 'POST',
-      body: JSON.stringify({
-        site_slug: slug,
-        ppid,
+      body: JSON.stringify(demoControlPayload(slug, ppid, {
         reason: `Demo block: automated behavior detected on ${slug}`,
-      }),
+      })),
     });
     markSessionBan(slug, ppid, 'site_ppid_revoked');
     clearVerifierCache(slug);
@@ -2552,13 +2571,11 @@
     }
     await requestJson('/api/demo/ishuman/site-doubt', {
       method: 'POST',
-      body: JSON.stringify({
-        site_slug: slug,
-        ppid,
+      body: JSON.stringify(demoControlPayload(slug, ppid, {
         reason: tier === 'ishuman'
           ? 'Demo doubt: require fresh human proof'
           : 'Demo doubt: require fresh passkey',
-      }),
+      })),
     });
     state.localDoubts[slug].add(ppid);
     clearVerifierCache(slug);
@@ -2716,13 +2733,13 @@
     try {
       const batch = await requestJson('/api/demo/ishuman/clear-bans', {
         method: 'POST',
-        body: JSON.stringify({
+        body: JSON.stringify(demoControlPayload(slug, [...ppids][0] || '', {
           ppids: [...ppids],
           site_slugs: SITE_SLUGS,
           // Row Unban also sweeps active demo bans so a mismatched derived
           // PPID cannot leave the real ban row behind.
           clear_all_active_demo_bans: true,
-        }),
+        })),
       });
       unblockedAny = !!(batch?.lifted_any || (batch?.cleared || []).some((row) => row.lifted));
       log('unban clear-bans', `lifted_any=${unblockedAny} sent=${ppids.size} server=${batch?.ppid_count ?? '?'}`);
@@ -2732,7 +2749,7 @@
         try {
           const payload = await requestJson('/api/demo/ishuman/site-unblock', {
             method: 'POST',
-            body: JSON.stringify({ site_slug: slug, ppid }),
+            body: JSON.stringify(demoControlPayload(slug, ppid)),
           });
           if (payload?.unblocked !== false || payload?.lifted || payload?.success) {
             unblockedAny = true;
@@ -2856,11 +2873,11 @@
     // (derivation/path drift), which left Unban looking successful while DB bans stayed.
     const batch = await requestJson('/api/demo/ishuman/clear-bans', {
       method: 'POST',
-      body: JSON.stringify({
+      body: JSON.stringify(demoControlPayload('tickets', [...allPpids][0] || '', {
         ppids: [...allPpids],
         site_slugs: SITE_SLUGS,
         clear_all_active_demo_bans: true,
-      }),
+      })),
     });
     const netJson = $('ih-master-json');
     if (netJson) netJson.textContent = pretty(batch);
@@ -3452,12 +3469,19 @@
       setDemoMode('live');
       const action = $('ih-step1-primary-btn')?.dataset.action;
       if (action === 'unlock') {
-        try {
-          await initWallet();
-          await refreshWalletStatus();
-        } catch (err) {
-          log('Wallet unlock needed', err.message);
-          openIdvPopup({ issueMode: 'unlock' });
+        // One ceremony only: unlock popup (same surface as create / IDV).
+        const popup = openIdvPopup({ issueMode: 'unlock' });
+        if (!popup) {
+          try {
+            await initWallet();
+            await refreshWalletStatus();
+          } catch (err) {
+            log('Wallet unlock needed', err.message);
+            setQuickInsight('Unlock', 'Allow popups for lemma.id, then unlock with your passkey.');
+          }
+        } else {
+          await waitForWalletId();
+          await refreshWalletStatus().catch(() => {});
         }
         return;
       }

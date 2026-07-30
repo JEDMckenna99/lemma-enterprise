@@ -427,6 +427,10 @@ def test_device_enroll_complete_registers_signing_key_and_passkey(
     payload = complete.get_json()
     assert payload["ceremony"] == "first_device"
     assert payload["credential_id"]
+    # Registration ceremony also issues the trusted server session (no second WebAuthn).
+    assert payload.get("unlocked_at")
+    assert payload.get("expires_at")
+    assert payload.get("auth_method") == "webauthn_registration"
 
     db = fake_ishuman_db_session_factory.session_local()
     assert db.query(WalletSigningKey).filter_by(wallet_id="wallet_enroll").count() == 1

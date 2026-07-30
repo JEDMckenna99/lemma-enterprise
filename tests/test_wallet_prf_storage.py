@@ -53,6 +53,23 @@ def test_lemma_wallet_register_and_unlock_request_prf(wallet_js):
 
 
 @pytest.mark.unit
+def test_server_webauthn_unlock_binds_prf_before_encrypted_profile_read(wallet_js):
+    """Regression: envelope_invalid after successful passkey on lemma.id.
+
+    ``_performServerWebAuthnUnlock`` must bind the PRF at-rest key before
+    ``getActiveProfile()`` decrypts enc_v1 profile/secret rows.
+    """
+    marker = "async _performServerWebAuthnUnlock("
+    start = wallet_js.index(marker)
+    # Bound the method body loosely by the next top-level async method.
+    end = wallet_js.index("\n    async requestWalletChallenge(", start)
+    body = wallet_js[start:end]
+    bind_at = body.index("await this._bindAtRestKeyFromCredential(")
+    profile_at = body.index("await this.getActiveProfile(")
+    assert bind_at < profile_at, "PRF bind must precede getActiveProfile during server unlock"
+
+
+@pytest.mark.unit
 def test_passkey_api_requests_prf_extensions():
     source = PASSKEY_API.read_text(encoding="utf-8")
     assert "_prf_extension_options" in source

@@ -65,6 +65,91 @@ ALLOWED_ORIGIN_SUFFIXES = [
 ]
 
 
+def _hostname_from_origin(origin: str | None) -> str | None:
+    if not origin:
+        return None
+    try:
+        return (urlparse(origin.strip()).hostname or '').lower() or None
+    except Exception:
+        return None
+
+
+def resolve_rp_id(*, origin: str | None = None) -> str:
+    """WebAuthn RP ID valid for the caller origin (lemma.id in prod, localhost in dev).
+
+    Chrome treats ``http://localhost`` as a WebAuthn-capable origin, but not
+    ``http://127.0.0.1`` — IP literals are not valid RP IDs. Loopback always
+    resolves to the ``localhost`` RP ID; callers on 127.0.0.1 should redirect.
+    """
+    explicit = os.environ.get('PASSKEY_RP_ID')
+    if explicit:
+        return explicit
+    host = _hostname_from_origin(origin)
+    if host in {'localhost', '127.0.0.1'}:
+        return 'localhost'
+    return 'lemma.id'
+
+
+def resolve_expected_origin(*, origin: str | None = None) -> str:
+    """Expected WebAuthn client origin for verification."""
+    host = _hostname_from_origin(origin)
+    # Prefer localhost for loopback so RP ID and origin stay aligned after redirect.
+    if host in {'localhost', '127.0.0.1'} and origin:
+        parsed = urlparse(origin.strip())
+        port = parsed.port
+        netloc = f"localhost:{port}" if port else "localhost"
+        if parsed.scheme:
+            return f"{parsed.scheme}://{netloc}"
+    explicit = os.environ.get('PASSKEY_EXPECTED_ORIGIN') or os.environ.get('PASSKEY_ORIGIN')
+    if explicit:
+        return explicit
+    return EXPECTED_ORIGIN
+
+
+def resolve_webauthn_origins(*, origin: str | None = None) -> list[str]:
+    """All client origins accepted when verifying WebAuthn on this request."""
+    origins: list[str] = []
+    for value in (
+        resolve_expected_origin(origin=origin),
+        ORIGIN,
+        EXPECTED_ORIGIN,
+    ):
+        text = str(value or '').strip()
+        if text and text not in origins:
+            origins.append(text)
+    for value in sorted(ALLOWED_AUTH_ORIGINS):
+        text = str(value or '').strip()
+        if text and text not in origins:
+            origins.append(text)
+    if os.environ.get('LEMMA_ALLOW_DEV_ORIGINS', '1') != '0':
+        for dev_origin in (
+            'http://localhost:5000',
+            'http://127.0.0.1:5000',
+            'http://localhost:8000',
+            'http://127.0.0.1:8000',
+        ):
+            if dev_origin not in origins:
+                origins.append(dev_origin)
+    req_origin = str(origin or '').strip()
+    if req_origin and req_origin not in origins:
+        origins.append(req_origin)
+    # Accept both loopback hostnames for the same port (redirect races).
+    for value in list(origins):
+        try:
+            parsed = urlparse(value)
+            host = (parsed.hostname or '').lower()
+            if host not in {'localhost', '127.0.0.1'} or not parsed.scheme:
+                continue
+            alt_host = '127.0.0.1' if host == 'localhost' else 'localhost'
+            netloc = f"{alt_host}:{parsed.port}" if parsed.port else alt_host
+            alt = f"{parsed.scheme}://{netloc}"
+            if alt not in origins:
+                origins.append(alt)
+        except Exception:
+            continue
+    return origins
+
+
 def _prf_extension_options(subject_id: str | None) -> dict:
     """Request WebAuthn PRF eval for wallet at-rest key derivation (client-side only)."""
     uid = (subject_id or "anonymous").strip()

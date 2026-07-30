@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign in with Lemma.id</title>
-    <meta name="description" content="Unlock your wallet to sign in securely.">
+    <meta name="description" content="Unlock your lemma.id to sign in securely.">
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
     
     <style nonce="{{ csp_nonce }}">
@@ -308,14 +308,14 @@
             <!-- Privacy Note -->
             <div class="privacy-note">
                 <strong>Privacy-first authentication.</strong><br>
-                Your wallet data stays on your device. No passwords are transmitted or stored.
+                Your lemma.id stays on your device. No passwords are transmitted or stored.
             </div>
             
             <!-- No Wallet Options -->
             <div class="no-wallet-section" id="no-wallet-section">
-                <p>No wallet detected on this device</p>
+                <p>No lemma.id on this device</p>
                 <div class="alt-actions">
-                    <button class="alt-btn alt-btn-create" id="create-wallet-btn">Create New Wallet</button>
+                    <button class="alt-btn alt-btn-create" id="create-wallet-btn">Create your lemma.id</button>
                     <a href="/wallet/link" class="alt-btn alt-btn-link">Link Existing</a>
                 </div>
             </div>
@@ -331,7 +331,7 @@
     <script src="/static/js/lemma-keys.js?v=8" nonce="{{ csp_nonce }}"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
-    <script src="/static/js/lemma-wallet.js?v=2690" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-wallet.js?v=2692" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
 // Initialize wallet SDK
 const wallet = new LemmaWallet();
@@ -393,7 +393,7 @@ async function handleUnlock() {
         const info = await wallet.getWalletInfo();
         
         if (!info.hasWallet) {
-            showStatus('No wallet found on this device', 'error');
+            showStatus('No lemma.id found on this device', 'error');
             document.getElementById('no-wallet-section').style.display = 'block';
             btn.innerHTML = origText;
             btn.disabled = false;
@@ -453,7 +453,7 @@ async function handleRedirectReturn() {
         }
         
         if (!walletSecret) {
-            showStatus('Could not retrieve wallet data', 'error');
+            showStatus('Could not retrieve lemma.id data', 'error');
             return;
         }
         
@@ -566,21 +566,21 @@ async function getStoredSecretDirectly() {
 async function createWallet() {
     const btn = document.getElementById('unlock-btn');
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>Creating wallet...';
+    btn.innerHTML = '<span class="spinner"></span>Creating lemma.id...';
     
     try {
         await wallet.init();
         const result = await wallet.registerPasskey();
         
         if (result.success) {
-            showStatus('Wallet created!', 'success');
+            showStatus('lemma.id created!', 'success');
             if (redirectParams) {
                 await handleRedirectReturn();
             } else {
                 window.location.href = '/wallet';
             }
         } else {
-            showStatus(result.message || 'Failed to create wallet', 'error');
+            showStatus(result.message || 'Failed to create lemma.id', 'error');
             btn.innerHTML = 'Unlock with Passkey';
             btn.disabled = false;
         }
@@ -734,9 +734,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (directSecret) {
                 // Wallet exists but SDK didn't find it - possible version issue
                 console.log('[Unlock Debug] SDK missed wallet but direct access found it!');
-                showStatus('Wallet detected - click to authenticate', 'info');
+                showStatus('lemma.id detected - click to authenticate', 'info');
             } else {
-                showStatus('No wallet found - create one or link an existing wallet', 'info');
+                showStatus('No lemma.id found - create one or link an existing lemma.id', 'info');
                 document.getElementById('no-wallet-section').style.display = 'block';
                 return; // No wallet, nothing more to check
             }
@@ -829,7 +829,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const directSecret = await getStoredSecretDirectly();
         if (directSecret) {
             console.log('[Unlock Debug] Direct access found wallet despite init error');
-            showStatus('Wallet detected - click to authenticate', 'info');
+            showStatus('lemma.id detected - click to authenticate', 'info');
         }
     }
 });

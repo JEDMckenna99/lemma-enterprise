@@ -706,9 +706,11 @@ def wallet_session_unlock_begin():
             'code': authority.code,
         }), 403
 
-    from api.passkey_auth import RP_ID
+    from api.passkey_auth import resolve_expected_origin, resolve_rp_id, resolve_webauthn_origins
 
     bootstrap_required = authority.code == "first_device_bootstrap"
+    rp_id = resolve_rp_id(origin=origin)
+    expected_origin = resolve_expected_origin(origin=origin)
     challenge = secrets.token_bytes(32)
     challenge_key = f"wus_{secrets.token_urlsafe(24)}"
     redis_store(
@@ -719,6 +721,8 @@ def wallet_session_unlock_begin():
             'device_id': device_id,
             'credential_id': credential_id,
             'bootstrap_required': bootstrap_required,
+            'rp_id': rp_id,
+            'expected_origin': expected_origin,
         },
         ttl_seconds=WALLET_WEBAUTHN_TTL_SECONDS,
     )
@@ -726,7 +730,7 @@ def wallet_session_unlock_begin():
         'success': True,
         'challenge_key': challenge_key,
         'challenge': base64.urlsafe_b64encode(challenge).decode('ascii').rstrip('='),
-        'rp_id': RP_ID,
+        'rp_id': rp_id,
         'expires_in': WALLET_WEBAUTHN_TTL_SECONDS,
         'bootstrap_required': bootstrap_required,
     })
@@ -761,18 +765,21 @@ def wallet_session_unlock_complete():
         return jsonify({'success': False, 'error': 'credential_id_mismatch'}), 403
 
     from api.fresh_passkey_attestation import (
-        allowed_fresh_passkey_origins,
         extract_cose_public_key_b64,
         lookup_wallet_passkey_public_key,
         update_wallet_passkey_sign_count,
         verify_wallet_webauthn_assertion,
     )
-    from api.passkey_auth import RP_ID
+    from api.passkey_auth import resolve_rp_id, resolve_webauthn_origins
     from api.wallet_authn import bind_wallet_passkey, device_authority_status, register_wallet_signing_key
 
     wallet_id = str(stored.get('wallet_id') or '')
     device_id = str(stored.get('device_id') or '')
     bootstrap_required = bool(stored.get('bootstrap_required'))
+    rp_id = str(stored.get('rp_id') or resolve_rp_id(origin=origin))
+    webauthn_origins = resolve_webauthn_origins(
+        origin=str(stored.get('expected_origin') or origin or '')
+    )
 
     authority = device_authority_status(
         wallet_id=wallet_id,
@@ -806,8 +813,8 @@ def wallet_session_unlock_complete():
         ok, reason, new_sign_count = verify_wallet_webauthn_assertion(
             credential=credential,
             expected_challenge=base64.urlsafe_b64decode(stored['challenge']),
-            rp_id=RP_ID,
-            origin=allowed_fresh_passkey_origins(),
+            rp_id=rp_id,
+            origin=webauthn_origins,
             public_key_b64=public_key,
             sign_count=0,
         )
@@ -851,8 +858,8 @@ def wallet_session_unlock_complete():
         ok, reason, new_sign_count = verify_wallet_webauthn_assertion(
             credential=credential,
             expected_challenge=base64.urlsafe_b64decode(stored['challenge']),
-            rp_id=RP_ID,
-            origin=allowed_fresh_passkey_origins(),
+            rp_id=rp_id,
+            origin=webauthn_origins,
             public_key_b64=public_key,
             sign_count=sign_count,
         )
@@ -1306,7 +1313,7 @@ def wallet_device_enroll_begin():
         return jsonify({"success": False, "error": "wallet_id and device_id required"}), 400
 
     from api.database import SessionLocal, WalletSigningKey
-    from api.passkey_auth import RP_ID, RP_NAME
+    from api.passkey_auth import RP_NAME, resolve_expected_origin, resolve_rp_id
     from api.wallet_authn import _wallet_has_established_identity
     from webauthn import generate_registration_options, options_to_json
     from webauthn.helpers.structs import (
@@ -1333,8 +1340,11 @@ def wallet_device_enroll_begin():
     finally:
         db.close()
 
+    rp_id = resolve_rp_id(origin=origin)
+    expected_origin = resolve_expected_origin(origin=origin)
+
     options = generate_registration_options(
-        rp_id=RP_ID,
+        rp_id=rp_id,
         rp_name=RP_NAME,
         user_id=wallet_id.encode("utf-8")[:64],
         user_name=f"wallet:{wallet_id[:16]}",
@@ -1357,6 +1367,8 @@ def wallet_device_enroll_begin():
             "device_name": device_name,
             "enrollment_grant": enrollment_grant,
             "purpose": "device_enroll",
+            "rp_id": rp_id,
+            "expected_origin": expected_origin,
         },
         ttl_seconds=WALLET_WEBAUTHN_TTL_SECONDS,
     )
@@ -1368,7 +1380,7 @@ def wallet_device_enroll_begin():
         "success": True,
         "challenge_key": challenge_key,
         "challenge": base64.urlsafe_b64encode(options.challenge).decode("ascii").rstrip("="),
-        "rp_id": RP_ID,
+        "rp_id": rp_id,
         "options": options_dict,
         "expires_in": WALLET_WEBAUTHN_TTL_SECONDS,
     })
@@ -1413,8 +1425,7 @@ def wallet_device_enroll_complete():
         body.get("enrollment_grant") or stored.get("enrollment_grant") or ""
     ).strip()
 
-    from api.fresh_passkey_attestation import allowed_fresh_passkey_origins
-    from api.passkey_auth import RP_ID
+    from api.passkey_auth import resolve_rp_id, resolve_webauthn_origins
     from api.wallet_authn import bind_wallet_passkey, register_wallet_signing_key
     from api.wallet_keys import b64url_encode
     from webauthn import verify_registration_response
@@ -1424,8 +1435,10 @@ def wallet_device_enroll_complete():
         verification = verify_registration_response(
             credential=credential,
             expected_challenge=base64.urlsafe_b64decode(stored["challenge"]),
-            expected_rp_id=RP_ID,
-            expected_origin=allowed_fresh_passkey_origins(),
+            expected_rp_id=str(stored.get("rp_id") or resolve_rp_id(origin=origin)),
+            expected_origin=resolve_webauthn_origins(
+                origin=str(stored.get("expected_origin") or origin or "")
+            ),
             require_user_verification=True,
         )
     except Exception as exc:
@@ -1491,16 +1504,20 @@ def wallet_device_enroll_complete():
             "code": passkey_result.code,
         }), 403
 
-    response = jsonify({
-        "success": True,
-        "registered": True,
-        "wallet_id": wallet_id,
-        "device_id": device_id,
-        "credential_id": credential_id,
-        "ceremony": "first_device" if first_unbound else "additional_device",
-    })
-    response.headers.update(_cors_headers(origin))
-    return response
+    # Registration already proved passkey possession — issue the server session
+    # here so the client does not run a second WebAuthn ceremony.
+    return _issue_wallet_session_response(
+        wallet_id=wallet_id,
+        profile_id=str(body.get("profile_id") or "default"),
+        profile_name=str(body.get("profile_name") or "Personal"),
+        extra_payload={
+            "registered": True,
+            "device_id": device_id,
+            "credential_id": credential_id,
+            "ceremony": "first_device" if first_unbound else "additional_device",
+            "auth_method": "webauthn_registration",
+        },
+    )
 
 
 @wallet_session_sync_bp.route("/api/wallet/lost-device-recovery/authorize", methods=["POST", "OPTIONS"])

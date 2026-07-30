@@ -8,6 +8,7 @@ from api.wallet_authn import (
     register_wallet_signing_key,
     verify_assertion_from_body,
 )
+from api.passkey_auth import resolve_expected_origin, resolve_rp_id, resolve_webauthn_origins
 from api.wallet_keys import (
     build_wallet_assertion,
     derive_wallet_signing_keypair,
@@ -24,6 +25,17 @@ def wallet_fixture():
         "wallet_id": "wallet_authn_test",
         "wallet_secret": "cd" * 32,
     }
+
+
+def test_resolve_rp_id_for_local_dev(monkeypatch):
+    monkeypatch.delenv("PASSKEY_RP_ID", raising=False)
+    # Chrome WebAuthn: loopback RP ID is always localhost (never the IP literal).
+    assert resolve_rp_id(origin="http://127.0.0.1:5000") == "localhost"
+    assert resolve_rp_id(origin="http://localhost:5000") == "localhost"
+    assert resolve_rp_id(origin="https://lemma.id") == "lemma.id"
+    assert resolve_expected_origin(origin="http://127.0.0.1:5000") == "http://localhost:5000"
+    assert resolve_expected_origin(origin="http://localhost:5000") == "http://localhost:5000"
+    assert "http://localhost:5000" in resolve_webauthn_origins(origin="http://127.0.0.1:5000")
 
 
 def _register(wallet_fixture, *, device_id: str = "legacy"):

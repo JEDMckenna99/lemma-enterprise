@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer">
-    <title>Unlock Lemma Wallet</title>
+    <title>Unlock your lemma.id</title>
     <script nonce="{{ csp_nonce }}">
         (function redirectToUnifiedPopup() {
             const params = new URLSearchParams(window.location.search);
@@ -132,14 +132,14 @@
                 </g>
             </svg>
         </div>
-        <h1>Unlock Your Wallet</h1>
+        <h1>Unlock your lemma.id</h1>
         
         <div id="site-info" class="site-info hidden">
             Signing in to: <strong id="site-name"></strong>
         </div>
         
         <div id="status" class="status info">
-            Checking wallet status...
+            Checking lemma.id status...
         </div>
         
         <div id="actions">
@@ -157,7 +157,7 @@
         <!-- Link device option (shown when no wallet) -->
         <div id="link-option" class="hidden" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e5e7eb; text-align: center;">
             <p style="color: #6b7280; font-size: 0.85rem; margin: 0 0 8px;">
-                Already have a wallet on another device?
+                Already have a lemma.id on another device?
             </p>
             <a href="/wallet/link" style="color: #667eea; font-weight: 500; text-decoration: none;">
                 🔗 Link this device instead
@@ -168,7 +168,7 @@
     <script src="/static/js/lemma-keys.js?v=8" nonce="{{ csp_nonce }}"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
-    <script src="/static/js/lemma-wallet.js?v=2690" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-wallet.js?v=2692" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
         let wallet = null;
         const params = new URLSearchParams(window.location.search);
@@ -243,7 +243,7 @@
                 await Promise.race([
                     wallet.init(),
                     new Promise((_, reject) => setTimeout(
-                        () => reject(new Error('Wallet status check timed out. Close other lemma.id tabs and retry.')),
+                        () => reject(new Error('lemma.id status check timed out. Close other lemma.id tabs and retry.')),
                         8000,
                     )),
                 ]);
@@ -255,7 +255,7 @@
                         await wallet._restoreIsHumanLockBundleIfValid();
                     }
                     // Already unlocked!
-                    showStatus('✅ Wallet is already unlocked!', 'success');
+                    showStatus('✅ Your lemma.id is already unlocked!', 'success');
                     setTimeout(() => sendSuccessAndClose(), 200);
                 } else if (info.hasPasskey) {
                     // Has passkey, just needs to unlock
@@ -263,7 +263,7 @@
                     document.getElementById('unlock-btn').classList.remove('hidden');
                 } else {
                     // No passkey yet - show create option AND link option
-                    showStatus('Create a passkey to secure your wallet', 'info');
+                    showStatus('Create a passkey to secure your lemma.id', 'info');
                     document.getElementById('register-btn').classList.remove('hidden');
                     // Show link device option for users who have wallet elsewhere
                     document.getElementById('link-option').classList.remove('hidden');
@@ -296,7 +296,7 @@
                 const result = await wallet.unlock(issuanceOpts());
                 
                 if (result.success) {
-                    showStatus('✅ Wallet unlocked!', 'success');
+                    showStatus('✅ lemma.id unlocked!', 'success');
                     setTimeout(() => sendSuccessAndClose(), 500);
                 } else {
                     showStatus('❌ ' + (result.message || 'Unlock failed'), 'error');
@@ -321,7 +321,7 @@
                 const result = await wallet.registerPasskey(issuanceOpts());
                 
                 if (result.success) {
-                    showStatus('✅ Passkey created and wallet unlocked!', 'success');
+                    showStatus('✅ Passkey created — your lemma.id is unlocked!', 'success');
                     setTimeout(() => sendSuccessAndClose(), 500);
                 } else {
                     showStatus('❌ ' + (result.message || 'Registration failed'), 'error');

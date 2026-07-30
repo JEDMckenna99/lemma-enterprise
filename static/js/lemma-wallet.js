@@ -2243,17 +2243,26 @@ class LemmaWallet {
         this._pendingEnrollmentGrant = null;
         this._deviceId = deviceId;
 
-        // Establish the first trusted server session with server-verified
-        // WebAuthn. This is deliberately separate from local wallet creation.
+        // device-enroll/complete issues the server session from the registration
+        // ceremony — no second passkey prompt. Fall back to session-unlock only
+        // if the enroll response omitted session fields (older servers).
         if (this._isLemmaDomain()) {
-            try {
-                console.log('[Lemma] Verifying new wallet passkey with server...');
-                await this._performServerWebAuthnUnlock(passkeyRecord, walletId.value);
+            if (enrollComplete.unlocked_at || enrollComplete.expires_at) {
                 this.session.serverSessionActive = true;
+                this.session.serverUnlockedAt = enrollComplete.unlocked_at || this.session.unlockedAt;
+                this.session.serverExpiresAt = enrollComplete.expires_at || this.session.expiresAt;
                 await this._put('session', { id: 'current', ...this.session });
-                console.log('[Lemma] Server-verified wallet session established');
-            } catch (e) {
-                console.warn('[Lemma] Could not establish server session:', e.message);
+                console.log('[Lemma] Server session established from device enrollment');
+            } else {
+                try {
+                    console.log('[Lemma] Verifying new wallet passkey with server...');
+                    await this._performServerWebAuthnUnlock(passkeyRecord, walletId.value);
+                    this.session.serverSessionActive = true;
+                    await this._put('session', { id: 'current', ...this.session });
+                    console.log('[Lemma] Server-verified wallet session established');
+                } catch (e) {
+                    console.warn('[Lemma] Could not establish server session:', e.message);
+                }
             }
         }
 
@@ -2713,7 +2722,31 @@ class LemmaWallet {
         const credential = await navigator.credentials.get({ publicKey: getOptions });
         if (!credential) throw new Error('Passkey authentication cancelled');
 
-        const activeProfile = profile || await this.getActiveProfile();
+        // PRF at-rest key must be bound before any encrypted IndexedDB reads.
+        // profiles/secrets are enc_v1 envelopes; getActiveProfile() decrypts them.
+        // Calling that before bind caused production unlock failures:
+        // envelope_invalid right after a successful WebAuthn ceremony.
+        await this._bindAtRestKeyFromCredential(
+            credential,
+            passkeyRecord.prfWalletId || walletId,
+        );
+
+        let activeProfile = profile;
+        if (!activeProfile) {
+            try {
+                activeProfile = await this.getActiveProfile();
+            } catch (e) {
+                if (this._isEncryptedStorageLockedError(e)) {
+                    console.warn(
+                        '[Lemma] Encrypted profile unavailable during server unlock; using default',
+                        e?.message || e,
+                    );
+                    activeProfile = { id: DEFAULT_PROFILE_ID, name: 'Personal' };
+                } else {
+                    throw e;
+                }
+            }
+        }
         const completeBody = {
             challenge_key: begin.challenge_key,
             credential: this._serializeCredential(credential),
@@ -6849,6 +6882,10 @@ class LemmaWallet {
         const host = (typeof window !== 'undefined' && window.location.hostname) || '';
         if (host === 'lemma.id' || host === 'www.lemma.id' || host.endsWith('.lemma.id')) {
             return 'lemma.id';
+        }
+        // Chrome WebAuthn allows http://localhost, not http://127.0.0.1 (IP ≠ domain).
+        if (host === 'localhost' || host === '127.0.0.1') {
+            return 'localhost';
         }
         return host || 'lemma.id';
     }
