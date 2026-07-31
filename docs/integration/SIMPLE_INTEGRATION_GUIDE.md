@@ -172,6 +172,12 @@ When users already have a password account, verify a presentation while they are
 
 Never link on a bare client `ppid` without presentation verification.
 
+### Legacy SDK redirect callback (retired)
+
+`/auth/sdk-callback` does **not** verify a presentation or bind a subject. It
+returns `lemma_auth=error&reason=callback_unbound`. Use `<lemma-signin>` /
+`ProofVerifier.verifyForBackend` and POST the presentation to your backend.
+
 ---
 
 ## 11. Sign-out semantics

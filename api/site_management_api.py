@@ -151,15 +151,10 @@ def get_site_users(site_id):
             
         except Exception as e:
             logger.error(f"Database query failed: {e}")
-            # Return empty list on error
             return jsonify({
-                'success': True,
-                'users': [],
-                'total': 0,
-                'page': 1,
-                'per_page': per_page,
-                'total_pages': 0
-            })
+                'success': False,
+                'error': 'directory_unavailable',
+            }), 503
         finally:
             db.close()
             

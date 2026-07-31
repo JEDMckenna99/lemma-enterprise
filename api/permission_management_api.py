@@ -814,108 +814,26 @@ def verify_access():
         logger.error(f"Access verification error: {e}")
         return jsonify({'error': str(e)}), 400
 
+_OAUTH_REMOVED_BODY = {
+    'code': 'oauth_removed',
+    'error': 'oauth_removed',
+    'message': (
+        'Legacy OAuth endpoints are retired. Use Sign in with lemma.id: '
+        'verify a signed presentation locally and issue your own session.'
+    ),
+    'docs': '/docs/integration/ISHUMAN_AGENT_INTEGRATION.md',
+}
+
+
 @permission_api.route('/api/v1/oauth/authorize', methods=['GET'])
 @cross_origin()
 def oauth_authorize():
-    """
-    OAuth authorization endpoint for "Sign in with Lemma"
-    
-    GET /api/v1/oauth/authorize?client_id=lemma_oauth_site123&redirect_uri=https://customer.com/callback&scope=profile+permissions
-    """
-    try:
-        client_id = request.args.get('client_id')
-        redirect_uri = request.args.get('redirect_uri')
-        scope = request.args.get('scope', 'profile')
-        state = request.args.get('state')
-        
-        # Extract site_id from client_id
-        if not client_id.startswith('lemma_oauth_'):
-            return jsonify({'error': 'Invalid client_id'}), 400
-            
-        site_id = client_id.replace('lemma_oauth_', '')
-        
-        manager = get_site_manager(site_id)
-        if not manager:
-            return jsonify({'error': 'Site not found'}), 404
-        
-        # Generate authorization code
-        auth_code = f"auth_{uuid.uuid4().hex}"
-        
-        # Store authorization request (temporary)
-        # TODO: Store in Redis/cache with expiry
-        auth_requests[auth_code] = {
-            'site_id': site_id,
-            'client_id': client_id,
-            'redirect_uri': redirect_uri,
-            'scope': scope,
-            'state': state,
-            'created_at': datetime.utcnow(),
-            'expires_at': datetime.utcnow() + timedelta(minutes=10)
-        }
-        
-        # Redirect to Lemma authorization page
-        auth_url = f"https://lemma.id/authorize?code={auth_code}&site_id={site_id}&redirect_uri={redirect_uri}&state={state}"
-        
-        return jsonify({
-            'authorization_url': auth_url,
-            'auth_code': auth_code
-        }), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 400
+    """Retired legacy OAuth authorize stub — use presentation verification instead."""
+    return jsonify(_OAUTH_REMOVED_BODY), 410
+
 
 @permission_api.route('/api/v1/oauth/token', methods=['POST'])
 @cross_origin()
 def oauth_token():
-    """
-    OAuth token endpoint - exchange auth code for access token
-    
-    POST /api/v1/oauth/token
-    {
-        "grant_type": "authorization_code",
-        "code": "auth_123",
-        "client_id": "lemma_oauth_site123",
-        "client_secret": "secret_456"
-    }
-    """
-    try:
-        data = request.get_json()
-        auth_code = data['code']
-        client_id = data['client_id']
-        client_secret = data['client_secret']
-        
-        # Validate authorization code
-        if auth_code not in auth_requests:
-            return jsonify({'error': 'Invalid authorization code'}), 400
-            
-        auth_request = auth_requests[auth_code]
-        
-        # Validate client credentials
-        # TODO: Validate client_secret against database
-        
-        # Generate access token (JWT)
-        token_payload = {
-            'site_id': auth_request['site_id'],
-            'client_id': client_id,
-            'scope': auth_request['scope'],
-            'iat': datetime.utcnow(),
-            'exp': datetime.utcnow() + timedelta(hours=1)
-        }
-        
-        access_token = jwt.encode(token_payload, os.environ.get('JWT_SIGNING_SECRET', 'change-me-in-production'), algorithm='HS256')
-        
-        # Clean up auth code
-        del auth_requests[auth_code]
-        
-        return jsonify({
-            'access_token': access_token,
-            'token_type': 'Bearer',
-            'expires_in': 3600,
-            'scope': auth_request['scope']
-        }), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 400
-
-# Temporary storage for OAuth (replace with Redis/database in production)
-auth_requests = {}
+    """Retired legacy OAuth token stub — use presentation verification instead."""
+    return jsonify(_OAUTH_REMOVED_BODY), 410

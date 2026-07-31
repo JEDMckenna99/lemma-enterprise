@@ -79,10 +79,10 @@
       const disabled = this.hasAttribute('disabled');
       this.shadowRoot.innerHTML = `
         <style>${STYLES}</style>
-        <button type="button" part="button" ${disabled ? 'disabled' : ''}>
-          ${this.buttonLabel}
-        </button>
+        <button type="button" part="button" ${disabled ? 'disabled' : ''}></button>
       `;
+      const btn = this.shadowRoot.querySelector('button');
+      if (btn) btn.textContent = this.buttonLabel;
     }
 
     _setBusy(busy) {

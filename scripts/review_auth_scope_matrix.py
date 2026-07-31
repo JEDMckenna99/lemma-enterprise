@@ -84,7 +84,6 @@ PUBLIC_STATE_CHANGING_ALLOWLIST = {
     "/api/sdk/verify",
     "/api/test/issue-credential",
     "/api/v1/iam/claim-permission",
-    "/api/v1/oauth/token",
     "/api/verify-credential",
     "/api/validate-key",
     "/api/wallet/session-sync",
@@ -100,6 +99,11 @@ ADMIN_EXPLICIT_AUTH_ALLOWLIST = {
 
 # State-changing routes that enforce auth inside the handler (wallet assertions,
 # webhook signatures, demo guards) rather than via route decorators.
+# Retired routes that intentionally return HTTP 410 and must not mint credentials.
+RETIRED_STATE_CHANGING_ROUTES = {
+    "/api/v1/oauth/token",
+}
+
 IN_HANDLER_AUTH_ALLOWLIST = {
     "/api/agent/monitor/log-external",
     "/api/auth/issue-credential",
@@ -210,6 +214,8 @@ def main() -> int:
         if not path.startswith("/api/"):
             continue
         if path in PUBLIC_STATE_CHANGING_ALLOWLIST:
+            continue
+        if path in RETIRED_STATE_CHANGING_ROUTES:
             continue
         if path in IN_HANDLER_AUTH_ALLOWLIST:
             continue

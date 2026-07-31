@@ -1345,11 +1345,11 @@ def _resolve_platform_role_for_ppid(ppid: str, site_id: str = 'lemma.id') -> Dic
 
         site_user = db.query(SiteUser).filter(
             SiteUser.site_id == site_id,
-            SiteUser.user_did == ppid
+            SiteUser.user_ppid == ppid
         ).order_by(SiteUser.id.desc()).first()
-        if site_user and (site_user.user_status or 'active').lower() not in {'suspended', 'banned'}:
+        if site_user and (site_user.status or 'active').lower() not in {'suspended', 'banned'}:
             return _finalize({
-                **_role_to_permission_profile(site_user.user_role or 'user'),
+                **_role_to_permission_profile(site_user.role or 'user'),
                 'source': 'site_users',
             })
     except Exception as role_err:

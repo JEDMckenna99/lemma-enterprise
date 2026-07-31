@@ -187,23 +187,41 @@ def sdk_auth_request():
 @cross_origin()
 def sdk_auth_callback():
     """
-    SDK callback after successful authentication
-    Redirects back to the external site with success status
+    Legacy SDK redirect callback — quarantined.
+
+    This route does not verify a presentation or bind a subject. Primary SIWL
+    uses <lemma-signin> / ProofVerifier.verifyForBackend and posts the
+    presentation to the relying site's backend directly.
     """
     state = request.args.get('state', '')
-    
+
     if not state:
-        return jsonify({'error': 'Invalid or expired session'}), 400
+        return jsonify({
+            'error': 'callback_unbound',
+            'code': 'callback_unbound',
+            'message': 'Missing or invalid SDK callback state.',
+        }), 401
 
     pending = _consume_pending_sdk_request(state)
     if not pending:
-        return jsonify({'error': 'Invalid or expired session'}), 400
+        return jsonify({
+            'error': 'callback_unbound',
+            'code': 'callback_unbound',
+            'message': 'Invalid or expired SDK callback state.',
+        }), 401
 
-    return_url = pending['return_url']
-    
-    # Add success indicator to return URL
-    separator = '&' if '?' in return_url else '?'
-    return redirect(f"{return_url}{separator}lemma_auth=success")
+    return_url = pending.get('return_url', '')
+    if return_url:
+        separator = '&' if '?' in return_url else '?'
+        return redirect(
+            f"{return_url}{separator}lemma_auth=error&reason=callback_unbound"
+        )
+
+    return jsonify({
+        'error': 'callback_unbound',
+        'code': 'callback_unbound',
+        'message': 'SDK redirect callback is retired; verify presentations on your backend.',
+    }), 409
 
 
 @sdk_auth_bp.route('/api/auth/signout', methods=['POST', 'OPTIONS'])

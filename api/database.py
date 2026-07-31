@@ -698,22 +698,19 @@ class RevocationList(Base):
     )
 
 class SiteUser(Base):
-    """Site-specific user registry for IAM subnet management"""
+    """Site-specific user directory entry keyed by site-private PPID."""
     __tablename__ = 'site_users'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    site_id = Column(String, nullable=False)
-    user_did = Column(String, nullable=False)  # User's DID (can be site-specific or universal)
-    user_email = Column(String)  # Optional: site-specific email
-    display_name = Column(String)  # Site-specific display name
-    user_status = Column(String, default='active')  # 'active', 'suspended', 'pending', 'banned'
-    user_role = Column(String, default='user')  # Site-defined role (admin, moderator, user, etc.)
-    site_user_metadata = Column(JSON, default=dict)  # Site-specific user data
-    added_by = Column(String, nullable=False)  # Admin who added user
+    site_id = Column(String, nullable=False, index=True)
+    user_ppid = Column(String, nullable=False, index=True)
+    display_name = Column(String)
+    role = Column(String, default='user')
+    status = Column(String, default='active')
+    added_by = Column(String, nullable=False, default='api')
     added_at = Column(DateTime, default=datetime.utcnow)
-    last_login = Column(DateTime)
-    login_count = Column(Integer, default=0)
-    # Unique constraint: one user per site
+    last_seen = Column(DateTime)
+    user_metadata = Column('metadata', JSON, default=dict)
     __table_args__ = (
         {'extend_existing': True}
     )
@@ -1157,6 +1154,26 @@ class PersonConvergenceEvent(Base):
     status = Column(String(32), nullable=False, default='pending')
     created_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime)
+
+
+class IdentitySubjectAlias(Base):
+    """Reserved cross-application subject continuity (explicit opt-in only)."""
+    __tablename__ = 'identity_subject_aliases'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id = Column(String, index=True)
+    from_site_id = Column(String, nullable=False, index=True)
+    from_ppid = Column(String, nullable=False, index=True)
+    to_site_id = Column(String, nullable=False, index=True)
+    to_ppid = Column(String, nullable=False, index=True)
+    alias_type = Column(String(64), nullable=False, default='explicit_link')
+    status = Column(String(32), nullable=False, default='reserved')
+    created_at = Column(DateTime, default=datetime.utcnow)
+    created_by = Column(String)
+    evidence_jti = Column(String)
+    __table_args__ = (
+        {'extend_existing': True}
+    )
 
 
 class DomainVerificationChallenge(Base):
