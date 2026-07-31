@@ -26,6 +26,12 @@ def test_lemma_signin_label_not_interpolated_into_innerhtml():
     assert "${this.buttonLabel}" not in source
 
 
+def test_lemma_signin_supports_lemma_origin_attribute():
+    source = LEMMA_SIGNIN_JS.read_text(encoding="utf-8")
+    assert "'lemma-origin'" in source
+    assert "config.lemmaOrigin = this.lemmaOrigin" in source
+
+
 def test_site_users_list_fail_closed_on_db_error():
     source = SITE_MANAGEMENT_PY.read_text(encoding="utf-8")
     tree = ast.parse(source)

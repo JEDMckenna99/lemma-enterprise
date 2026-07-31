@@ -28,13 +28,13 @@
 
 ## What you are building
 
-1. **Browser:** Load `proof-verifier.js`, create `ProofVerifier({ siteId })`, call `verify({ autoProvision: true })` before protected actions.
-2. **Account binding:** Store the returned site-private `ppid` as the platform's durable enforcement handle for that user.
-3. **Backend:** Accept a signed presentation or stamp from the client and verify locally with `@lemma.id/proof-verifier` or `lemma_proof_verifier.py`.
-4. **Assurance policy:** Use `passkey` for continuity when that is enough (not Sybil-resistant alone). Require `ishuman` when the action needs one verified human behind the account, such as Sybil-resistant signup, trials, ticketing, payouts, or recovery after abuse.
+1. **Browser:** Load `proof-verifier.js` (and optionally `lemma-signin.js`), then call `verifyForBackend({ autoProvision: true, requiredAssurance: 'passkey' })` for login / signup.
+2. **Backend:** Accept the signed `presentation`, verify it locally with `@lemma.id/proof-verifier` or `lemma-proof-verifier`, and use **`result.ppid`** from the verified result.
+3. **Account binding:** Store that site-private `ppid` as the platform's durable account key; issue **your own** session cookie.
+4. **Assurance policy:** Default login to `passkey`. Require `ishuman` only when the action needs one verified human (Sybil-resistant signup, trials, ticketing, payouts, recovery after abuse).
 5. **Optional:** Register a site API key only when the developer needs server-side PPID blocks.
 
-lemma.id runs wallet unlock, proof issuance, and IDV step-up (Didit by default) in a Lemma-hosted popup. **The relying site does not configure webhooks, Didit, or Stripe Identity.**
+lemma.id runs wallet unlock and proof issuance in a Lemma-hosted popup. IDV (Didit by default) is used only for **isHuman** step-up. **The relying site does not configure webhooks, Didit, or Stripe Identity.**
 
 ---
 
@@ -75,13 +75,13 @@ Apply these on every integration. Do not skip or "simplify" them.
 
 Work through these in order. Stop and ask the developer if hostname or trust tier is unclear.
 
-- [ ] **1. Identify protected actions**: signup, posting, checkout, voting, account recovery, etc.
+- [ ] **1. Identify protected actions**: signup/login, posting, checkout, voting, account recovery, etc.
 - [ ] **2. Set `siteId`**: canonical hostname for each environment.
-- [ ] **3. Add browser SDK**: script tag or bundler import from `https://lemma.id/sdk/proof-verifier.js`.
-- [ ] **4. Gate entry points**: `await verifier.verify({ autoProvision: true })` on first-touch flows; fail closed.
-- [ ] **5. Choose backend trust tier** (see below), default to **T2 (verifyStamp)** for signup.
-- [ ] **6. Bind `ppid` to account**: store on user row after server verification.
-- [ ] **7. Optional audit stamps**: `stamp(payload, { includeCredential: true })` on actions the developer logs.
+- [ ] **3. Add browser SDK**: script tag or bundler import from `https://lemma.id/sdk/proof-verifier.js` (optional drop-in: `lemma-signin.js`).
+- [ ] **4. Gate login/signup**: `await verifier.verifyForBackend({ autoProvision: true, requiredAssurance: 'passkey' })`; fail closed when `ok` is false.
+- [ ] **5. Choose backend trust tier** (see below), default to **T2 (verify presentation)** for login/signup. Always set `required_assurance='passkey'` (or `'ishuman'` when needed) — do not rely on package defaults.
+- [ ] **6. Bind `ppid` to account**: store **verified** `result.ppid` on the user row; issue your own session.
+- [ ] **7. Optional audit stamps**: `stamp` / `stampAction` on mutations the developer logs (T2+).
 - [ ] **8. Optional abuse controls**: API key + `POST /api/ishuman/site-block` when bans must survive browser clears.
 
 ---
@@ -91,16 +91,22 @@ Work through these in order. Stop and ask the developer if hostname or trust tie
 `ProofVerifier` is the primary browser class. The legacy `IsHumanVerifier` class
 and `/sdk/ishuman-verifier.js` URL remain supported as compatibility aliases.
 
-### Minimal gate (low-risk UX only)
+### Minimal client check (low-risk UX only)
+
+For **login / account creation**, prefer `verifyForBackend` + server verify (T2 below).
+Use this client-only gate only for soft UX gates; still fail closed.
 
 ```html
 <script src="https://lemma.id/sdk/proof-verifier.js"></script>
 <script>
   const verifier = new ProofVerifier({ siteId: 'app.example.com' });
 
-  async function requireHuman() {
-    const result = await verifier.verify({ autoProvision: true });
-    if (!result.human) throw new Error(result.reason || 'not_verified');
+  async function requirePasskey() {
+    const result = await verifier.verify({
+      autoProvision: true,
+      requiredAssurance: 'passkey',
+    });
+    if (!result.ok && !result.human) throw new Error(result.reason || 'not_verified');
     return result.ppid;
   }
 </script>
@@ -220,7 +226,7 @@ Pass the same canonical hostname to `VerificationContext(site_id=...)` or `creat
 | Tier | Client sends | Server verifies | Use when |
 |------|--------------|-----------------|----------|
 | **T1** | `{ ppid }` only | None | Low-risk gates only (waitlists, soft limits) |
-| **T2** (recommended) | `presentation` from `verifyForBackend()` or `stamp(..., { includeCredential: true })` | Local `verify()` / `verifyStamp()` | **Signup**, account creation, moderate trust |
+| **T2** (recommended) | `presentation` from `verifyForBackend()` | Local `createVerifier(...).verify()` / `VerificationContext.verify()` | **Login / signup**, account creation, moderate trust |
 | **T2+** | `stampAction(...)` envelope with `action_assertion` + `action_signature` | Local `verifyActionStamp()` / `verify_action_stamp()` + nonce replay store | **Mutations only**: checkout, withdrawals, posting, other fraud-sensitive server actions |
 | **T3** | Full presentation + session assertion | Local verify with `requireSessionAssertion: true`, or `POST /api/ishuman/verify-presentation` | High-trust / financial actions needing live session proof |
 
@@ -605,7 +611,7 @@ the relying site does not call wallet-internal derivation endpoints directly.
 See [One PPID, assurance tiers, and site-local input burn](https://lemma.id/docs/product/PASSKEY_STAMP_INPUT_BURN.md)
 for the relying-site contract.
 
-**Reference implementation:** [lemma.id integration demo](https://lemma.id/demo), passkey wallet → distinct site PPIDs → Heroku demo sites with `verifyStamp` → optional isHuman step-up (same PPID) → site-scoped revocation. Enable flags on staging before recording.
+**Reference implementation:** [lemma.id integration demo](https://lemma.id/demo), passkey wallet → distinct site PPIDs → Heroku demo sites with local presentation verify → optional isHuman step-up (same PPID) → site-scoped revocation.
 
 ---
 
@@ -638,9 +644,10 @@ Confirm with the developer:
 
 ## Privacy summary (for developer communication)
 
-- User completes live IDV once in a Lemma popup.
-- Relying site receives `{ human, ppid }`, never government ID, selfie, or legal name.
-- Each site gets a **pairwise-unlinkable** PPID derived from verified-person root + hostname.
+- Default login is **passkey** — no IDV required.
+- Optional **isHuman** step-up runs live IDV once in a Lemma popup when the site requests it.
+- Relying site receives `{ ok, ppid, assurance }` (and related proof fields), never government ID, selfie, or legal name.
+- Each site gets a **pairwise-unlinkable** PPID; sites own profile fields and sessions.
 - Audit stamps and action logs stay in **the developer's** systems.
 
 For the full human-readable reference, see https://lemma.id/docs .

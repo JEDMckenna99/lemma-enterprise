@@ -1,6 +1,13 @@
-> **Superseded** by [ISHUMAN Agent Integration Guide](ISHUMAN_AGENT_INTEGRATION.md). This document is retained for historical reference only.
+> **Retired / historical only.** Do not follow this guide for new integrations.
+>
+> Canonical path: [Sign-in quickstart](QUICK_START_SIMPLE_LOGIN.md) and
+> [ISHUMAN Agent Integration Guide](ISHUMAN_AGENT_INTEGRATION.md).
+>
+> Legacy OAuth endpoints (`/api/v1/oauth/authorize`, `/api/v1/oauth/token`) return
+> **HTTP 410** (`oauth_removed`). Sign in with lemma.id uses signed presentations
+> and local verification — not OAuth tokens.
 
-# Permission Lemmas IAM - Developer Guide
+# Permission Lemmas IAM - Developer Guide (historical)
 
 ## Overview
 

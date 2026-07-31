@@ -39,7 +39,7 @@
 
   class LemmaSignIn extends HTMLElement {
     static get observedAttributes() {
-      return ['site-id', 'required-assurance', 'auto-provision', 'disabled', 'label'];
+      return ['site-id', 'required-assurance', 'auto-provision', 'disabled', 'label', 'lemma-origin'];
     }
 
     connectedCallback() {
@@ -75,6 +75,14 @@
       return this.getAttribute('label') || 'Sign in with lemma.id';
     }
 
+    get lemmaOrigin() {
+      return (
+        this.getAttribute('lemma-origin')
+        || this.getAttribute('lemmaOrigin')
+        || ''
+      ).trim();
+    }
+
     _render() {
       const disabled = this.hasAttribute('disabled');
       this.shadowRoot.innerHTML = `
@@ -101,7 +109,9 @@
       }
       this._setBusy(true);
       try {
-        const verifier = new window.ProofVerifier({ siteId: this.siteId });
+        const config = { siteId: this.siteId };
+        if (this.lemmaOrigin) config.lemmaOrigin = this.lemmaOrigin;
+        const verifier = new window.ProofVerifier(config);
         const result = await verifier.verifyForBackend({
           autoProvision: this.autoProvision,
           requiredAssurance: this.requiredAssurance,
