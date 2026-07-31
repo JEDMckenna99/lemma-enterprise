@@ -44,7 +44,12 @@ No site registration, no API key, and no IDV required for basic login. Require `
 </script>
 ```
 
-Attributes: `site-id` (required), `required-assurance` (default `passkey`), `auto-provision` (default `true`), `label` (button text).
+Attributes: `site-id` (required), `required-assurance` (default `passkey`), `auto-provision` (default `true`), `label` (button text), `lemma-origin` (optional — override the lemma.id API/popup host for staging or local demos; omit in production).
+
+```html
+<!-- Staging demo site pointing at demo.lemma.id -->
+<lemma-signin site-id="tickets-demo.lemma.id" lemma-origin="https://demo.lemma.id"></lemma-signin>
+```
 
 **React:** see [`examples/nextjs_ishuman_signup/components/LemmaSignIn.tsx`](../../examples/nextjs_ishuman_signup/components/LemmaSignIn.tsx).
 
