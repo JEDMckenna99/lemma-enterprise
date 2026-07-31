@@ -57,6 +57,8 @@ def test_lemma_signin_web_component_source():
     assert "lemma-signin-success" in source
     assert "verifyForBackend" in source
     assert "required-assurance" in source
+    assert "lemma-origin" in source
+    assert "lemmaOrigin" in source
 
 
 def test_sdk_public_reason_normalization():

@@ -1,19 +1,25 @@
-# isHuman Relying-Site Demo Apps
+# Sign in with lemma.id — relying-site demo apps
 
-These tiny Flask apps simulate real third-party relying sites for the isHuman demo.
+These tiny Flask apps simulate real third-party relying sites for the Sign in with lemma.id demo.
 
-Each app serves one page that loads:
+Each app loads the documented drop-in:
 
 ```html
 <script src="https://lemma.id/sdk/proof-verifier.js"></script>
+<script src="https://lemma.id/sdk/lemma-signin.js"></script>
+<lemma-signin site-id="tickets-demo.lemma.id" lemma-origin="https://lemma.id"></lemma-signin>
 ```
+
+Use `lemma-origin` when `LEMMA_ORIGIN` is not production `https://lemma.id` (staging demos).
 
 ## Expected Heroku Apps
 
-- `lemma-demo-tickets`, **unique presale code distributor reference**
+- `lemma-demo-tickets`, **Sign in shell + optional presale tour**
   - `LEMMA_DEMO_SITE_ID=tickets-demo.lemma.id`
   - `LEMMA_DEMO_SITE_NAME=Lemma Ticketing Demo`
   - `LEMMA_DEMO_SITE_KIND=ticketing`
+  - Default `/` — Sign in with `<lemma-signin>` → session cookie
+  - `/?tour=presale` — Sybil-resistant presale enforcement demo
   - `LEMMA_PRESALE_DROP_ID=artist-presale-2026` (optional)
   - `LEMMA_PRESALE_CODE_CLAIM_ASSURANCE=passkey` (default; optional)
   - `LEMMA_PRESALE_ESCALATED_ASSURANCE=ishuman` (optional, IDV penalty on site doubt)
@@ -23,11 +29,24 @@ Each app serves one page that loads:
   - `LEMMA_DEMO_SITE_NAME=Lemma Free Trial Demo`
   - `LEMMA_DEMO_SITE_KIND=free trial`
 
-## Presale reference flow (tickets demo)
+## Sign-in session (primary product demo)
+
+Both demo sites use Sign in with lemma.id:
+
+1. User clicks `<lemma-signin>` (passkey ceremony in Lemma popup).
+2. Browser sends signed `presentation` to `POST /api/login`.
+3. Server verifies locally and sets HttpOnly `lemma_demo_session` cookie.
+4. Soft actions (`/api/demo/action`, presale register/status) reuse that cookie until policy requires a fresh passkey ceremony at claim time.
+
+Session endpoints:
+
+- `POST /api/login` — verify presentation, set HttpOnly `lemma_demo_session` cookie
+- `GET /api/me` / `POST /api/logout` — session introspection and logout
+- `POST /api/demo/action` — soft action via session cookie or presentation
+
+## Presale reference flow (secondary — tickets `/?tour=presale`)
 
 Low-friction passkey proof by default; fresh IDV only when the site flags a fan.
-
-**Sign-in session:** both demo sites use Sign in with lemma.id → `POST /api/login` (verify presentation) → HttpOnly `lemma_demo_session` cookie. Soft actions (`/api/demo/action`, presale register/status) reuse that cookie until policy requires a fresh passkey ceremony at claim time.
 
 **Guided tour:** `/?tour=presale`
 
@@ -66,12 +85,6 @@ Copy-paste modules:
 - [`presale_allocation.py`](presale_allocation.py), registration store + in-memory `(drop_id, ppid)` ledger
 - [`relying_site_app.py`](relying_site_app.py), sign-in session, presale challenge/register/claim/status APIs
 
-Session endpoints:
-
-- `POST /api/login` — verify presentation, set HttpOnly `lemma_demo_session` cookie
-- `GET /api/me` / `POST /api/logout` — session introspection and logout
-- `POST /api/demo/action` — soft action via session cookie or presentation
-
 Sales script: [`docs/demo/PRESALE_DEMO_SCRIPT.md`](../docs/demo/PRESALE_DEMO_SCRIPT.md)
 
 ## Deploy
@@ -83,4 +96,8 @@ git subtree push --prefix demo-sites https://git.heroku.com/lemma-demo-tickets.g
 git subtree push --prefix demo-sites https://git.heroku.com/lemma-demo-trials.git main
 ```
 
-After deploy, verify https://tickets-demo.lemma.id/?tour=presale
+After deploy, verify:
+
+- https://tickets-demo.lemma.id/ (Sign in shell)
+- https://tickets-demo.lemma.id/?tour=presale (presale tour)
+- https://trials-demo.lemma.id/

@@ -180,7 +180,10 @@ to know both IDs.
 | `passkey` (free login) | Durable across device upgrades when passkeys sync (iCloud/Google). Adding a second device via [lemma.id/link](https://lemma.id/link) improves continuity. Guaranteed account recovery is not promised for passkey-only wallets. |
 | `ishuman` (step-up) | Same PPID; IDV-backed recovery on the paid tier. |
 
-Document this honestly to users when you ship passkey-only login.
+Document this honestly to users when you ship passkey-only login. For the full
+recovery matrix, lemma.id outage/failure behavior, and a "what this is not"
+(no blockchain, no token, no tracking) rundown, see
+[Trust, recovery & failure modes](SIGN_IN_TRUST_AND_RECOVERY.md).
 
 ---
 

@@ -4,7 +4,7 @@
 
 **Duration:** ~3 minutes
 
-**Hub context:** This is **Enforce in the wild**: action-level presence stamps on a relying site. The hub demo covers Create · Verify · Enforce at the identity layer; presale shows stamps at claim time.
+**Hub context:** This is **Enforce in the wild**: action-level presence stamps on a relying site. The hub demo covers Create · Sign in · Enforce at the identity layer; presale shows stamps at claim time. The tickets site default `/` is the Sign in shell; open `/?tour=presale` for this tour.
 
 ## One-liner
 

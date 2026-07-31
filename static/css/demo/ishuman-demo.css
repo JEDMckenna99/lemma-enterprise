@@ -2411,7 +2411,7 @@
   }
 }
 
-/* Create · Verify · Enforce polish */
+/* Create · Sign in · Enforce polish */
 body:has(.demo-page) .nav-header {
   background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(10px);

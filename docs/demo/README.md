@@ -1,15 +1,14 @@
-# isHuman Demo Playground
+# Sign in with lemma.id — demo playground
 
 ## What this proves
 
-The public **`/demo`** route (alias `/demo/ishuman`) demonstrates the Lemma
-isHuman integration flow in three concepts: **Create**, **Verify**, **Enforce**: not Agent Ops.
+The public **`/demo`** route (alias `/demo/ishuman`) demonstrates Sign in with lemma.id in three concepts: **Create**, **Sign in**, **Enforce** — not Agent Ops.
 
 When one-PPID assurance flags are enabled on staging:
 
 - **Create**: passkey wallet + provisional person root (no IDV required to start).
-- **Verify**: hub derives distinct site PPIDs via `verifyForBackend`; Heroku demo sites use **Sign in with lemma.id** → `POST /api/login` → site session cookie; soft actions verify locally until fresh passkey step-up (presale claim).
-- **Enforce**: set assurance (`passkey` → `ishuman`), site doubt, and site ban via `/api/demo/ishuman/*`. Hub Enforce attaches the last verified site `presentation`; mutations are allowed when the presentation PPID matches the target (**self-scoped**) or the caller is **SiteAdmin / platform operator** for `site_demo_*`. After Didit IDV, re-verify with `requiredAssurance: 'ishuman'`: **same PPID**, assurance flips to `ishuman`.
+- **Sign in**: hub derives distinct site PPIDs via `verifyForBackend`; Heroku demo sites use the drop-in **`<lemma-signin>`** element → `POST /api/login` → site session cookie; soft actions reuse the session until fresh passkey step-up (presale claim).
+- **Enforce**: set assurance (`passkey` → `ishuman`), site doubt, and site ban via `/api/demo/ishuman/*`. Hub Enforce attaches the last verified site `presentation`; mutations are allowed when the presentation PPID matches the target (**self-scoped**) or the caller is **SiteAdmin / platform operator** for `site_demo_*`. After Didit IDV, re-sign-in with `requiredAssurance: 'ishuman'`: **same PPID**, assurance flips to `ishuman`.
 
 Legacy IDV-first copy remains when `assurance_demo_mode` is false (flags off).
 
@@ -20,18 +19,19 @@ Legacy IDV-first copy remains when `assurance_demo_mode` is false (flags off).
 | Demo hub | https://lemma.id/demo |
 | Demo hub (alias) | https://lemma.id/demo/ishuman |
 | Staging hub | https://demo.lemma.id/demo |
-| Ticketing relying site | https://lemma-demo-tickets-1d3d7411af33.herokuapp.com |
-| Free-trial relying site | https://lemma-demo-trials-7090f46cae0d.herokuapp.com |
-| Custom domains (when configured) | `tickets-demo.lemma.id`, `trials-demo.lemma.id` |
+| Ticketing relying site (Sign in) | https://tickets-demo.lemma.id/ |
+| Ticketing presale tour (Enforce) | https://tickets-demo.lemma.id/?tour=presale |
+| Free-trial relying site | https://trials-demo.lemma.id/ |
+| Heroku fallbacks | `lemma-demo-tickets-*.herokuapp.com`, `lemma-demo-trials-*.herokuapp.com` |
 
-Both relying sites load the hosted verifier from your configured `LEMMA_ORIGIN`.
-Sign-in uses `verifyForBackend` once, then the site issues an HttpOnly session cookie.
+Both relying sites load `proof-verifier.js` + `lemma-signin.js` from your configured `LEMMA_ORIGIN`.
+Sign-in uses `<lemma-signin>` (with `lemma-origin` when staging), then `POST /api/login` for an HttpOnly session cookie.
 High-value presale claim still uses `requireFreshPasskey: true`. Site policy defaults
 from `LEMMA_DEMO_REQUIRED_ASSURANCE` (default `passkey`).
 
 > **Agent Ops demo** (proof-constrained authorization with runtime kill/revoke)
 > lives separately at `/demo/firewall` and is operator-only, not the public
-> isHuman integration demo.
+> Sign in integration demo.
 
 ## Required environment variables
 
@@ -52,27 +52,27 @@ Demo Heroku apps:
 Legacy Stripe Identity keys (`STRIPE_SECRET_KEY`, `STRIPE_IDENTITY_WEBHOOK_SECRET`)
 are migration-only for document-root recovery; do not provision them for new demos.
 
-## Recording checklist (Create · Verify · Enforce)
+## Recording checklist (Create · Sign in · Enforce)
 
 1. Load `/demo` on staging (`assurance_demo_mode: true` in config).
 2. **Create**: Create passkey wallet (no IDV popup). Note: continuity only, not unique humanness.
-3. **Verify**: Verify both sites; show different PPIDs and `assurance: passkey`. Optional: open Developer view for signed presentations; open ticketing + trials Heroku demos.
-4. **Enforce: set assurance**: Require human proof on ticketing → show valid-but-insufficient denial → complete Didit IDV (or staging test-verify) → re-verify with **same PPID** at `ishuman`.
+3. **Sign in**: Sign in on both sites; show different PPIDs and `assurance: passkey`. Optional: open Developer view for signed presentations; open ticketing + trials Heroku demos (both use `<lemma-signin>`).
+4. **Enforce: set assurance**: Require human proof on ticketing → show valid-but-insufficient denial → complete Didit IDV (or staging test-verify) → re-sign-in with **same PPID** at `ishuman`.
 5. **Enforce: doubt**: Mark ticketing doubtful (`doubt_required`); resolve with `verifyFreshForBackend()`. Works whether the user only has passkey presence or already has a human proof.
-6. **Enforce: ban**: Ban ticketing PPID (`site_blocked`); confirm fresh verification does not clear the ban. Trials stays verified throughout.
+6. **Enforce: ban**: Ban ticketing PPID (`site_blocked`); confirm fresh sign-in does not clear the ban. Trials stays signed in throughout.
 
 ## Legacy recording checklist (flags off)
 
 1. Load `/demo`.
 2. Create lemma.id via Didit IDV popup.
-3. Verify both demo sites (IDV-first flow).
+3. Sign in on both demo sites (IDV-first flow).
 4. Ban ticketing; confirm trials still valid.
 
 ## Demo language guardrail
 
 Use: "This demo uses Didit as the IDV rail."
 
-Prefer: **create**, **verify**, **set assurance** / **require human proof**, **doubt**, **ban** (site block).
+Prefer: **create**, **sign in**, **set assurance** / **require human proof**, **doubt**, **ban** (site block).
 
 Avoid: **escalate**, five-act chapter names, stamps as the hub spine.
 
@@ -103,4 +103,4 @@ persistent per-site enforcement drills.
 
 ## Presale deep link (Enforce in the wild)
 
-The presale tour at `?tour=presale` demonstrates **presence stamps** and action-level enforcement on a relying site, not a separate hub story. See `PRESALE_DEMO_SCRIPT.md`.
+The presale tour at `?tour=presale` demonstrates **presence stamps** and action-level enforcement on a relying site, not the primary Sign in story. See `PRESALE_DEMO_SCRIPT.md`.

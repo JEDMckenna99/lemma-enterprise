@@ -350,18 +350,32 @@ def _presale_gate_report(
     return {"gates_passed": passed, "gate_failed": reason}
 
 
-def _content():
+def _signin_content():
     if "trial" in SITE_KIND.lower():
         return {
-            "eyebrow": "SaaS free trial",
-            "headline": "Start a 14-day Pro workspace",
-            "subhead": "Protected by Lemma, passkey proof first; IDV only when this site requires human proof assurance.",
+            "eyebrow": "Sign in with lemma.id",
+            "headline": "Passwordless login for your app",
+            "subhead": "Sign in with a passkey-backed lemma.id. Your backend verifies a signed presentation and stores a site-private account ID — no passwords or emails required for login.",
             "primary": "Start free trial",
             "success": "Trial workspace created",
-            "form": "Work email",
+            "form": "Work email (optional profile field)",
             "placeholder": "founder@example.com",
             "action": "start_trial",
         }
+    return {
+        "eyebrow": "Sign in with lemma.id",
+        "headline": "Sign in to this demo site",
+        "subhead": "Same integration as the docs quickstart: drop in <lemma-signin>, verify the presentation on your backend, issue a session cookie. When you need Sybil-resistant enforcement, open the presale tour.",
+        "primary": "Run protected action",
+        "success": "Action completed",
+        "form": "Note (optional)",
+        "placeholder": "Signed in demo",
+        "action": "demo_action",
+        "presale_link": True,
+    }
+
+
+def _presale_content():
     return {
         "eyebrow": "Unique presale code distributor",
         "headline": "Passkey proves who you are, phone is for delivery",
@@ -380,6 +394,29 @@ def _content():
         "register_action": "register_presale",
         "claim_action": "claim_presale_code",
     }
+
+
+def _content():
+    return _signin_content()
+
+
+def _sdk_script_tags() -> str:
+    return (
+        f'<script src="{LEMMA_ORIGIN}/sdk/proof-verifier.js?v={ISHUMAN_VERIFIER_SDK_VERSION}" '
+        f'crossorigin="anonymous" '
+        f'onerror="window.__lemmaSdkLoadError=\'proof-verifier failed to load from {LEMMA_ORIGIN}\'"></script>\n'
+        f'  <script src="{LEMMA_ORIGIN}/sdk/lemma-signin.js?v={ISHUMAN_VERIFIER_SDK_VERSION}" '
+        f'crossorigin="anonymous" '
+        f'onerror="window.__lemmaSdkLoadError=\'lemma-signin failed to load from {LEMMA_ORIGIN}\'"></script>'
+    )
+
+
+def _lemma_signin_element() -> str:
+    return (
+        f'<lemma-signin id="lemma-signin-btn" site-id="{SITE_ID}" '
+        f'required-assurance="{DEMO_REQUIRED_ASSURANCE}" auto-provision="true" '
+        f'lemma-origin="{LEMMA_ORIGIN}"></lemma-signin>'
+    )
 
 
 @app.get("/health")
@@ -1000,7 +1037,9 @@ Cleared.
 @app.get("/")
 def index():
     if _is_presale_site():
-        return _presale_index()
+        if request.args.get("tour") == "presale":
+            return _presale_index()
+        return _ticketing_signin_index()
     return _generic_index()
 
 
@@ -1141,6 +1180,8 @@ def _generic_index():
       font-size: 12px;
     }}
     @media (max-width: 820px) {{ .layout {{ grid-template-columns: 1fr; }} }}
+    lemma-signin {{ display: block; width: 100%; margin-top: 16px; }}
+    lemma-signin::part(button) {{ width: 100%; }}
   </style>
 </head>
 <body>
@@ -1156,7 +1197,7 @@ def _generic_index():
         <p class="muted">{copy["subhead"]}</p>
         <label for="email">{copy["form"]}</label>
         <input id="email" value="{copy["placeholder"]}" aria-label="{copy["form"]}">
-        <button type="button" id="signin-btn">Sign in with lemma.id</button>
+        {_lemma_signin_element()}
         <button id="verify-btn" disabled>{copy["primary"]}</button>
         <p class="muted" id="session-copy" style="margin-top:12px;font-size:13px;">Sign in once. This site keeps a session until a fresh passkey is required.</p>
         <div class="verdict" id="decision-card">
@@ -1193,12 +1234,11 @@ def _generic_index():
       </aside>
     </div>
   </main>
-  <script src="{LEMMA_ORIGIN}/sdk/ishuman-verifier.js?v={ISHUMAN_VERIFIER_SDK_VERSION}" crossorigin="anonymous"
-    onerror="window.__lemmaSdkLoadError='ishuman-verifier failed to load from {LEMMA_ORIGIN}'"></script>
+  {_sdk_script_tags()}
   <script>
-    if (typeof IsHumanVerifier === 'undefined') {{
+    if (typeof ProofVerifier === 'undefined') {{
       const msg = window.__lemmaSdkLoadError
-        || 'Lemma SDK (IsHumanVerifier) did not load, check network connection and that {LEMMA_ORIGIN} is reachable.';
+        || 'Lemma SDK (ProofVerifier) did not load, check network connection and that {LEMMA_ORIGIN} is reachable.';
       document.getElementById('decision-copy').textContent = msg;
       document.getElementById('verify-btn').disabled = true;
     }}
@@ -1211,11 +1251,18 @@ def _generic_index():
     const decisionCard = document.getElementById('decision-card');
     const decisionCopy = document.getElementById('decision-copy');
     const sessionCopy = document.getElementById('session-copy');
-    const signinBtn = document.getElementById('signin-btn');
+    const signInEl = document.getElementById('lemma-signin-btn');
     const actionBtn = document.getElementById('verify-btn');
     const SITE_POLICY = '{DEMO_REQUIRED_ASSURANCE}';
     let sharedVerifier = null;
     let siteSessionPpid = null;
+
+    function setSignInDisabled(disabled) {{
+      if (!signInEl) return;
+      if (disabled) signInEl.setAttribute('disabled', '');
+      else signInEl.removeAttribute('disabled');
+    }}
+
     function makeVerifier(autoProvision) {{
       if (sharedVerifier && sharedVerifier.autoProvision === autoProvision) {{
         return sharedVerifier;
@@ -1384,7 +1431,7 @@ def _generic_index():
             sessionCopy.textContent = 'Signed in · PPID ' + (siteSessionPpid || '').slice(0, 24) + '…';
           }}
           if (actionBtn) actionBtn.disabled = false;
-          if (signinBtn) signinBtn.disabled = true;
+          setSignInDisabled(true);
           pill.textContent = 'SIGNED IN';
           pill.className = 'pill ok';
           setAssurancePill(data.assurance || SITE_POLICY);
@@ -1394,33 +1441,15 @@ def _generic_index():
       siteSessionPpid = null;
       if (sessionCopy) sessionCopy.textContent = 'Sign in once. This site keeps a session until a fresh passkey is required.';
       if (actionBtn) actionBtn.disabled = true;
-      if (signinBtn) signinBtn.disabled = false;
+      setSignInDisabled(false);
       return false;
     }}
 
-    async function signInWithLemma() {{
-      if (typeof IsHumanVerifier === 'undefined') {{
-        decisionCopy.textContent = window.__lemmaSdkLoadError
-          || 'Lemma SDK failed to load. Open this page in Safari/Chrome (not an in-app browser) and retry.';
-        return false;
-      }}
-      signinBtn.disabled = true;
+    async function completeLoginFromPresentation(presentation, timeMs) {{
       pill.textContent = 'CHECKING';
       pill.className = 'pill checking';
-      decisionCard.innerHTML = '<strong>Sign in with lemma.id</strong><p class="tiny">Passkey unlock, then server verifies your signed presentation and sets a site session cookie.</p>';
+      decisionCard.innerHTML = '<strong>Sign in with lemma.id</strong><p class="tiny">Server verifies your signed presentation and sets a site session cookie.</p>';
       try {{
-        const verifier = makeVerifier(true);
-        const {{ ok, presentation, reason, timeMs }} = await verifier.verifyForBackend({{
-          autoProvision: true,
-          requiredAssurance: SITE_POLICY,
-        }});
-        if (!ok) {{
-          pill.textContent = 'DENY';
-          pill.className = 'pill deny';
-          decisionCopy.textContent = formatDenyReason(reason);
-          signinBtn.disabled = false;
-          return false;
-        }}
         const loginRes = await fetch('/api/login', {{
           method: 'POST',
           credentials: 'include',
@@ -1442,7 +1471,7 @@ def _generic_index():
         pill.textContent = 'ERROR';
         pill.className = 'pill deny';
         decisionCopy.textContent = 'Sign in failed: ' + err.message;
-        signinBtn.disabled = false;
+        setSignInDisabled(false);
         return false;
       }}
     }}
@@ -1493,12 +1522,22 @@ def _generic_index():
 
     refreshSessionState();
     refreshActionLog();
-    signinBtn?.addEventListener('click', () => signInWithLemma());
+    signInEl?.addEventListener('lemma-signin-success', (e) => {{
+      completeLoginFromPresentation(e.detail.presentation, e.detail.timeMs);
+    }});
+    signInEl?.addEventListener('lemma-signin-error', (e) => {{
+      pill.textContent = 'DENY';
+      pill.className = 'pill deny';
+      decisionCopy.textContent = formatDenyReason(e.detail.reason);
+      setSignInDisabled(false);
+    }});
     actionBtn?.addEventListener('click', () => runProtectedAction());
 
     if (new URLSearchParams(window.location.search).get('lemma_ishuman_return') === '1') {{
-      signInWithLemma().then((ok) => {{
-        if (ok) runProtectedAction();
+      signInEl?.signIn()?.then((result) => {{
+        if (result?.ok) completeLoginFromPresentation(result.presentation, result.timeMs).then((ok) => {{
+          if (ok) runProtectedAction();
+        }});
       }});
     }}
   </script>
@@ -1507,8 +1546,208 @@ def _generic_index():
     return Response(html, mimetype="text/html")
 
 
+def _ticketing_signin_index():
+    copy = _signin_content()
+    html = f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{SITE_NAME}</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <style>
+    :root {{
+      --bg: #f8fafc; --ink: #0f172a; --muted: #64748b; --line: #e2e8f0; --brand: #4E3D8F; --ok: #166534; --deny: #991b1b;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; background: var(--bg); color: var(--ink); }}
+    header {{ background: #fff; border-bottom: 1px solid var(--line); padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; }}
+    .site-brand {{ display: flex; align-items: center; gap: 10px; }}
+    .site-icon {{ display: inline-flex; width: 42px; height: 42px; align-items: center; justify-content: center; border: 1px solid #fde68a; border-radius: 10px; background: #fffbeb; }}
+    .site-icon svg {{ width: 28px; height: 28px; }}
+    header a {{ color: var(--muted); font-size: 13px; text-decoration: none; }}
+    main {{ max-width: 920px; margin: 0 auto; padding: 28px 18px 48px; }}
+    .layout {{ display: grid; grid-template-columns: 1.1fr .9fr; gap: 18px; }}
+    .card {{ background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 24px; box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06); }}
+    .eyebrow {{ font-size: 11px; font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase; color: var(--brand); margin: 0 0 8px; }}
+    h1 {{ margin: 0 0 10px; font-size: clamp(32px, 6vw, 44px); line-height: 1.05; }}
+    .muted {{ color: var(--muted); line-height: 1.55; margin: 0; }}
+    button {{ width: 100%; border: 0; background: #1A1A24; color: #fff; border-radius: 10px; padding: 14px 16px; font-weight: 800; font-size: 15px; cursor: pointer; margin-top: 16px; }}
+    button:disabled {{ opacity: 0.65; cursor: not-allowed; }}
+    .pill {{ display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 4px 9px; font-size: 11px; font-weight: 800; background: #f8fafc; }}
+    .pill.ok {{ border-color: #86efac; background: #dcfce7; color: var(--ok); }}
+    .pill.deny {{ border-color: #fca5a5; background: #fee2e2; color: var(--deny); }}
+    .pill.checking {{ border-color: #fde68a; background: #fef9c3; color: #854d0e; }}
+    .verdict {{ margin-top: 18px; border-radius: 14px; padding: 16px; background: #0f172a; color: #e2e8f0; min-height: 100px; }}
+    .verdict strong {{ color: #fff; display: block; margin-bottom: 6px; }}
+    .verdict .tiny {{ font-size: 12px; color: #94a3b8; margin: 0; line-height: 1.45; }}
+    .how {{ margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; line-height: 1.55; }}
+    .how li {{ margin-bottom: 8px; }}
+    code {{ font-size: 12px; background: #f1f5f9; padding: 2px 6px; border-radius: 6px; }}
+    .presale-link {{ display: inline-block; margin-top: 14px; color: var(--brand); font-weight: 700; text-decoration: none; }}
+    @media (max-width: 820px) {{ .layout {{ grid-template-columns: 1fr; }} }}
+    lemma-signin {{ display: block; width: 100%; margin-top: 16px; }}
+    lemma-signin::part(button) {{ width: 100%; }}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="site-brand">
+      <span class="site-icon">{TICKETING_ICON_SVG}</span>
+      <strong>{SITE_NAME}</strong>
+    </div>
+    <a href="{DEMO_HUB_URL}?from=demo" target="_blank" rel="noopener">Return to demo hub</a>
+  </header>
+  <main>
+    <div class="layout">
+      <section class="card">
+        <p class="eyebrow">{copy["eyebrow"]}</p>
+        <h1>{copy["headline"]}</h1>
+        <p class="muted">{copy["subhead"]}</p>
+        {_lemma_signin_element()}
+        <button id="verify-btn" disabled>{copy["primary"]}</button>
+        <p class="muted" id="session-copy" style="margin-top:12px;font-size:13px;">Sign in once. This site keeps a session until a fresh passkey is required.</p>
+        <a class="presale-link" href="/?tour=presale">Open presale enforcement demo →</a>
+        <div class="verdict" id="decision-card">
+          <strong>Drop-in Sign in</strong>
+          <p class="tiny">This page uses the same <code>&lt;lemma-signin&gt;</code> element from the docs quickstart. Your backend verifies the presentation and sets a session cookie.</p>
+        </div>
+      </section>
+      <aside class="card">
+        <p class="eyebrow">Customer site view</p>
+        <p class="muted">Site binding: <code id="site-id">{SITE_ID}</code></p>
+        <p style="margin:12px 0 6px">Decision <span class="pill" id="status-pill">WAITING</span>
+          <span class="pill" id="assurance-pill">policy: {DEMO_REQUIRED_ASSURANCE}</span></p>
+        <p class="muted" id="decision-copy">Sign in to start.</p>
+        <ol class="how">
+          <li>Sign in with lemma.id once — server verifies presentation and sets a session cookie.</li>
+          <li>Protected actions reuse the site session until policy requires fresh passkey.</li>
+          <li>For Sybil-resistant presale flows, open the presale tour.</li>
+        </ol>
+      </aside>
+    </div>
+  </main>
+  {_sdk_script_tags()}
+  <script>
+    const pill = document.getElementById('status-pill');
+    const assurancePill = document.getElementById('assurance-pill');
+    const decisionCard = document.getElementById('decision-card');
+    const decisionCopy = document.getElementById('decision-copy');
+    const sessionCopy = document.getElementById('session-copy');
+    const signInEl = document.getElementById('lemma-signin-btn');
+    const actionBtn = document.getElementById('verify-btn');
+    const SITE_POLICY = '{DEMO_REQUIRED_ASSURANCE}';
+    let siteSessionPpid = null;
+
+    function setSignInDisabled(disabled) {{
+      if (!signInEl) return;
+      if (disabled) signInEl.setAttribute('disabled', '');
+      else signInEl.removeAttribute('disabled');
+    }}
+
+    function setAssurancePill(assurance) {{
+      if (!assurancePill) return;
+      assurancePill.textContent = assurance ? ('assurance: ' + assurance) : ('policy: ' + SITE_POLICY);
+    }}
+
+    async function refreshSessionState() {{
+      try {{
+        const me = await fetch('/api/me', {{ credentials: 'include' }});
+        if (me.ok) {{
+          const data = await me.json();
+          siteSessionPpid = data.ppid || null;
+          if (sessionCopy) sessionCopy.textContent = 'Signed in · PPID ' + (siteSessionPpid || '').slice(0, 24) + '…';
+          if (actionBtn) actionBtn.disabled = false;
+          setSignInDisabled(true);
+          pill.textContent = 'SIGNED IN';
+          pill.className = 'pill ok';
+          setAssurancePill(data.assurance || SITE_POLICY);
+          return true;
+        }}
+      }} catch (err) {{}}
+      siteSessionPpid = null;
+      if (sessionCopy) sessionCopy.textContent = 'Sign in once. This site keeps a session until a fresh passkey is required.';
+      if (actionBtn) actionBtn.disabled = true;
+      setSignInDisabled(false);
+      return false;
+    }}
+
+    async function completeLoginFromPresentation(presentation, timeMs) {{
+      try {{
+        const loginRes = await fetch('/api/login', {{
+          method: 'POST', credentials: 'include',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ presentation }}),
+        }});
+        const loginPayload = await loginRes.json();
+        if (!loginRes.ok || !loginPayload.success) throw new Error(loginPayload.reason || 'login_failed');
+        siteSessionPpid = loginPayload.ppid || null;
+        await refreshSessionState();
+        decisionCard.innerHTML = '<strong>Signed in</strong><p class="tiny">Site session active · '
+          + (timeMs || 0).toFixed(0) + 'ms · PPID ' + (siteSessionPpid || '').slice(0, 24) + '…</p>';
+        decisionCopy.textContent = 'Session active. Run a protected action or open the presale tour.';
+        return true;
+      }} catch (err) {{
+        pill.textContent = 'ERROR';
+        pill.className = 'pill deny';
+        decisionCopy.textContent = 'Sign in failed: ' + err.message;
+        setSignInDisabled(false);
+        return false;
+      }}
+    }}
+
+    async function runProtectedAction() {{
+      if (!siteSessionPpid && !(await refreshSessionState())) {{
+        decisionCopy.textContent = 'Sign in with lemma.id first.';
+        return;
+      }}
+      actionBtn.disabled = true;
+      pill.textContent = 'CHECKING';
+      pill.className = 'pill checking';
+      try {{
+        const serverRes = await fetch('/api/demo/action', {{
+          method: 'POST', credentials: 'include',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ action: '{copy["action"]}', at: Date.now() }}),
+        }});
+        const serverEntry = await serverRes.json();
+        if (serverEntry.success) {{
+          pill.textContent = 'ALLOW';
+          pill.className = 'pill ok';
+          decisionCopy.textContent = 'Protected action allowed via site session.';
+        }} else {{
+          pill.textContent = 'DENY';
+          pill.className = 'pill deny';
+          decisionCopy.textContent = 'Blocked: ' + (serverEntry.reason || 'denied');
+        }}
+      }} catch (err) {{
+        decisionCopy.textContent = 'Action failed: ' + err.message;
+      }} finally {{
+        actionBtn.disabled = !siteSessionPpid;
+      }}
+    }}
+
+    refreshSessionState();
+    signInEl?.addEventListener('lemma-signin-success', (e) => {{
+      pill.textContent = 'CHECKING';
+      pill.className = 'pill checking';
+      completeLoginFromPresentation(e.detail.presentation, e.detail.timeMs);
+    }});
+    signInEl?.addEventListener('lemma-signin-error', (e) => {{
+      pill.textContent = 'DENY';
+      pill.className = 'pill deny';
+      decisionCopy.textContent = e.detail.reason || 'not_verified';
+      setSignInDisabled(false);
+    }});
+    actionBtn?.addEventListener('click', () => runProtectedAction());
+  </script>
+</body>
+</html>"""
+    return Response(html, mimetype="text/html")
+
+
 def _presale_index():
-    copy = _content()
+    copy = _presale_content()
     html = f"""<!doctype html>
 <html lang="en">
 <head>
@@ -1823,6 +2062,8 @@ def _presale_index():
       .layout {{ grid-template-columns: 1fr; }}
       .defense-strip {{ grid-template-columns: 1fr 1fr; }}
     }}
+    lemma-signin {{ display: block; width: 100%; margin-top: 16px; }}
+    lemma-signin::part(button) {{ width: 100%; }}
   </style>
 </head>
 <body>
@@ -1832,6 +2073,7 @@ def _presale_index():
       <strong>{SITE_NAME}</strong>
     </div>
     <a href="{DEMO_HUB_URL}?from=demo" target="_blank" rel="noopener">Return to demo hub</a>
+    <a href="/" style="margin-left:12px;">← Sign-in demo</a>
   </header>
   <main>
     <div class="tour-banner" id="tour-banner" hidden>
@@ -1868,7 +2110,7 @@ def _presale_index():
         <input id="phone" value="{copy["placeholder_phone"]}" aria-label="{copy["form_phone"]}">
         <p class="contact-note">For SMS alerts and CRM, passkey proves identity.</p>
         <p class="muted" style="margin-top:12px;font-size:13px;">Drop: <code id="drop-id">{PRESALE_DROP_ID}</code></p>
-        <button type="button" id="signin-btn">Sign in with lemma.id</button>
+        {_lemma_signin_element()}
         <p class="contact-note" id="session-copy">Sign in once. Presale register uses your site session; claim still requires a fresh passkey ceremony.</p>
         <button id="register-btn" disabled>{copy["register"]}</button>
         <button type="button" class="btn-secondary" id="claim-btn" disabled>{copy["claim"]}</button>
@@ -1942,8 +2184,7 @@ def _presale_index():
       </aside>
     </div>
   </main>
-  <script src="{LEMMA_ORIGIN}/sdk/ishuman-verifier.js?v={ISHUMAN_VERIFIER_SDK_VERSION}" crossorigin="anonymous"
-    onerror="window.__lemmaSdkLoadError='ishuman-verifier failed to load from {LEMMA_ORIGIN}'"></script>
+  {_sdk_script_tags()}
   <script>
     const DROP_ID = {PRESALE_DROP_ID!r};
     const SITE_ID = '{SITE_ID}';
@@ -1978,6 +2219,7 @@ def _presale_index():
     const stepClaim = document.getElementById('step-claim');
     const tourBanner = document.getElementById('tour-banner');
     const tourImpact = document.getElementById('tour-impact');
+    const signInEl = document.getElementById('lemma-signin-btn');
     let sharedVerifier = null;
     let lastPpid = null;
     let siteSessionPpid = null;
@@ -2065,7 +2307,7 @@ def _presale_index():
       setTourHighlight(next);
     }}
 
-    if (typeof IsHumanVerifier === 'undefined') {{
+    if (typeof ProofVerifier === 'undefined' && typeof IsHumanVerifier === 'undefined') {{
       const msg = window.__lemmaSdkLoadError
         || 'Lemma SDK did not load, check that {LEMMA_ORIGIN} is reachable.';
       decisionCopy.textContent = msg;
@@ -2105,9 +2347,14 @@ def _presale_index():
       }};
     }}
 
+    function setSignInDisabled(disabled) {{
+      if (!signInEl) return;
+      if (disabled) signInEl.setAttribute('disabled', '');
+      else signInEl.removeAttribute('disabled');
+    }}
+
     async function refreshSessionState() {{
       const sessionCopy = document.getElementById('session-copy');
-      const signinBtn = document.getElementById('signin-btn');
       const registerBtn = document.getElementById('register-btn');
       try {{
         const me = await fetch('/api/me', {{ credentials: 'include' }});
@@ -2118,7 +2365,7 @@ def _presale_index():
           if (sessionCopy) {{
             sessionCopy.textContent = 'Signed in · PPID ' + (siteSessionPpid || '').slice(0, 24) + '…';
           }}
-          if (signinBtn) signinBtn.disabled = true;
+          setSignInDisabled(true);
           if (registerBtn && !presaleRegistered) registerBtn.disabled = false;
           pill.textContent = 'SIGNED IN';
           pill.className = 'pill ok';
@@ -2129,7 +2376,7 @@ def _presale_index():
       if (sessionCopy) {{
         sessionCopy.textContent = 'Sign in once. Presale register uses your site session; claim still requires a fresh passkey ceremony.';
       }}
-      if (signinBtn) signinBtn.disabled = false;
+      setSignInDisabled(false);
       if (registerBtn) registerBtn.disabled = true;
       return false;
     }}
@@ -2142,26 +2389,11 @@ def _presale_index():
       return false;
     }}
 
-    async function signInWithLemma() {{
-      if (typeof IsHumanVerifier === 'undefined') return false;
-      const signinBtn = document.getElementById('signin-btn');
-      signinBtn.disabled = true;
+    async function completeLoginFromPresentation(presentation) {{
       pill.textContent = 'CHECKING';
       pill.className = 'pill checking';
       decisionCard.innerHTML = '<strong>Sign in with lemma.id</strong><p class="tiny">Server verifies your signed presentation and sets a site session cookie.</p>';
       try {{
-        const verifier = makeVerifier('passkey');
-        const {{ ok, presentation, reason }} = await verifier.verifyForBackend({{
-          autoProvision: true,
-          requiredAssurance: 'passkey',
-        }});
-        if (!ok) {{
-          pill.textContent = 'DENY';
-          pill.className = 'pill deny';
-          decisionCopy.textContent = formatDenyReason(reason);
-          signinBtn.disabled = false;
-          return false;
-        }}
         const loginRes = await fetch('/api/login', {{
           method: 'POST',
           credentials: 'include',
@@ -2181,7 +2413,7 @@ def _presale_index():
         pill.textContent = 'ERROR';
         pill.className = 'pill deny';
         decisionCopy.textContent = 'Sign in failed: ' + err.message;
-        signinBtn.disabled = false;
+        setSignInDisabled(false);
         return false;
       }}
     }}
@@ -2735,7 +2967,15 @@ def _presale_index():
 
     refreshSessionState();
     refreshActionLog();
-    document.getElementById('signin-btn')?.addEventListener('click', () => signInWithLemma());
+    signInEl?.addEventListener('lemma-signin-success', (e) => {{
+      completeLoginFromPresentation(e.detail.presentation);
+    }});
+    signInEl?.addEventListener('lemma-signin-error', (e) => {{
+      pill.textContent = 'DENY';
+      pill.className = 'pill deny';
+      decisionCopy.textContent = formatDenyReason(e.detail.reason);
+      setSignInDisabled(false);
+    }});
     document.getElementById('register-btn')?.addEventListener('click', () => runRegister());
     document.getElementById('claim-btn')?.addEventListener('click', () => runClaim());
     document.getElementById('retry-btn')?.addEventListener('click', () => runClaim(undefined, 0, {{ isRetry: true }}));

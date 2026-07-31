@@ -525,7 +525,7 @@
     btn.hidden = ready;
 
     if (ready) {
-      setQuickInsight('Create', 'lemma.id ready, verify on the two demo sites below.');
+      setQuickInsight('Create', 'lemma.id ready, sign in on the two demo sites below.');
       updateQuickProgress(deriveProgressAct());
       return;
     }
@@ -1159,7 +1159,7 @@
     setDemoMode('live');
     setWorkflowHighlight(1);
     updateQuickProgress(1);
-    setQuickInsight('Create', 'Create or unlock your lemma.id, then verify on the two sites.');
+    setQuickInsight('Create', 'Create or unlock your lemma.id, then sign in on the two sites.');
     scrollToPanel('ih-step-1');
     log('Demo started', 'create or unlock your lemma.id');
   }
@@ -2089,7 +2089,7 @@
   }
 
   /**
-   * When a site is doubted, Verify must open the deliberate ceremony — never
+   * When a site is doubted, Sign in must open the deliberate ceremony — never
    * treat a cached session as verified. Humanity doubt → fresh_idv popup;
    * Fresh presence → passkey site_proof popup.
    */
