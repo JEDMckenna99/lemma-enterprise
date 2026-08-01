@@ -365,7 +365,7 @@ def _signin_content():
     return {
         "eyebrow": "Sign in with lemma.id",
         "headline": "Sign in to this demo site",
-        "subhead": "Same integration as the docs quickstart: drop in <lemma-signin>, verify the presentation on your backend, issue a session cookie. When you need Sybil-resistant enforcement, open the presale tour.",
+        "subhead": "Same integration as the docs quickstart: drop in the lemma-signin element, verify the presentation on your backend, issue a session cookie. When you need Sybil-resistant enforcement, open the presale tour.",
         "primary": "Run protected action",
         "success": "Action completed",
         "form": "Note (optional)",
