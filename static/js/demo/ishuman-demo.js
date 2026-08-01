@@ -2073,10 +2073,7 @@
     const ppid = resolveSitePpid(slug);
     if (!ppid || !isSiteDoubted(slug)) return;
     try {
-      await requestJson('/api/demo/ishuman/clear-site-doubt', {
-        method: 'POST',
-        body: JSON.stringify(demoControlPayload(slug, ppid)),
-      });
+      await requestDemoControl(slug, '/api/demo/ishuman/clear-site-doubt');
     } catch (err) {
       // fresh_idv billing may already have cleared the server row
       if (err?.status !== 404 && err?.payload?.error !== 'no_active_doubt') {
@@ -2496,16 +2493,82 @@
     };
   }
 
+  function isDemoControlPresentationError(err) {
+    const reason = String(err?.payload?.reason || err?.message || '').toLowerCase();
+    return err?.status === 403 && (
+      reason.includes('presentation_missing')
+      || reason.includes('presentation_invalid')
+      || reason.includes('presentation_verify_error')
+      || reason.includes('expired')
+    );
+  }
+
+  /**
+   * Demo enforce APIs authorize via a signed site presentation. After reload
+   * (or expiry) the PPID/doubt can still hydrate while presentation is gone —
+   * mint a fresh one without running the doubt-resolve ceremony.
+   */
+  async function ensureControlPresentation(slug, { force = false } = {}) {
+    if (!force && state.results[slug]?.presentation) {
+      return state.results[slug].presentation;
+    }
+    const ppid = resolveSitePpid(slug);
+    const wasDoubted = !!(ppid && state.localDoubts[slug]?.has(ppid));
+    if (wasDoubted) state.localDoubts[slug].delete(ppid);
+    try {
+      const verifier = verifierFor(slug, { requiredAssurance: 'passkey' });
+      const backend = await verifier.verifyForBackend({
+        autoProvision: true,
+        requiredAssurance: 'passkey',
+      });
+      if (!backend?.ok || !backend.presentation) {
+        throw new Error(backend?.reason || 'presentation_missing');
+      }
+      state.results[slug] = {
+        ...(state.results[slug] || {}),
+        ppid: backend.ppid || ppid || state.results[slug]?.ppid || null,
+        assurance: backend.assurance || 'passkey',
+        presentation: backend.presentation,
+        human: !!(backend.ok || backend.human),
+        reason: backend.reason || 'valid',
+        timeMs: backend.timeMs || 0,
+      };
+      if (state.results[slug].ppid) {
+        state.passkeyPpids[slug] = state.results[slug].ppid;
+      }
+      return backend.presentation;
+    } finally {
+      if (wasDoubted && ppid) state.localDoubts[slug].add(ppid);
+    }
+  }
+
+  async function requestDemoControl(slug, url, extra = {}) {
+    await ensureControlPresentation(slug);
+    const ppid = resolveSitePpid(slug);
+    if (!ppid) throw new Error(`${slug} PPID unavailable`);
+    try {
+      return await requestJson(url, {
+        method: 'POST',
+        body: JSON.stringify(demoControlPayload(slug, ppid, extra)),
+      });
+    } catch (err) {
+      if (!isDemoControlPresentationError(err)) throw err;
+      await ensureControlPresentation(slug, { force: true });
+      const retryPpid = resolveSitePpid(slug) || ppid;
+      return requestJson(url, {
+        method: 'POST',
+        body: JSON.stringify(demoControlPayload(slug, retryPpid, extra)),
+      });
+    }
+  }
+
   async function blockSite(slug) {
     const ppid = await ensureSitePpid(slug);
     if (!ppid) throw new Error(`${slug} PPID unavailable`);
     const result = state.results[slug] || { ppid };
 
-    const payload = await requestJson('/api/demo/ishuman/site-block', {
-      method: 'POST',
-      body: JSON.stringify(demoControlPayload(slug, ppid, {
-        reason: `Demo block: automated behavior detected on ${slug}`,
-      })),
+    const payload = await requestDemoControl(slug, '/api/demo/ishuman/site-block', {
+      reason: `Demo block: automated behavior detected on ${slug}`,
     });
     markSessionBan(slug, ppid, 'site_ppid_revoked');
     clearVerifierCache(slug);
@@ -2569,13 +2632,10 @@
         `${slug === 'tickets' ? 'Presale' : 'SaaS trial'} is banned. Unban before doubting.`,
       );
     }
-    await requestJson('/api/demo/ishuman/site-doubt', {
-      method: 'POST',
-      body: JSON.stringify(demoControlPayload(slug, ppid, {
-        reason: tier === 'ishuman'
-          ? 'Demo doubt: require fresh human proof'
-          : 'Demo doubt: require fresh passkey',
-      })),
+    await requestDemoControl(slug, '/api/demo/ishuman/site-doubt', {
+      reason: tier === 'ishuman'
+        ? 'Demo doubt: require fresh human proof'
+        : 'Demo doubt: require fresh passkey',
     });
     state.localDoubts[slug].add(ppid);
     clearVerifierCache(slug);
@@ -2618,8 +2678,9 @@
     await clearActiveDoubtQuiet(slug);
     log(`${slug} doubt cleared`, short(ppid));
     if (!options.skipRecheck) {
-      await verifySite('tickets', { resolveDoubt: false });
-      await verifySite('trials', { resolveDoubt: false });
+      // Snapshot only — do not open a new popup after Undoubt.
+      await verifySite('tickets', { autoProvision: false, resolveDoubt: false });
+      await verifySite('trials', { autoProvision: false, resolveDoubt: false });
     }
     if (!options.skipInsight) {
       const label = slug === 'tickets' ? 'Presale' : 'SaaS trial';
@@ -2731,6 +2792,7 @@
     // One-shot clear across both demo sites for every known PPID so a mismatch
     // between tickets/trials or sticky bloom rows cannot strand the visitor.
     try {
+      await ensureControlPresentation(slug);
       const batch = await requestJson('/api/demo/ishuman/clear-bans', {
         method: 'POST',
         body: JSON.stringify(demoControlPayload(slug, [...ppids][0] || '', {
@@ -2744,9 +2806,28 @@
       unblockedAny = !!(batch?.lifted_any || (batch?.cleared || []).some((row) => row.lifted));
       log('unban clear-bans', `lifted_any=${unblockedAny} sent=${ppids.size} server=${batch?.ppid_count ?? '?'}`);
     } catch (err) {
-      errors.push(err?.message || String(err));
+      if (isDemoControlPresentationError(err)) {
+        try {
+          await ensureControlPresentation(slug, { force: true });
+          const batch = await requestJson('/api/demo/ishuman/clear-bans', {
+            method: 'POST',
+            body: JSON.stringify(demoControlPayload(slug, [...ppids][0] || '', {
+              ppids: [...ppids],
+              site_slugs: SITE_SLUGS,
+              clear_all_active_demo_bans: true,
+            })),
+          });
+          unblockedAny = !!(batch?.lifted_any || (batch?.cleared || []).some((row) => row.lifted));
+          log('unban clear-bans', `retry lifted_any=${unblockedAny}`);
+        } catch (retryErr) {
+          errors.push(retryErr?.message || String(retryErr));
+        }
+      } else {
+        errors.push(err?.message || String(err));
+      }
       for (const ppid of ppids) {
         try {
+          await ensureControlPresentation(slug);
           const payload = await requestJson('/api/demo/ishuman/site-unblock', {
             method: 'POST',
             body: JSON.stringify(demoControlPayload(slug, ppid)),
