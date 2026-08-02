@@ -6,7 +6,7 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=51">
+<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=52">
 {% endblock %}
 
 {% block content %}
@@ -136,6 +136,29 @@
       </div>
     </aside>
   </header>
+
+  <nav class="demo-lane-chooser" id="ih-lane-chooser" aria-label="Demo mode">
+    <button type="button" class="demo-lane-btn is-active" id="ih-lane-try-btn" data-lane="try">Try it</button>
+    <button type="button" class="demo-lane-btn" id="ih-lane-builder-btn" data-lane="builder">See how it works</button>
+  </nav>
+
+  <section class="demo-try-lane" id="ih-try-lane">
+    <div class="demo-try-card">
+      <h2>Feel the difference in under two minutes</h2>
+      <p class="demo-muted">A guided story on the ticketing demo site: contrast the old signup way, sign in with a passkey, claim a code, and see one-code-per-person enforcement.</p>
+      <ol class="demo-try-steps">
+        <li>See what email/password signup feels like (mock)</li>
+        <li>Sign in with lemma.id — no form</li>
+        <li>Claim a presale code</li>
+        <li>Try to grab a second code — denied</li>
+        <li>Close the tab and come back — still you</li>
+      </ol>
+      <a class="demo-btn demo-btn-primary" id="ih-try-lane-start" href="#" target="_blank" rel="noopener">Start the guided demo →</a>
+      <button type="button" class="demo-btn demo-btn-secondary demo-btn-outline" id="ih-try-lane-builder-link">See how it works instead</button>
+    </div>
+  </section>
+
+  <div id="ih-builder-lane" hidden>
 
   <button class="demo-btn demo-btn-secondary demo-btn-quiet" id="ih-popup-retry-btn" type="button" hidden>Retry popup</button>
 
@@ -292,15 +315,15 @@
               <span class="demo-pill" id="ih-tickets-pill">Pending</span>
             </div>
             <div class="site-card-field">
-              <span class="result-label">Private site ID</span>
+              <span class="result-label">What this site sees</span>
               <span class="result-value" id="ih-tickets-ppid">did:lemma:ppid_ticketing_••••</span>
             </div>
             <div class="site-card-field assurance-only is-withheld">
-              <span class="result-label">Assurance</span>
+              <span class="result-label">Proof level</span>
               <span class="result-value" id="ih-tickets-assurance">—</span>
             </div>
             <div class="site-card-field is-withheld">
-              <span class="result-label">Reason</span>
+              <span class="result-label">Status</span>
               <span class="result-value" id="ih-tickets-reason">—</span>
             </div>
             <div class="site-card-field is-withheld">
@@ -326,15 +349,15 @@
               <span class="demo-pill" id="ih-trials-pill">Pending</span>
             </div>
             <div class="site-card-field">
-              <span class="result-label">Private site ID</span>
+              <span class="result-label">What this site sees</span>
               <span class="result-value" id="ih-trials-ppid">did:lemma:ppid_trials_••••</span>
             </div>
             <div class="site-card-field assurance-only is-withheld">
-              <span class="result-label">Assurance</span>
+              <span class="result-label">Proof level</span>
               <span class="result-value" id="ih-trials-assurance">—</span>
             </div>
             <div class="site-card-field is-withheld">
-              <span class="result-label">Reason</span>
+              <span class="result-label">Status</span>
               <span class="result-value" id="ih-trials-reason">—</span>
             </div>
             <div class="site-card-field is-withheld">
@@ -348,17 +371,17 @@
           </article>
         </div>
 
-          <div class="ppid-compare">
-            <p class="ppid-compare-title">Same lemma.id. Different private IDs.</p>
-            <p class="demo-muted ppid-compare-desc" id="ih-ppid-compare-desc">Ticketing and Trials receive different identifiers, even though both proofs come from the same lemma.id.</p>
+          <div class="ppid-compare ppid-compare-privacy" id="ih-ppid-compare-panel">
+            <p class="ppid-compare-title">These sites can't compare notes about you.</p>
+            <p class="demo-muted ppid-compare-desc" id="ih-ppid-compare-desc">Same lemma.id signed in on both demos — each site sees a different private ID.</p>
             <div class="ppid-compare-grid">
-              <div class="ppid-slot">
-                <span class="result-label">Ticketing</span>
+              <div class="ppid-slot ppid-badge ppid-badge-tickets">
+                <span class="result-label">Tickets sees</span>
                 <span class="ppid-val" id="ih-tickets-ppid-compare">—</span>
               </div>
               <div class="ppid-diff" id="ih-ppid-diff">Sign in on both sites</div>
-              <div class="ppid-slot">
-                <span class="result-label">Trials</span>
+              <div class="ppid-slot ppid-badge ppid-badge-trials">
+                <span class="result-label">Trials sees</span>
                 <span class="ppid-val" id="ih-trials-ppid-compare">—</span>
               </div>
             </div>
@@ -406,7 +429,7 @@
         <div class="workflow-head">
           <div>
             <h2 id="ih-block-step-title">Enforce</h2>
-            <p class="demo-muted">The step-up tier on the same private ID: each site decides — doubt for a fresh proof, require human proof, or ban. Scoped per site: action on presale does not affect SaaS trial.</p>
+            <p class="demo-muted demo-hat-switch"><strong>Put on the site-owner hat.</strong> Each site decides — require human proof, doubt for a fresh check, or ban. Action on presale does not affect SaaS trial.</p>
           </div>
         </div>
 
@@ -418,8 +441,8 @@
               <span class="demo-pill enforce-row-status" id="ih-enforce-tickets-status">Not verified</span>
             </div>
             <div class="enforce-row-actions">
-              <button type="button" class="enforce-chip" id="ih-doubt-tickets-presence-btn">Fresh presence</button>
-              <button type="button" class="enforce-chip" id="ih-doubt-tickets-human-btn">Doubt humanity</button>
+              <button type="button" class="enforce-chip" id="ih-doubt-tickets-presence-btn">Doubt</button>
+              <button type="button" class="enforce-chip" id="ih-doubt-tickets-human-btn" hidden aria-hidden="true">Doubt humanity</button>
               <button type="button" class="enforce-chip enforce-chip--danger" id="ih-abuse-block-btn">Ban</button>
             </div>
           </article>
@@ -430,8 +453,8 @@
               <span class="demo-pill enforce-row-status" id="ih-enforce-trials-status">Not verified</span>
             </div>
             <div class="enforce-row-actions">
-              <button type="button" class="enforce-chip" id="ih-doubt-trials-presence-btn">Fresh presence</button>
-              <button type="button" class="enforce-chip" id="ih-doubt-trials-human-btn">Doubt humanity</button>
+              <button type="button" class="enforce-chip" id="ih-doubt-trials-presence-btn">Doubt</button>
+              <button type="button" class="enforce-chip" id="ih-doubt-trials-human-btn" hidden aria-hidden="true">Doubt humanity</button>
               <button type="button" class="enforce-chip enforce-chip--danger" id="ih-trials-ban-btn">Ban</button>
             </div>
           </article>
@@ -519,6 +542,29 @@
       </div>
     </section>
   </div>
+
+  </div>
+
+  <section class="demo-end-card" id="ih-end-card">
+    <h2>What next?</h2>
+    <div class="demo-end-grid">
+      <article>
+        <h3>For developers</h3>
+        <pre class="demo-end-snippet">&lt;lemma-signin site-id="app.example.com"&gt;&lt;/lemma-signin&gt;</pre>
+        <a href="/docs/integration/ISHUMAN_AGENT_INTEGRATION.md">Integration guide →</a>
+      </article>
+      <article>
+        <h3>For site operators</h3>
+        <p class="demo-muted">Require human proof, doubt a user, or ban — scoped per site.</p>
+        <button type="button" class="demo-btn demo-btn-secondary" id="ih-end-enforce-link">Open Enforce chapter</button>
+      </article>
+      <article>
+        <h3>For everyone</h3>
+        <p class="demo-muted">Create your passkey-protected lemma.id and use it across the web.</p>
+        <button type="button" class="demo-btn demo-btn-primary" id="ih-end-create-link">Create your lemma.id</button>
+      </article>
+    </div>
+  </section>
 
   <section class="demo-outcome-footer">
     <img src="/static/img/lemma_logo.svg" alt="" width="56" height="56" class="demo-outcome-logo">
@@ -691,5 +737,6 @@ const { ok, ppid, assurance, presentation } = await new ProofVerifier({
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <!-- Legacy SDK alias remains available at /sdk/ishuman-verifier.js. -->
 <script src="/sdk/proof-verifier.js?v={{ proof_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=86" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/plain-language.js?v=1" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=87" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}

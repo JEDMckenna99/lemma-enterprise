@@ -51,7 +51,7 @@ def test_demo_hub_template_has_three_concept_lifecycle():
     assert "assurance-only" in html
     assert 'data-quick-act="3"' in html
     assert "ih-enforce-rows" in html
-    assert "Fresh presence" in html
+    assert "Doubt" in html
     assert "Doubt humanity" in html
     assert "Set assurance, doubt a user" in html
 

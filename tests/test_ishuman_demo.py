@@ -50,7 +50,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "Enforce" in body
     assert "ih-enforce-rows" in body
     assert "ih-enforce-trials-ppid" in body
-    assert "Fresh presence" in body
+    assert ">Doubt</button>" in body
     assert "Doubt humanity" in body
     assert "Fresh passkey" not in body.split("ih-enforce-rows")[1].split("ih-block-results-table")[0]
     assert "Set assurance level (presale)" in body
@@ -77,7 +77,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert ">Human proof</button>" in body
     assert ">Ban</button>" in body
     assert ">Unblock</button>" in body
-    assert "/static/css/demo/ishuman-demo.css?v=51" in body
+    assert "/static/css/demo/ishuman-demo.css?v=52" in body
     assert "ih-raise-tickets-policy-btn" not in body
     assert "ih-policy-toggle-card" not in body
     assert "ih-complete-human-main-btn" in body
@@ -91,7 +91,9 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "Different private ID than presale" in body
     assert "demo-diagram-stage" in body
     assert "demo-diagram-footnotes" in body
+    assert "ih-lane-chooser" in body
     assert "ih-proof-receipt" in body
+    assert "plain-language.js" in body
     assert "ih-link-tickets-tour" in body
     assert "ih-link-trials-inline" not in body
     assert "ih-link-tickets-main" not in body
@@ -118,7 +120,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-network-pill" not in body
     assert "ih-verify-tickets-btn" in body
     assert "ih-verify-trials-btn" in body
-    assert "Verify on ticketing site" in body
+    assert "Sign in on ticketing site" in body
     assert "ih-verify-sites-btn" in body
     assert "ih-link-tickets-tour" in body
     assert "ih-link-tickets-step2" not in body
@@ -142,7 +144,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=85" in body
+    assert "/static/js/demo/plain-language.js?v=1" in body
+    assert "/static/js/demo/ishuman-demo.js?v=87" in body
     assert "ih-clear-my-bans-btn" in body
     assert "Clear my bans" in body
     js = (ROOT / "static/js/demo/ishuman-demo.js").read_text(encoding="utf-8")

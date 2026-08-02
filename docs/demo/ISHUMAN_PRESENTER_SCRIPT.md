@@ -1,36 +1,78 @@
-# Sign in with lemma.id — demo presenter script
+# Sign in with lemma.id — demo presenter script (user lane)
 
-Hub narrative: **Create · Sign in · Enforce**.
+Read this verbatim when giving the demo to a non-technical audience. Use the **Try it** lane on `/demo`, then the ticketing demo site.
 
-## Create
+## Before you start
 
-1. Create or unlock a passkey-protected lemma.id on device.
-2. Say: continuity only at first, not proof of unique humanness until a site requires it.
+- Open `/demo` and click **Start the guided demo** (or go directly to the ticketing demo site).
+- If anything looks stuck, click **Clear demo data** on the hub and close demo site tabs.
 
-## Sign in
+This demo uses Didit as the IDV rail when human proof step-up is shown.
 
-3. Sign in once and show two distinct site-private PPIDs for ticketing and trials.
-4. Say: same lemma.id, unlinkable IDs; signed presentations verified offline on each site backend. Demo sites use the same `<lemma-signin>` drop-in from the docs quickstart.
-5. Optional: expand **Developer view** for presentation JSON; mention **presence** (fresh passkey on high-value actions), detail lives on the presale tour, not the hub spine.
+---
 
-## Enforce
+## Beat 1 — Contrast (20 seconds)
 
-6. **Set assurance**: require human proof on ticketing; show valid-but-insufficient passkey proof; complete IDV; re-sign-in with **same PPID** at `ishuman`.
-7. **Doubt**: create temporary site doubt; invoke `verifyFreshForBackend()`. Site can doubt passkey-only or post-human-proof users.
-8. Show fresh proof clears only the ticketing doubt; it never clears a site ban or touches trials.
-9. **Ban**: block the ticketing PPID; show ticketing denied while trials remains valid.
-10. Explain the ban survives credential renewal, wallet recovery, document renewal, and fresh IDV until ticketing explicitly unblocks it.
-11. Show local backend presentation verification and the privacy-safe billing event fields.
+> "This is what signing up usually feels like — email, password, verify your inbox. It takes minutes and creates data that can be breached."
 
-## Presale tour (Enforce in the wild)
+Click **Now try the lemma.id way**.
 
-On https://tickets-demo.lemma.id/?tour=presale:
+---
 
-- **Step 1**: Passkey register via `stampAction` + server challenge; email/phone stay site-local.
-- **Step 2**: Unlock unique code with fresh passkey `stampAction` (`requireFreshPasskey: true`); ledger keys `(drop_id, ppid)`.
-- **Optional**: Simulate site risk flag → fan completes fresh IDV (`verifyFreshForBackend`) when policy requires human proof → retry at `ishuman`.
-- Second claim with the same wallet is denied with `allocation_already_claimed`.
-- **Attack lab**: replay stamp (`action_nonce_reused`) or skip Step 1 (`registration_required`).
+## Beat 2 — Form-free sign-in
 
-Do not describe or demonstrate network-wide user enumeration or revocation.
-Those legacy endpoints are retired and return HTTP 410.
+> "Tap Sign in with lemma.id. Use your passkey."
+
+After sign-in:
+
+> "You're in. No email, no password, nothing to breach."
+
+---
+
+## Beat 3 — Claim the scarce thing
+
+Click **Step 1: Passkey register for drop**, then **Step 2: Fresh passkey unlocks unique code**.
+
+> "You got a one-time code. One code per person for this drop — and this site never saw your ID documents."
+
+Optional: enter email/phone **after** the claim if they ask where the code goes. That info stays on the ticketing site only.
+
+---
+
+## Beat 4 — The denial (centerpiece)
+
+Click **Try again with same lemma.id**.
+
+> "You already got yours — it's one per person. The site knows without collecting your government ID."
+
+---
+
+## Beat 5 — Privacy reveal
+
+Open the trials demo site (link on success screen or from the hub **See how it works** lane after signing in on both sites).
+
+> "Same lemma.id, different private ID on each site. These sites can't compare notes about you."
+
+---
+
+## Beat 6 — Returning user
+
+> "Close this tab and come back. Still you — no forgot password."
+
+---
+
+## Beat 7 — What's next
+
+On `/demo`, use the end card:
+
+- **Developers:** copy the `<lemma-signin>` snippet and open the integration guide.
+- **Site operators:** open the Enforce chapter (builder lane) — require human proof, doubt, or ban.
+- **Everyone:** create your lemma.id.
+
+---
+
+## Builder lane (optional deep dive)
+
+On `/demo`, click **See how it works** for Create · Sign in · Enforce.
+
+> "Put on the site-owner hat. Each site decides — require human proof, doubt for a fresh check, or ban. Action on presale does not affect SaaS trial."

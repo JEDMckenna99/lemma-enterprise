@@ -6,7 +6,7 @@ The public **`/demo`** route (alias `/demo/ishuman`) demonstrates Sign in with l
 
 When one-PPID assurance flags are enabled on staging:
 
-- **Create**: passkey wallet + provisional person root (no IDV required to start).
+- **Create**: passkey-backed lemma.id + provisional person root (no IDV required to start).
 - **Sign in**: hub derives distinct site PPIDs via `verifyForBackend`; Heroku demo sites use the drop-in **`<lemma-signin>`** element → `POST /api/login` → site session cookie; soft actions reuse the session until fresh passkey step-up (presale claim).
 - **Enforce**: set assurance (`passkey` → `ishuman`), site doubt, and site ban via `/api/demo/ishuman/*`. Hub Enforce attaches the last verified site `presentation`; mutations are allowed when the presentation PPID matches the target (**self-scoped**) or the caller is **SiteAdmin / platform operator** for `site_demo_*`. After Didit IDV, re-sign-in with `requiredAssurance: 'ishuman'`: **same PPID**, assurance flips to `ishuman`.
 
@@ -52,14 +52,28 @@ Demo Heroku apps:
 Legacy Stripe Identity keys (`STRIPE_SECRET_KEY`, `STRIPE_IDENTITY_WEBHOOK_SECRET`)
 are migration-only for document-root recovery; do not provision them for new demos.
 
-## Recording checklist (Create · Sign in · Enforce)
+## Recording checklist — user lane (default)
 
-1. Load `/demo` on staging (`assurance_demo_mode: true` in config).
-2. **Create**: Create passkey wallet (no IDV popup). Note: continuity only, not unique humanness.
-3. **Sign in**: Sign in on both sites; show different PPIDs and `assurance: passkey`. Optional: open Developer view for signed presentations; open ticketing + trials Heroku demos (both use `<lemma-signin>`).
-4. **Enforce: set assurance**: Require human proof on ticketing → show valid-but-insufficient denial → complete Didit IDV (or staging test-verify) → re-sign-in with **same PPID** at `ishuman`.
-5. **Enforce: doubt**: Mark ticketing doubtful (`doubt_required`); resolve with `verifyFreshForBackend()`. Works whether the user only has passkey presence or already has a human proof.
-6. **Enforce: ban**: Ban ticketing PPID (`site_blocked`); confirm fresh sign-in does not clear the ban. Trials stays signed in throughout.
+See `DEMO_HANDOFF_ONEPAGER.md` and `ISHUMAN_PRESENTER_SCRIPT.md`.
+
+1. Open `/demo` → **Try it** → **Start the guided demo** (or tickets demo site `/`).
+2. **Contrast**: mock email/password card → **Now try the lemma.id way**.
+3. **Sign in**: passkey sign-in — no form.
+4. **Claim**: Step 1 register, Step 2 fresh passkey claim.
+5. **Denial**: **Try again with same lemma.id** — one per person.
+6. **Privacy**: trials demo site — different private ID.
+7. **Returning user**: close tab, come back.
+
+Contact email/phone is optional **after** a successful claim (delivery only, site-local).
+
+## Recording checklist — builder lane (Create · Sign in · Enforce)
+
+1. Open `/demo` → **See how it works** (`?lane=builder`).
+2. **Create**: Create passkey-backed lemma.id (no IDV popup). Note: continuity only, not unique humanness.
+3. **Sign in**: Sign in on both sites; show different private IDs. Optional: Developer view for signed presentations.
+4. **Enforce: require human proof**: Require human proof on ticketing → complete Didit IDV (or staging test-verify) → re-sign-in with **same private ID** at human proof tier.
+5. **Enforce: doubt**: Mark ticketing doubtful; resolve with fresh passkey check.
+6. **Enforce: ban**: Ban ticketing account; confirm fresh sign-in does not clear the ban. Trials stays signed in throughout.
 
 ## Legacy recording checklist (flags off)
 
@@ -91,7 +105,7 @@ Then:
 
 1. Start the Didit IDV flow (or skeleton IDV when Didit is unavailable locally).
 2. Enter the test token and click **Test mode: complete verification**.
-3. The demo marks the matching internal session verified, issues the real signed master `isHuman` credential, stores it in the wallet, and continues through the same verifier/PPID/site-ban flow.
+3. The demo marks the matching internal session verified, issues the real signed master `isHuman` credential, stores it in the lemma.id, and continues through the same verifier/PPID/site-ban flow.
 
 This helper is guarded by an explicit demo token and non-production `ENVIRONMENT`. Do not enable test-verify on production.
 

@@ -40,7 +40,9 @@
     trials: 'did:lemma:ppid_trials_••••',
   };
 
-  const REASON_LABELS = {
+  const REASON_LABELS = window.LemmaDemoPlain && window.LemmaDemoPlain.REASON
+    ? window.LemmaDemoPlain.REASON
+    : {
     valid: 'Verified locally',
     session_valid: 'Session valid — verified locally',
     vc_valid: 'Credential valid',
@@ -61,6 +63,20 @@
     expired: 'Session expired',
     untrusted_issuer: 'Platform issuer not trusted',
   };
+
+  function plainReason(reason) {
+    if (window.LemmaDemoPlain && typeof window.LemmaDemoPlain.reason === 'function') {
+      return window.LemmaDemoPlain.reason(reason);
+    }
+    return formatReasonLabel(reason);
+  }
+
+  function plainAssurance(tier) {
+    if (window.LemmaDemoPlain && typeof window.LemmaDemoPlain.assurance === 'function') {
+      return window.LemmaDemoPlain.assurance(tier);
+    }
+    return tier || '—';
+  }
 
   function formatReasonLabel(reason) {
     const code = String(reason || '').trim();
@@ -186,8 +202,8 @@
         const result = state.results[slug];
         if (!result || !isSiteVerified(result)) return null;
         const site = SITE_IDS[slug] || slug;
-        const assurance = result.assurance || '—';
-        const reason = formatReasonLabel(result.reason);
+        const assurance = plainAssurance(result.assurance);
+        const reason = plainReason(result.reason);
         const ms = Number.isFinite(result.timeMs) ? `${result.timeMs.toFixed(1)}ms` : '—';
         return `<div class="demo-proof-receipt-row"><span class="demo-proof-receipt-site">${site}</span><span class="demo-proof-receipt-assurance">${assurance}</span><span class="demo-proof-receipt-reason">${reason}</span><span class="demo-proof-receipt-ms">${ms}</span></div>`;
       })
@@ -691,13 +707,24 @@
 
   function formatBlockResult(slug, result) {
     const ppid = result?.ppid || resolveSitePpid(slug);
-    if (!ppid) return { text: 'Not verified yet', className: '' };
-    if (isSiteBanned(slug, result)) return { text: 'Banned', className: 'result-deny' };
-    if (result?.reason === 'doubt_required') return { text: 'Doubted', className: 'result-warn' };
-    if (result?.human || isSiteVerified(result)) return { text: 'Verified', className: 'result-ok' };
-    if (['assurance_insufficient', 'not_ishuman'].includes(result?.reason)) {
-      return { text: 'Insufficient assurance', className: 'result-warn' };
+    const banned = isSiteBanned(slug, result);
+    const verified = result?.human || isSiteVerified(result);
+    const doubted = result?.reason === 'doubt_required';
+    const insufficient = ['assurance_insufficient', 'not_ishuman'].includes(result?.reason);
+    if (window.LemmaDemoPlain && typeof window.LemmaDemoPlain.blockResult === 'function') {
+      return window.LemmaDemoPlain.blockResult({
+        ppid,
+        banned,
+        verified,
+        doubted,
+        insufficient,
+      });
     }
+    if (!ppid) return { text: 'Not verified yet', className: '' };
+    if (banned) return { text: 'Banned', className: 'result-deny' };
+    if (doubted) return { text: 'Doubted', className: 'result-warn' };
+    if (verified) return { text: 'Verified', className: 'result-ok' };
+    if (insufficient) return { text: 'Insufficient assurance', className: 'result-warn' };
     return { text: 'Not verified', className: 'result-warn' };
   }
 
@@ -890,6 +917,14 @@
   }
 
   function formatSiteStatus(result, slug = null) {
+    if (window.LemmaDemoPlain && typeof window.LemmaDemoPlain.siteStatus === 'function') {
+      return window.LemmaDemoPlain.siteStatus(result, {
+        banned: (slug && isSiteBanned(slug, result)) || isSiteBanReason(result?.reason),
+        humanityDoubted: slug && activeDoubtTier(slug) === 'ishuman',
+        doubted: slug && isSiteDoubted(slug),
+        verified: isSiteVerified(result),
+      });
+    }
     if (!result) return 'Pending';
     if (slug && isSiteBanned(slug, result)) return 'Banned';
     if (isSiteBanReason(result.reason)) return 'Banned';
@@ -1282,8 +1317,10 @@
       if (diff) diff.textContent = 'Sign in on both sites';
       return;
     }
-    diff.textContent = tPpid !== rPpid ? 'Result: different site-private IDs' : 'Result: same ID (unexpected)';
-    diff.className = tPpid !== rPpid ? 'ppid-diff' : 'ppid-diff deny';
+    diff.textContent = tPpid !== rPpid
+      ? "Different IDs — these sites can't compare notes about you."
+      : 'Same ID (unexpected in demo)';
+    diff.className = tPpid !== rPpid ? 'ppid-diff ppid-diff-ok' : 'ppid-diff deny';
   }
 
   function isSiteDoubted(slug) {
@@ -2395,13 +2432,13 @@
     if (ppidEl) ppidEl.textContent = showFields ? maskPpid(slug, result.ppid) : PPID_PLACEHOLDER[slug];
     const assuranceEl = $(`ih-${slug}-assurance`);
     if (assuranceEl) {
-      assuranceEl.textContent = showFields ? (result.assurance || '—') : '—';
+      assuranceEl.textContent = showFields ? plainAssurance(result.assurance) : '—';
       assuranceEl.closest('.site-card-field')?.classList.toggle('is-withheld', !showFields);
     }
     const reasonEl = $(`ih-${slug}-reason`);
     if (reasonEl) {
       reasonEl.textContent = showFields
-        ? (humanityDoubted ? 'Humanity doubted' : formatReasonLabel(result.reason))
+        ? (humanityDoubted ? plainReason('doubt_required') : plainReason(result.reason))
         : '—';
       reasonEl.closest('.site-card-field')?.classList.toggle('is-withheld', !showFields);
     }
@@ -3541,6 +3578,46 @@
     window.addEventListener('resize', scheduleLayout);
   }
 
+  function setDemoLane(lane) {
+    const tryLane = $('ih-try-lane');
+    const builderLane = $('ih-builder-lane');
+    const tryBtn = $('ih-lane-try-btn');
+    const builderBtn = $('ih-lane-builder-btn');
+    const isBuilder = lane === 'builder';
+    if (tryLane) tryLane.hidden = isBuilder;
+    if (builderLane) builderLane.hidden = !isBuilder;
+    if (tryBtn) tryBtn.classList.toggle('is-active', !isBuilder);
+    if (builderBtn) builderBtn.classList.toggle('is-active', isBuilder);
+    try {
+      const url = new URL(window.location.href);
+      if (isBuilder) url.searchParams.set('lane', 'builder');
+      else url.searchParams.delete('lane');
+      window.history.replaceState({}, '', url);
+    } catch (_) { /* ignore */ }
+  }
+
+  function initDemoLanes() {
+    const params = new URLSearchParams(window.location.search);
+    const lane = params.get('lane') === 'builder' ? 'builder' : 'try';
+    setDemoLane(lane);
+    const urls = (state.config && state.config.customer_site_urls) || {};
+    const ticketsUrl = urls.tickets || 'https://tickets-demo.lemma.id/';
+    const startLink = $('ih-try-lane-start');
+    if (startLink) startLink.href = ticketsUrl.replace(/\/?$/, '/');
+    $('ih-lane-try-btn')?.addEventListener('click', () => setDemoLane('try'));
+    $('ih-lane-builder-btn')?.addEventListener('click', () => setDemoLane('builder'));
+    $('ih-try-lane-builder-link')?.addEventListener('click', () => setDemoLane('builder'));
+    $('ih-end-enforce-link')?.addEventListener('click', () => {
+      setDemoLane('builder');
+      $('ih-step-3')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    $('ih-end-create-link')?.addEventListener('click', () => {
+      setDemoLane('builder');
+      $('ih-get-started')?.click();
+      $('ih-step-1')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
   async function boot() {
     setDemoMode('live');
     setWorkflowHighlight(1);
@@ -3674,9 +3751,11 @@
 
     initOperationsUI();
     initHeroDiagramWires();
+    initDemoLanes();
 
     // Config failure must not leave the page dead, buttons are already bound.
     await loadConfig().catch((err) => log('Demo config load failed', err.message));
+    initDemoLanes();
 
     try {
       await refreshWalletStatus();

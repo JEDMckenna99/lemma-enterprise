@@ -30,6 +30,22 @@ SITE_NAME = os.getenv("LEMMA_DEMO_SITE_NAME", "Lemma Demo Site")
 SITE_KIND = os.getenv("LEMMA_DEMO_SITE_KIND", "ticketing")
 LEMMA_ORIGIN = os.getenv("LEMMA_ORIGIN", "https://lemma.id")
 DEMO_HUB_URL = os.getenv("LEMMA_DEMO_HUB_URL", f"{LEMMA_ORIGIN}/demo")
+TRIALS_DEMO_URL = os.getenv("LEMMA_DEMO_TRIALS_URL", "https://trials-demo.lemma.id")
+
+_PLAIN_LANGUAGE_JS = """
+function formatDenyReason(reason) {
+  if (window.LemmaDemoPlain && typeof window.LemmaDemoPlain.reason === 'function') {
+    return window.LemmaDemoPlain.reason(reason);
+  }
+  return String(reason || 'Something went wrong — try again.');
+}
+function plainAssurance(tier) {
+  if (window.LemmaDemoPlain && typeof window.LemmaDemoPlain.assurance === 'function') {
+    return window.LemmaDemoPlain.assurance(tier);
+  }
+  return tier || '';
+}
+"""
 DEMO_REQUIRED_ASSURANCE = os.getenv("LEMMA_DEMO_REQUIRED_ASSURANCE", "passkey").strip().lower()
 PRESALE_DROP_ID = os.getenv("LEMMA_PRESALE_DROP_ID", "artist-presale-2026").strip()
 PRESALE_CODE_CLAIM_ASSURANCE = os.getenv(
@@ -378,8 +394,8 @@ def _signin_content():
 def _presale_content():
     return {
         "eyebrow": "Unique presale code distributor",
-        "headline": "Passkey proves who you are, phone is for delivery",
-        "subhead": "Join the drop with an action-bound passkey register. Unlock your one-time code with a fresh passkey ceremony at claim time. Email and phone stay on this site for SMS and CRM, not as identity. No SMS OTP. IDV runs only when the site flags you for review. This site never sees your device details — it keeps its own signals and gets a signed proof on top.",
+        "headline": "Passkey proves who you are",
+        "subhead": "Join the drop with a passkey register — no email or password. Unlock your one-time code with a fresh passkey ceremony at claim time. Contact info is optional delivery after you claim. No SMS OTP. IDV runs only when the site flags you for review.",
         "register": "Step 1, Passkey register for drop",
         "claim": "Step 2, Fresh passkey unlocks unique code",
         "retry": "Try again with same lemma.id",
@@ -407,7 +423,9 @@ def _sdk_script_tags() -> str:
         f'onerror="window.__lemmaSdkLoadError=\'proof-verifier failed to load from {LEMMA_ORIGIN}\'"></script>\n'
         f'  <script src="{LEMMA_ORIGIN}/sdk/lemma-signin.js?v={ISHUMAN_VERIFIER_SDK_VERSION}" '
         f'crossorigin="anonymous" '
-        f'onerror="window.__lemmaSdkLoadError=\'lemma-signin failed to load from {LEMMA_ORIGIN}\'"></script>'
+        f'onerror="window.__lemmaSdkLoadError=\'lemma-signin failed to load from {LEMMA_ORIGIN}\'"></script>\n'
+        f'  <script src="{LEMMA_ORIGIN}/static/js/demo/plain-language.js?v=1" '
+        f'crossorigin="anonymous"></script>'
     )
 
 
@@ -805,6 +823,32 @@ def presale_register():
     })
 
 
+@app.post("/api/presale/delivery")
+def presale_delivery():
+    """Optional post-claim contact update — site-local delivery fields only."""
+    body = request.get_json(silent=True) or {}
+    session = _session_from_request()
+    if not session or not session.get("ppid"):
+        return jsonify({"success": False, "reason": "site_proof_required"}), 403
+    drop_id = str(body.get("drop_id") or PRESALE_DROP_ID).strip()
+    email = str(body.get("email") or "").strip()
+    phone = str(body.get("phone") or "").strip()
+    updated = _PRESALE_REGISTRATIONS.update_contact(
+        drop_id,
+        session["ppid"],
+        email=email,
+        phone=phone,
+    )
+    if not updated.ok:
+        return jsonify({"success": False, "reason": updated.reason}), 403
+    return jsonify({
+        "success": True,
+        "drop_id": updated.drop_id,
+        "ppid": updated.ppid,
+        "reason": "ok",
+    })
+
+
 @app.post("/api/presale/claim-code")
 def presale_claim_code():
     body = request.get_json(silent=True) or {}
@@ -1037,9 +1081,12 @@ Cleared.
 @app.get("/")
 def index():
     if _is_presale_site():
-        if request.args.get("tour") == "presale":
+        tour = request.args.get("tour")
+        if tour == "presale":
             return _presale_index()
-        return _ticketing_signin_index()
+        if tour == "signin":
+            return _ticketing_signin_index()
+        return _ticketing_welcome_index()
     return _generic_index()
 
 
@@ -1236,6 +1283,7 @@ def _generic_index():
   </main>
   {_sdk_script_tags()}
   <script>
+  {_PLAIN_LANGUAGE_JS}
     if (typeof ProofVerifier === 'undefined') {{
       const msg = window.__lemmaSdkLoadError
         || 'Lemma SDK (ProofVerifier) did not load, check network connection and that {LEMMA_ORIGIN} is reachable.';
@@ -1301,30 +1349,7 @@ def _generic_index():
       }}
     }}
 
-    function formatDenyReason(reason) {{
-      if (reason === 'site_blocked' || reason === 'revoked') {{
-        return 'Persistent site revocation, fresh verification does not clear this.';
-      }}
-      if (reason === 'doubt_required') {{
-        return 'Temporary doubt, the site requires a deliberate fresh proof.';
-      }}
-      if (reason === 'assurance_insufficient' || reason === 'not_ishuman') {{
-        return 'Valid passkey proof, but this site policy requires stronger assurance.';
-      }}
-      if (reason === 'idv_cancelled') {{
-        return 'Complete verification in the Lemma popup to continue.';
-      }}
-      if (reason === 'site_proof_required' || reason === 'no_credential' || reason === 'wallet_locked') {{
-        return 'No site proof cached yet, tap the step button to unlock with passkey and issue one.';
-      }}
-      if (reason === 'redirect_started') {{
-        return 'Continuing on lemma.id, you will return here automatically after passkey unlock.';
-      }}
-      if (reason === 'session_bloom_sequence_mismatch') {{
-        return 'Session sync race, retry the step once (revocation list refreshed).';
-      }}
-      return reason || 'unknown';
-    }}
+    {_PLAIN_LANGUAGE_JS}
 
     function renderServerReceipt(response, serverEntry) {{
       if (!serverReceipt || !serverReceiptFields) return;
@@ -1414,8 +1439,8 @@ def _generic_index():
         }}
       }} else if (!silent) {{
         const detail = formatDenyReason(response.reason);
-        decisionCopy.textContent = 'Blocked. Reason: ' + response.reason;
-        decisionCard.innerHTML = '<strong>Action blocked</strong><p class="tiny">reason=' + response.reason + ', ' + detail + '</p>';
+        decisionCopy.textContent = detail;
+        decisionCard.innerHTML = '<strong>Action blocked</strong><p class="tiny">' + detail + '</p>';
       }} else {{
         decisionCopy.textContent = formatMissingProof(response.reason);
       }}
@@ -1629,6 +1654,7 @@ def _ticketing_signin_index():
   </main>
   {_sdk_script_tags()}
   <script>
+  {_PLAIN_LANGUAGE_JS}
     const pill = document.getElementById('status-pill');
     const assurancePill = document.getElementById('assurance-pill');
     const decisionCard = document.getElementById('decision-card');
@@ -1647,7 +1673,7 @@ def _ticketing_signin_index():
 
     function setAssurancePill(assurance) {{
       if (!assurancePill) return;
-      assurancePill.textContent = assurance ? ('assurance: ' + assurance) : ('policy: ' + SITE_POLICY);
+      assurancePill.textContent = assurance ? plainAssurance(assurance) : ('Policy: passkey');
     }}
 
     async function refreshSessionState() {{
@@ -1718,7 +1744,7 @@ def _ticketing_signin_index():
         }} else {{
           pill.textContent = 'DENY';
           pill.className = 'pill deny';
-          decisionCopy.textContent = 'Blocked: ' + (serverEntry.reason || 'denied');
+          decisionCopy.textContent = formatDenyReason(serverEntry.reason || 'denied');
         }}
       }} catch (err) {{
         decisionCopy.textContent = 'Action failed: ' + err.message;
@@ -1736,7 +1762,7 @@ def _ticketing_signin_index():
     signInEl?.addEventListener('lemma-signin-error', (e) => {{
       pill.textContent = 'DENY';
       pill.className = 'pill deny';
-      decisionCopy.textContent = e.detail.reason || 'not_verified';
+      decisionCopy.textContent = formatDenyReason(e.detail.reason || 'not_verified');
       setSignInDisabled(false);
     }});
     actionBtn?.addEventListener('click', () => runProtectedAction());
@@ -1746,8 +1772,118 @@ def _ticketing_signin_index():
     return Response(html, mimetype="text/html")
 
 
-def _presale_index():
-    copy = _presale_content()
+def _welcome_content():
+    base = _presale_content()
+    base.update({
+        "eyebrow": "Try Sign in with lemma.id",
+        "headline": "Sign in with a passkey — no email, no password",
+        "subhead": "Follow the steps below. Each one shows something different about signing in with lemma.id.",
+    })
+    return base
+
+
+def _ticketing_welcome_index():
+    return _presale_index(welcome_mode=True)
+
+
+def _presale_index(welcome_mode=False):
+    copy = _welcome_content() if welcome_mode else _presale_content()
+    body_class = "welcome-mode tour-mode" if welcome_mode else ""
+    layout_class = "layout layout-welcome" if welcome_mode else "layout"
+    aside_block = "" if welcome_mode else f"""
+      <aside class="card">
+        <p class="eyebrow">Server verification</p>
+        <p class="muted">Site binding: <code>{SITE_ID}</code></p>
+        <p style="margin:12px 0 6px">Decision <span class="pill" id="status-pill">WAITING</span>
+          <span class="pill" id="assurance-pill">default: {PRESALE_CODE_CLAIM_ASSURANCE}</span></p>
+        <p class="muted" id="decision-copy">Join the presale first, then unlock your code.</p>
+        <label class="dev-toggle">
+          <input type="checkbox" id="backend-gates-toggle">
+          Show backend gates (engineer view)
+        </label>
+        <details open>
+          <summary>Fan-visible flow</summary>
+          <ol class="how">
+            <li>Passkey register binds a site-private ID (Step 1).</li>
+            <li>Fresh passkey at claim (Step 2).</li>
+            <li>One code per person per drop.</li>
+          </ol>
+        </details>
+        <details open class="engineer-only" id="receipt-details">
+          <summary>Server verification receipt</summary>
+          <div class="server-receipt" id="server-receipt" hidden>
+            <div id="gate-chips" class="gate-chips"></div>
+            <dl id="server-receipt-fields"></dl>
+          </div>
+          <p class="muted" id="receipt-placeholder" style="font-size:12px;margin-top:8px;">Run a presale action to populate the receipt.</p>
+        </details>
+        <details class="engineer-only" id="crypto-envelope-details">
+          <summary>Cryptographic envelope</summary>
+          <pre id="stamp-json">{{}}</pre>
+          <pre id="fresh-attestation-json" style="margin-top:10px;">{{}}</pre>
+        </details>
+        <p class="eyebrow" style="margin-top:18px;">Typical phone-first vs this demo</p>
+        <table class="compare-table">
+          <thead>
+            <tr><th>Dimension</th><th>Phone-first presale</th><th>This demo</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Identity</td><td>Phone or email uniqueness</td><td>Site-scoped ID from passkey</td></tr>
+            <tr><td>Claim presence</td><td>SMS OTP or none</td><td>Fresh passkey at unlock</td></tr>
+            <tr><td>Contact data</td><td>Auth + CRM</td><td>Site-local delivery only</td></tr>
+          </tbody>
+        </table>
+        <details>
+          <summary>Action log</summary>
+          <pre id="action-log">[]</pre>
+        </details>
+      </aside>"""
+    welcome_contrast = """
+    <section class="card welcome-contrast" id="welcome-contrast">
+      <p class="eyebrow">What signing up usually feels like</p>
+      <h2 style="margin:0 0 10px;font-size:22px;">Email, password, verify your inbox…</h2>
+      <p class="muted" style="font-size:14px;margin-bottom:14px;">This is a mock — it does not submit anything. Typical signup takes minutes and creates data to breach.</p>
+      <label>Email<input disabled value="you@example.com" style="opacity:0.7"></label>
+      <label>Password<input disabled type="password" value="••••••••" style="opacity:0.7"></label>
+      <button type="button" disabled style="opacity:0.5">Create account</button>
+      <button type="button" class="btn-secondary" id="welcome-contrast-next" style="margin-top:12px">Now try the lemma.id way →</button>
+    </section>""" if welcome_mode else ""
+    welcome_progress = """
+    <div class="welcome-progress" id="welcome-progress">
+      <span class="welcome-step is-active" data-welcome-step="contrast">1 · Contrast</span>
+      <span class="welcome-step" data-welcome-step="signin">2 · Sign in</span>
+      <span class="welcome-step" data-welcome-step="claim">3 · Claim code</span>
+      <span class="welcome-step" data-welcome-step="deny">4 · One per person</span>
+      <span class="welcome-step" data-welcome-step="return">5 · Come back</span>
+    </div>""" if welcome_mode else ""
+    privacy_cta = f"""
+    <section class="card welcome-privacy" id="welcome-privacy" hidden>
+      <p class="eyebrow">Privacy reveal</p>
+      <h2 style="margin:0 0 8px;font-size:22px;">Now try the other site</h2>
+      <p class="muted" style="font-size:14px;">Sign in on the trials demo with the same lemma.id. Each site gets a different private ID — they cannot compare notes about you.</p>
+      <a class="presale-link" href="{TRIALS_DEMO_URL}/?from=welcome" target="_blank" rel="noopener">Open trials demo site →</a>
+      <a class="presale-link" href="{DEMO_HUB_URL}?lane=builder&from=welcome" style="margin-left:12px;">See what the backend saw →</a>
+    </section>""" if welcome_mode else ""
+    welcome_status = """
+        <p style="margin:12px 0 6px"><span class="pill" id="status-pill">WAITING</span>
+          <span class="pill" id="assurance-pill">Ready</span></p>
+        <p class="muted" id="decision-copy">Sign in to start.</p>""" if welcome_mode else ""
+    welcome_engineer_stubs = """
+        <div hidden aria-hidden="true">
+          <pre id="stamp-json">{{}}</pre>
+          <pre id="fresh-attestation-json">{{}}</pre>
+          <pre id="action-log">[]</pre>
+          <div id="server-receipt"></div>
+          <dl id="server-receipt-fields"></dl>
+          <div id="gate-chips"></div>
+          <p id="receipt-placeholder"></p>
+          <input type="checkbox" id="backend-gates-toggle" hidden>
+        </div>""" if welcome_mode else ""
+    header_links = f"""
+    <a href="{DEMO_HUB_URL}?from=welcome" target="_blank" rel="noopener">Demo hub</a>
+    <a href="/?tour=presale" style="margin-left:12px;">Builder presale tour →</a>""" if welcome_mode else f"""
+    <a href="{DEMO_HUB_URL}?from=demo" target="_blank" rel="noopener">Return to demo hub</a>
+    <a href="/" style="margin-left:12px;">← Sign-in demo</a>"""
     html = f"""<!doctype html>
 <html lang="en">
 <head>
@@ -2053,6 +2189,50 @@ def _presale_index():
     body.tour-mode .attack-lab {{
       display: block;
     }}
+    body.welcome-mode .defense-strip,
+    body.welcome-mode .attack-lab {{
+      display: none;
+    }}
+    body.welcome-mode .layout-welcome {{
+      grid-template-columns: 1fr;
+      max-width: 640px;
+      margin: 0 auto;
+    }}
+    .welcome-progress {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+      max-width: 640px;
+      margin-left: auto;
+      margin-right: auto;
+    }}
+    .welcome-step {{
+      font-size: 11px;
+      font-weight: 700;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      background: #fff;
+    }}
+    .welcome-step.is-active {{
+      border-color: var(--brand);
+      color: var(--brand);
+      background: #f5f3ff;
+    }}
+    .welcome-step.is-done {{
+      border-color: #86efac;
+      color: var(--ok);
+      background: #f0fdf4;
+    }}
+    body.welcome-mode .welcome-contrast.is-dismissed {{
+      display: none;
+    }}
+    body.welcome-mode #flag-btn,
+    body.welcome-mode #clear-flag-btn {{
+      display: none;
+    }}
     .attack-lab-buttons {{
       display: grid;
       gap: 8px;
@@ -2066,16 +2246,17 @@ def _presale_index():
     lemma-signin::part(button) {{ width: 100%; }}
   </style>
 </head>
-<body>
+<body class="{body_class}">
   <header>
     <div class="site-brand">
       <span class="site-icon">{TICKETING_ICON_SVG}</span>
       <strong>{SITE_NAME}</strong>
     </div>
-    <a href="{DEMO_HUB_URL}?from=demo" target="_blank" rel="noopener">Return to demo hub</a>
-    <a href="/" style="margin-left:12px;">← Sign-in demo</a>
+    {header_links}
   </header>
   <main>
+    {welcome_progress}
+    {welcome_contrast}
     <div class="tour-banner" id="tour-banner" hidden>
       <strong>Guided presale demo</strong>
       <ol class="tour-checklist" id="tour-checklist">
@@ -2085,9 +2266,9 @@ def _presale_index():
         <li data-tour-step="flag" id="tour-step-flag">Simulate risk flag, IDV penalty, then code at isHuman</li>
         <li data-tour-step="attack" id="tour-step-attack">Attack lab, replay stamp or skip Step 1</li>
       </ol>
-      <p class="tour-impact" id="tour-impact">Start with Step 1. Passkey is who you are; phone is where the code goes.</p>
+      <p class="tour-impact" id="tour-impact">Start with Step 1. Passkey is who you are — contact info comes after you claim.</p>
     </div>
-    <div class="layout">
+    <div class="{layout_class}">
       <section class="card">
         <p class="eyebrow">{copy["eyebrow"]}</p>
         <h1>{copy["headline"]}</h1>
@@ -2103,12 +2284,6 @@ def _presale_index():
           <div class="step active" id="step-register">1 · Passkey register</div>
           <div class="step" id="step-claim">2 · Fresh passkey claim</div>
         </div>
-        <label for="email">{copy["form_email"]}</label>
-        <input id="email" value="{copy["placeholder_email"]}" aria-label="{copy["form_email"]}">
-        <p class="contact-note">Stored on this site only, not your login.</p>
-        <label for="phone">{copy["form_phone"]}</label>
-        <input id="phone" value="{copy["placeholder_phone"]}" aria-label="{copy["form_phone"]}">
-        <p class="contact-note">For SMS alerts and CRM, passkey proves identity.</p>
         <p class="muted" style="margin-top:12px;font-size:13px;">Drop: <code id="drop-id">{PRESALE_DROP_ID}</code></p>
         {_lemma_signin_element()}
         <p class="contact-note" id="session-copy">Sign in once. Presale register uses your site session; claim still requires a fresh passkey ceremony.</p>
@@ -2117,6 +2292,8 @@ def _presale_index():
         <button type="button" class="btn-secondary" id="retry-btn" disabled>{copy["retry"]}</button>
         <button type="button" class="btn-secondary btn-ghost" id="flag-btn">{copy["flag"]}</button>
         <button type="button" class="btn-secondary btn-ghost" id="clear-flag-btn">{copy["clear_flag"]}</button>
+        {welcome_status}
+        {welcome_engineer_stubs}
         <details class="attack-lab" id="attack-lab">
           <summary>Attack lab</summary>
           <div class="attack-lab-buttons">
@@ -2125,67 +2302,28 @@ def _presale_index():
           </div>
         </details>
         <div class="code-display" id="code-display" hidden>--------</div>
+        <div id="delivery-panel" hidden style="margin-top:18px;padding-top:18px;border-top:1px solid var(--line);">
+          <p class="eyebrow" style="margin-bottom:6px;">Optional delivery</p>
+          <p class="muted" style="font-size:13px;margin-bottom:12px;">Where should we send your code? Stays on this site — lemma.id never sees it.</p>
+          <label for="email">{copy["form_email"]}</label>
+          <input id="email" value="" placeholder="{copy["placeholder_email"]}" aria-label="{copy["form_email"]}">
+          <label for="phone">{copy["form_phone"]}</label>
+          <input id="phone" value="" placeholder="{copy["placeholder_phone"]}" aria-label="{copy["form_phone"]}">
+          <button type="button" class="btn-secondary" id="save-delivery-btn">Save delivery info</button>
+          <button type="button" class="btn-secondary btn-ghost" id="skip-delivery-btn">Skip for now</button>
+        </div>
         <div class="verdict" id="decision-card">
           <strong>Protected presale flow</strong>
           <p class="tiny">Step 1: action-bound passkey register, email/phone are delivery fields on this site. Step 2: fresh passkey ceremony (Face ID / Touch ID / Windows Hello) unlocks your unique code. If the site flags suspicious activity, fresh IDV (<code>verifyFreshForBackend</code>) is required before issuance.</p>
         </div>
       </section>
-      <aside class="card">
-        <p class="eyebrow">Server verification</p>
-        <p class="muted">Site binding: <code>{SITE_ID}</code></p>
-        <p style="margin:12px 0 6px">Decision <span class="pill" id="status-pill">WAITING</span>
-          <span class="pill" id="assurance-pill">default: {PRESALE_CODE_CLAIM_ASSURANCE}</span></p>
-        <p class="muted" id="decision-copy">Join the presale first, then unlock your code.</p>
-        <label class="dev-toggle">
-          <input type="checkbox" id="backend-gates-toggle">
-          Show backend gates (engineer view)
-        </label>
-        <details open>
-          <summary>Fan-visible flow</summary>
-          <ol class="how">
-            <li>Passkey register binds a site-private PPID (Step 1).</li>
-            <li>Email/phone stay on this site, lemma.id never sees them.</li>
-            <li>Fresh passkey + <code>stampAction</code> at claim (Step 2).</li>
-            <li>Risk flag → fresh IDV, then retry at <code>ishuman</code>.</li>
-            <li>Ledger enforces one code per PPID per drop.</li>
-          </ol>
-        </details>
-        <details open class="engineer-only" id="receipt-details">
-          <summary>Server verification receipt</summary>
-          <div class="server-receipt" id="server-receipt" hidden>
-            <div id="gate-chips" class="gate-chips"></div>
-            <dl id="server-receipt-fields"></dl>
-          </div>
-          <p class="muted" id="receipt-placeholder" style="font-size:12px;margin-top:8px;">Run a presale action to populate the receipt.</p>
-        </details>
-        <details class="engineer-only" id="crypto-envelope-details">
-          <summary>Cryptographic envelope</summary>
-          <pre id="stamp-json">{{}}</pre>
-          <pre id="fresh-attestation-json" style="margin-top:10px;">{{}}</pre>
-        </details>
-        <p class="eyebrow" style="margin-top:18px;">Typical phone-first vs this demo</p>
-        <table class="compare-table">
-          <thead>
-            <tr><th>Dimension</th><th>Phone-first presale</th><th>This demo</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>Identity</td><td>Phone or email uniqueness</td><td>Site-scoped PPID from passkey</td></tr>
-            <tr><td>Claim presence</td><td>SMS OTP or none</td><td>Fresh passkey at unlock</td></tr>
-            <tr><td>Replay</td><td>Session or none</td><td>Action stamp + server nonce</td></tr>
-            <tr><td>Enumeration</td><td>Rate limits only</td><td>One code per drop + PPID</td></tr>
-            <tr><td>Escalation</td><td>Manual review</td><td>Site doubt → fresh IDV</td></tr>
-            <tr><td>Contact data</td><td>Auth + CRM</td><td>Site-local delivery only</td></tr>
-          </tbody>
-        </table>
-        <details>
-          <summary>Action log</summary>
-          <pre id="action-log">[]</pre>
-        </details>
-      </aside>
+      {aside_block}
     </div>
+    {privacy_cta}
   </main>
   {_sdk_script_tags()}
   <script>
+  {_PLAIN_LANGUAGE_JS}
     const DROP_ID = {PRESALE_DROP_ID!r};
     const SITE_ID = '{SITE_ID}';
     const CLAIM_ASSURANCE = {PRESALE_CODE_CLAIM_ASSURANCE!r};
@@ -2195,8 +2333,10 @@ def _presale_index():
     const CLAIM_ACTION = {copy["claim_action"]!r};
     const CLAIM_PATH = {PRESALE_CLAIM_PATH!r};
     const TOUR_MODE = new URLSearchParams(window.location.search).get('tour') === 'presale';
+    const WELCOME_MODE = document.body.classList.contains('welcome-mode');
+    const WELCOME_SEQUENCE = ['contrast', 'signin', 'claim', 'deny', 'return'];
     const TOUR_IMPACTS = {{
-      register: 'Passkey binds a site-private PPID. Phone and email are delivery-only on this site.',
+      register: 'Passkey binds a site-private ID — no email or password required.',
       claim: 'Fresh passkey ceremony proves present control, bots cannot replay cached sessions for codes.',
       retry: 'Ledger enforces one code per verified person. Same lemma.id cannot farm multiple codes.',
       flag: 'Site doubt escalates to fresh IDV, policy-driven penalty before code issuance.',
@@ -2253,6 +2393,32 @@ def _presale_index():
     if (TOUR_MODE && tourBanner) {{
       tourBanner.hidden = false;
       setTourHighlight('register');
+    }}
+
+    function setWelcomeStep(stepId) {{
+      if (!WELCOME_MODE) return;
+      const idx = WELCOME_SEQUENCE.indexOf(stepId);
+      document.querySelectorAll('.welcome-step').forEach((el) => {{
+        const step = el.getAttribute('data-welcome-step');
+        const stepIdx = WELCOME_SEQUENCE.indexOf(step);
+        el.classList.remove('is-active', 'is-done');
+        if (stepIdx < idx) el.classList.add('is-done');
+        else if (stepIdx === idx) el.classList.add('is-active');
+      }});
+    }}
+
+    function showWelcomePrivacy() {{
+      const panel = document.getElementById('welcome-privacy');
+      if (panel) panel.hidden = false;
+    }}
+
+    if (WELCOME_MODE) {{
+      setWelcomeStep('contrast');
+      document.getElementById('welcome-contrast-next')?.addEventListener('click', () => {{
+        document.getElementById('welcome-contrast')?.classList.add('is-dismissed');
+        setWelcomeStep('signin');
+        decisionCopy.textContent = 'Tap Sign in with lemma.id — no form, no email.';
+      }});
     }}
 
     function applyBackendGatesToggle(enabled) {{
@@ -2340,11 +2506,48 @@ def _presale_index():
     }}
 
     function contactPayload() {{
+      return {{ drop_id: DROP_ID }};
+    }}
+
+    function deliveryPayload() {{
       return {{
         drop_id: DROP_ID,
         email: document.getElementById('email')?.value || '',
         phone: document.getElementById('phone')?.value || '',
       }};
+    }}
+
+    function showDeliveryPanel() {{
+      const panel = document.getElementById('delivery-panel');
+      if (panel) panel.hidden = false;
+    }}
+
+    async function saveDelivery(skipEmpty) {{
+      const payload = deliveryPayload();
+      if (skipEmpty && !payload.email && !payload.phone) {{
+        const panel = document.getElementById('delivery-panel');
+        if (panel) panel.hidden = true;
+        return;
+      }}
+      try {{
+        const res = await fetch('/api/presale/delivery', {{
+          method: 'POST',
+          credentials: 'include',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify(payload),
+        }});
+        const data = await res.json();
+        if (data.success) {{
+          savePresaleSession({{ contact: {{ email: payload.email, phone: payload.phone }} }});
+          decisionCopy.textContent = 'Delivery info saved on this site only.';
+          const panel = document.getElementById('delivery-panel');
+          if (panel) panel.hidden = true;
+        }} else {{
+          decisionCopy.textContent = formatDenyReason(data.reason || 'unknown');
+        }}
+      }} catch (err) {{
+        decisionCopy.textContent = err.message;
+      }}
     }}
 
     function setSignInDisabled(disabled) {{
@@ -2407,7 +2610,13 @@ def _presale_index():
         siteSessionPpid = loginPayload.ppid || null;
         lastPpid = siteSessionPpid;
         await refreshSessionState();
-        decisionCopy.textContent = 'Signed in. Continue with Step 1 register or Step 2 claim.';
+        if (WELCOME_MODE) {{
+          setWelcomeStep('claim');
+          decisionCopy.textContent = "You're in. No email, no password, nothing to breach.";
+          decisionCard.innerHTML = '<strong>Signed in</strong><p class="tiny">Next: register for the drop, then claim your one-time code.</p>';
+        }} else {{
+          decisionCopy.textContent = 'Signed in. Continue with Step 1 register or Step 2 claim.';
+        }}
         return true;
       }} catch (err) {{
         pill.textContent = 'ERROR';
@@ -2454,52 +2663,6 @@ def _presale_index():
       const phoneEl = document.getElementById('phone');
       if (emailEl && restoredSession.contact.email) emailEl.value = restoredSession.contact.email;
       if (phoneEl && restoredSession.contact.phone) phoneEl.value = restoredSession.contact.phone;
-    }}
-
-    function formatDenyReason(reason) {{
-      if (reason === 'allocation_already_claimed') {{
-        return 'This verified person already received a code for this drop.';
-      }}
-      if (reason === 'registration_required') {{
-        return 'Complete Step 1, passkey register before unlocking a code.';
-      }}
-      if (reason === 'doubt_required') {{
-        return 'Site flagged this fan for review, complete fresh IDV, then retry.';
-      }}
-      if (reason === 'action_nonce_reused') {{
-        return 'Replay blocked, each mutation needs a fresh server nonce.';
-      }}
-      if (reason === 'assurance_insufficient') {{
-        return 'Higher assurance is required (IDV-backed human proof).';
-      }}
-      if (reason === 'idv_cancelled') {{
-        return 'Complete verification in the Lemma popup to continue.';
-      }}
-      if (reason === 'rate_limited') {{
-        return 'Too many attempts, wait and retry.';
-      }}
-      if (reason === 'fresh_passkey_missing') {{
-        return 'Claim requires a fresh passkey ceremony, unlock with Face ID / Touch ID / Windows Hello.';
-      }}
-      if (reason === 'fresh_passkey_expired' || reason === 'fresh_passkey_too_old') {{
-        return 'Fresh passkey attestation expired, retry the claim to get a new ceremony.';
-      }}
-      if (reason === 'fresh_passkey_invalid_signature' || reason === 'fresh_passkey_signature_missing') {{
-        return 'Fresh passkey attestation failed server verification.';
-      }}
-      if (reason === 'fresh_passkey_server_nonce_missing') {{
-        return 'Server nonce missing for fresh passkey binding.';
-      }}
-      if (reason === 'passkey_not_registered_on_server' || reason === 'passkey_server_binding_failed') {{
-        return 'Wallet passkey is not registered on lemma.id yet, unlock on lemma.id once, then retry Step 2.';
-      }}
-      if (reason === 'fresh_passkey_webauthn_invalid') {{
-        return 'Fresh passkey ceremony failed server verification, unlock on lemma.id and retry Step 2.';
-      }}
-      if (String(reason || '').startsWith('fresh_passkey_')) {{
-        return 'Fresh passkey gate failed: ' + reason;
-      }}
-      return reason || 'unknown';
     }}
 
     function redactFreshPasskeyAttestation(stamped) {{
@@ -2706,7 +2869,7 @@ def _presale_index():
           }}
           pill.textContent = 'DENY';
           pill.className = 'pill deny';
-          decisionCopy.textContent = 'Blocked: ' + (stampMeta.reason || 'not_verified');
+          decisionCopy.textContent = formatDenyReason(stampMeta.reason || 'not_verified');
           decisionCard.innerHTML = '<strong>Registration blocked</strong><p class="tiny">' + formatDenyReason(stampMeta.reason) + '</p>';
           return;
         }}
@@ -2731,7 +2894,7 @@ def _presale_index():
         }} else {{
           pill.textContent = 'DENY';
           pill.className = 'pill deny';
-          decisionCopy.textContent = 'Blocked: ' + (serverEntry.reason || 'denied');
+          decisionCopy.textContent = formatDenyReason(serverEntry.reason || 'denied');
           decisionCard.innerHTML = '<strong>Registration denied</strong><p class="tiny">' + formatDenyReason(serverEntry.reason) + '</p>';
         }}
       }} catch (err) {{
@@ -2817,7 +2980,7 @@ def _presale_index():
           pill.textContent = 'DENY';
           pill.className = 'pill deny';
           const reason = stampMeta.reason || 'not_verified';
-          decisionCopy.textContent = 'Blocked: ' + reason;
+          decisionCopy.textContent = formatDenyReason(reason);
           decisionCard.innerHTML = '<strong>Verification required</strong><p class="tiny">' + formatDenyReason(reason) + '</p>';
           if (codeDisplay) codeDisplay.hidden = true;
           return;
@@ -2843,7 +3006,7 @@ def _presale_index():
           if (!fresh.ok) {{
             pill.textContent = 'DENY';
             pill.className = 'pill deny';
-            decisionCopy.textContent = 'IDV blocked: ' + (fresh.reason || 'not_verified');
+            decisionCopy.textContent = formatDenyReason(fresh.reason || 'not_verified');
             return;
           }}
           return runClaim(ESCALATED_ASSURANCE, retryDepth + 1, opts);
@@ -2857,20 +3020,29 @@ def _presale_index():
             codeDisplay.textContent = serverEntry.code;
           }}
           decisionCopy.textContent = 'Code ' + serverEntry.code + ' bound to PPID ' + (serverEntry.ppid || '').slice(0, 24) + '…';
-          decisionCard.innerHTML = '<strong>{copy["success"]}</strong><p class="tiny">Single-use code for drop '
-            + (serverEntry.drop_id || DROP_ID) + '. Try again with the same lemma.id to see duplicate denial.</p>';
+          decisionCard.innerHTML = '<strong>{copy["success"]}</strong><p class="tiny">One code per person for this drop. This site never saw your ID documents.</p>';
+          showDeliveryPanel();
+          if (WELCOME_MODE) {{
+            setWelcomeStep('deny');
+            decisionCopy.textContent = 'You got your code. Now try to grab a second one.';
+          }}
           if (!isRetry) advanceTour('claim');
         }} else {{
           pill.textContent = 'DENY';
           pill.className = 'pill deny';
           const reason = serverEntry.reason || 'denied';
-          decisionCopy.textContent = 'Blocked: ' + reason;
+          decisionCopy.textContent = formatDenyReason(reason);
           decisionCard.innerHTML = '<strong>Claim denied</strong><p class="tiny">' + formatDenyReason(reason) + '</p>';
           if (codeDisplay && serverEntry.existing_code) {{
             codeDisplay.hidden = false;
             codeDisplay.textContent = serverEntry.existing_code;
           }}
           if (isRetry && reason === 'allocation_already_claimed') {{
+            if (WELCOME_MODE) {{
+              setWelcomeStep('return');
+              showWelcomePrivacy();
+              decisionCard.innerHTML = '<strong>One per person</strong><p class="tiny">' + formatDenyReason(reason) + ' Close this tab and come back — you will still be you.</p>';
+            }}
             advanceTour('retry');
           }}
           if (opts.skipStepDemo && reason === 'registration_required') {{
@@ -2983,6 +3155,8 @@ def _presale_index():
     document.getElementById('clear-flag-btn')?.addEventListener('click', () => clearRiskFlag());
     document.getElementById('replay-btn')?.addEventListener('click', () => runReplayAttack());
     document.getElementById('skip-step-btn')?.addEventListener('click', () => runSkipStepAttack());
+    document.getElementById('save-delivery-btn')?.addEventListener('click', () => saveDelivery(false));
+    document.getElementById('skip-delivery-btn')?.addEventListener('click', () => saveDelivery(true));
 
     async function resumeAfterLemmaRedirect() {{
       const params = new URLSearchParams(window.location.search);
@@ -3036,7 +3210,7 @@ def _presale_index():
           }}
           pill.textContent = 'DENY';
           pill.className = 'pill deny';
-          decisionCopy.textContent = 'Blocked: ' + (serverEntry.reason || 'denied');
+          decisionCopy.textContent = formatDenyReason(serverEntry.reason || 'denied');
           return;
         }}
       }}

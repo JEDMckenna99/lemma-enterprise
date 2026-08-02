@@ -216,19 +216,24 @@ def test_relying_site_index_loads_verifier_script(relying_site_client):
     assert 'stroke="#d97706"' in body
     assert "IsHumanVerifier" in body
     assert "Sign in with lemma.id" in body
-    assert "stampAction" in body
-    assert "claim_presale_code" in body
-    assert "register_presale" in body
-    assert "unique code" in body.lower()
-    assert "Step 1" in body
-    assert "verifyFreshForBackend" in body
-    assert "/api/presale/register" in body
-    assert "Simulate site risk flag" in body
+    assert "Try Sign in with lemma.id" in body
+    assert "WELCOME_MODE" in body
+    assert "plain-language.js" in body
     assert "tickets-demo.lemma.id" in body
-    assert "Unique presale code distributor" in body
-    assert "requireFreshPasskey: true" in body
-    assert "Laylo" not in body
-    assert "RealFan" not in body
+
+    presale = client.get("/?tour=presale")
+    presale_body = presale.get_data(as_text=True)
+    assert presale.status_code == 200
+    assert "stampAction" in presale_body
+    assert "claim_presale_code" in presale_body
+    assert "register_presale" in presale_body
+    assert "unique code" in presale_body.lower()
+    assert "Step 1" in presale_body
+    assert "verifyFreshForBackend" in presale_body
+    assert "/api/presale/register" in presale_body
+    assert "Simulate site risk flag" in presale_body
+    assert "Unique presale code distributor" in presale_body
+    assert "requireFreshPasskey: true" in presale_body
 
 
 def test_relying_site_ticketing_favicon(relying_site_client):
@@ -256,8 +261,8 @@ def test_relying_site_index_exposes_presale_defense_and_tour_ui(relying_site_cli
     assert "TOUR_MODE" in body
     assert "Phone-first presale" in body
     assert "compare-table" in body
-    assert "fresh_passkey_missing" in body
-    assert "rate_limited" in body
+    assert "LemmaDemoPlain" in body
+    assert "formatDenyReason" in body
     assert "Nonce consumed" in body
     assert "Gate reason" in body
     assert 'id="backend-gates-toggle"' in body
@@ -275,7 +280,7 @@ def test_relying_site_index_exposes_presale_defense_and_tour_ui(relying_site_cli
 
 def test_relying_site_index_exposes_server_receipt_and_hub_return(relying_site_client):
     client, _mod = relying_site_client
-    resp = client.get("/")
+    resp = client.get("/?tour=presale")
     body = resp.get_data(as_text=True)
 
     assert 'id="server-receipt"' in body
@@ -391,6 +396,42 @@ def test_presale_register_stores_signup(relying_site_client, monkeypatch):
         mod.PRESALE_DROP_ID,
         "did:lemma:ppid_demo_123",
     )
+
+
+def test_presale_delivery_updates_contact_after_register(relying_site_client, monkeypatch):
+    client, mod = relying_site_client
+    mod._PRESALE_REGISTRATIONS.reset()
+    mod._PRESALE_REGISTRATIONS.register(
+        mod.PRESALE_DROP_ID,
+        "did:lemma:ppid_demo_123",
+    )
+    monkeypatch.setattr(
+        mod,
+        "_session_from_request",
+        lambda: {"ppid": "did:lemma:ppid_demo_123", "assurance": "passkey"},
+    )
+    resp = client.post(
+        "/api/presale/delivery",
+        json={
+            "drop_id": mod.PRESALE_DROP_ID,
+            "email": "fan@example.com",
+            "phone": "+15550101234",
+        },
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 200
+    assert payload["success"] is True
+
+
+def test_welcome_index_hides_contact_until_after_claim(relying_site_client):
+    client, _mod = relying_site_client
+    resp = client.get("/")
+    body = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert 'id="delivery-panel"' in body
+    assert "delivery-panel" in body
+    assert "WELCOME_MODE" in body
+    assert "Optional delivery" in body
 
 
 def test_presale_claim_requires_registration(relying_site_client, monkeypatch):

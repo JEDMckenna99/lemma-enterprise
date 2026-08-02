@@ -133,6 +133,28 @@ class PresaleRegistrationStore:
             }
         return RegisterResult(True, "ok", drop_id=drop, ppid=subject)
 
+    def update_contact(
+        self,
+        drop_id: str,
+        ppid: str,
+        *,
+        email: str = "",
+        phone: str = "",
+    ) -> RegisterResult:
+        drop = _normalize_drop_id(drop_id)
+        subject = _normalize_ppid(ppid)
+        if not drop:
+            return RegisterResult(False, "drop_id_missing")
+        if not subject:
+            return RegisterResult(False, "ppid_missing")
+        with self._lock:
+            key = (drop, subject)
+            if key not in self._registered:
+                return RegisterResult(False, "registration_required")
+            self._registered[key]["email"] = str(email or "").strip()
+            self._registered[key]["phone"] = str(phone or "").strip()
+        return RegisterResult(True, "ok", drop_id=drop, ppid=subject)
+
     def is_registered(
         self,
         drop_id: str,
@@ -326,6 +348,38 @@ class SQLitePresaleStore(PresaleRegistrationStore, PresaleAllocationLedger):
                     (drop, subject, str(email or "").strip(), str(phone or "").strip(), time.time()),
                 )
                 self._conn.commit()
+            except sqlite3.Error:
+                self._conn.rollback()
+                return RegisterResult(False, "registration_store_error")
+        return RegisterResult(True, "ok", drop_id=drop, ppid=subject)
+
+    def update_contact(
+        self,
+        drop_id: str,
+        ppid: str,
+        *,
+        email: str = "",
+        phone: str = "",
+    ) -> RegisterResult:
+        drop = _normalize_drop_id(drop_id)
+        subject = _normalize_ppid(ppid)
+        if not drop:
+            return RegisterResult(False, "drop_id_missing")
+        if not subject:
+            return RegisterResult(False, "ppid_missing")
+        with self._lock:
+            try:
+                cur = self._conn.execute(
+                    """
+                    UPDATE presale_registrations
+                    SET email = ?, phone = ?
+                    WHERE drop_id = ? AND ppid = ?
+                    """,
+                    (str(email or "").strip(), str(phone or "").strip(), drop, subject),
+                )
+                self._conn.commit()
+                if cur.rowcount < 1:
+                    return RegisterResult(False, "registration_required")
             except sqlite3.Error:
                 self._conn.rollback()
                 return RegisterResult(False, "registration_store_error")

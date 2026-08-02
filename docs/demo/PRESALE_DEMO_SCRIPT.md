@@ -4,50 +4,49 @@
 
 **Duration:** ~3 minutes
 
-**Hub context:** This is **Enforce in the wild**: action-level presence stamps on a relying site. The hub demo covers Create · Sign in · Enforce at the identity layer; presale shows stamps at claim time. The tickets site default `/` is the Sign in shell; open `/?tour=presale` for this tour.
+**Hub context:** Default tickets site `/` is the **user-lane welcome tour**. This presale tour at `/?tour=presale` is **Enforce in the wild** for integrators. The hub **Try it** lane links to the welcome tour; **See how it works** covers Create · Sign in · Enforce.
 
 ## One-liner
 
-Phone is for delivery; passkey is who you are; Face ID again to get the code.
+Passkey is who you are; Face ID again to get the code; delivery contact is optional after you claim.
 
 ## Talk track
 
 ### 1. Join presale (Step 1)
 
-- Click **Step 1, Passkey register for drop**.
-- Say: email and phone are CRM/delivery fields on the relying site only, not identity, not sent to lemma.id.
-- Point at the defense strip: site PPID, action stamp, server nonce.
+- Click **Step 1, Passkey register for drop** (no email or phone first).
+- Say: passkey proves identity — no signup form, nothing sent to lemma.id.
 
 ### 2. Unlock code (Step 2)
 
 - Click **Step 2, Fresh passkey unlocks unique code**.
-- Say: this is a fresh passkey ceremony at claim time, bots cannot replay a cached session.
-- Toggle **Show backend gates** and show `fresh_passkey_attestation` in the cryptographic envelope (redacted excerpt).
+- Say: fresh passkey at claim time — bots cannot replay a cached session.
+- Optional delivery: after success, email/phone are **where to send the code** — site-local only.
 
-### 3. Retry same wallet
+### 3. Retry same lemma.id
 
-- Click **Try again with same wallet**.
-- Say: ledger enforces one code per verified person per drop, enumeration without farming.
+- Click **Try again with same lemma.id**.
+- Say: one code per person for this drop — you already got yours.
 
 ### 4. Risk flag + IDV
 
 - Click **Simulate site risk flag**, then claim again.
-- Say: site doubt requires fresh IDV (`verifyFreshForBackend`) before code issuance when policy requires `ishuman` assurance.
+- Say: site doubt requires fresh identity check before code issuance when human proof is required.
 
 ### 5. Attack lab (optional)
 
-- Expand **Attack lab** (visible in tour mode).
-- **Replay last stamp** → `action_nonce_reused`.
-- **Skip Step 1** (before registering) → `registration_required`.
+- Expand **Attack lab** (presale tour mode or engineer view).
+- **Replay last stamp** → blocked: old approval reused.
+- **Skip Step 1** (before registering) → sign up for the drop first.
 
 ## Objection handlers
 
 | Objection | Response |
 |-----------|----------|
-| "We already use SMS OTP" | OTP proves possession of a phone number, not present control of a wallet. Fresh passkey at unlock binds the code to a site-private PPID with replay protection. |
+| "We already use SMS OTP" | OTP proves possession of a phone number, not present control of a lemma.id. Fresh passkey at unlock binds the code to a site-private PPID with replay protection. |
 | "Passkeys add friction" | Step 1 is low-friction passkey register; Step 2 is intentional friction at the high-value moment (code unlock). |
 | "What does lemma.id see?" | Action names, bodies, and contact fields stay on your site. lemma.id attests fresh passkey to an opaque action commitment only. |
-| "Can one person get multiple codes?" | No, ledger keys `(drop_id, ppid)`; same wallet retry is denied. |
+| "Can one person get multiple codes?" | No, ledger keys `(drop_id, ppid)`; same lemma.id retry is denied. |
 
 ## Manual deploy checklist
 
