@@ -376,6 +376,14 @@ def create_app():
     except Exception as e:
         logger.warning(f"⚠️ Lemma Auth not available: {e}")
 
+    # Platform sign-in session (dogfooded Sign in with lemma.id -> /app)
+    try:
+        from api.lemma_session_auth import lemma_session_bp
+        app.register_blueprint(lemma_session_bp)
+        logger.info("✅ Lemma Session Auth registered")
+    except Exception as e:
+        logger.warning(f"⚠️ Lemma Session Auth not available: {e}")
+
     # Passkey (WebAuthn) Authentication
     try:
         from api.passkey_auth import passkey_bp
@@ -699,14 +707,36 @@ def create_app():
 
     @app.route('/app')
     def app_page():
-        """Direct link to Lemma ID management app (bypasses smart routing)"""
-        logger.info("🏠 Serving Lemma ID app (direct)")
-        app.jinja_env.cache = {}
-        return render_template('wallet_simple.html'), 200, {
+        """lemma.id manager, opened by a verified Sign in with lemma.id session.
+
+        Dogfooded auth: without a session minted from a server-verified
+        presentation (api/lemma_session_auth.py), the sign-in gate renders
+        instead of the manager.
+        """
+        from api.lemma_session_auth import current_signin_session
+        from api.ishuman_demo import signin_flow_context
+
+        no_cache = {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache',
             'Expires': '0'
         }
+
+        if not current_signin_session():
+            logger.info("🔐 Serving /app sign-in gate (no verified session)")
+            return render_template(
+                'demo/signin.html',
+                mock_mode=False,
+                initial_screen='gate',
+                **signin_flow_context(),
+            ), 200, no_cache
+
+        logger.info("🏠 Serving Lemma ID app (verified session)")
+        app.jinja_env.cache = {}
+        return render_template(
+            'wallet_simple.html',
+            show_signin_panels=True,
+        ), 200, no_cache
 
     @app.route('/about')
     def about():

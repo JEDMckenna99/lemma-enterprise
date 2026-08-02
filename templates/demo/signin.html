@@ -1,0 +1,103 @@
+{% extends "modern/layout.html" %}
+{% set is_public_page = true %}
+
+{% block title %}Try lemma.id | Sign in without an account, an email, or a password{% endblock %}
+{% block description %}Create a lemma.id on your device, then use it to sign in to lemma.id itself. No email, no password, no form. The site learns one random ID and nothing else.{% endblock %}
+
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="/static/css/demo/signin-flow.css?v=3">
+{% endblock %}
+
+{% macro atom_mark(extra_class='') -%}
+<div class="sf-mark{% if extra_class %} {{ extra_class }}{% endif %}" aria-hidden="true">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" focusable="false">
+    <g stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <g class="atom-orbit"><ellipse cx="60" cy="60" rx="38" ry="14"/></g>
+      <g class="atom-orbit"><ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(90 60 60)"/></g>
+      <g class="atom-orbit"><ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(45 60 60)"/></g>
+      <g class="atom-orbit"><ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(-45 60 60)"/></g>
+    </g>
+  </svg>
+</div>
+{%- endmacro %}
+
+{% block content %}
+<main class="sf-page" id="sf-root"
+  data-mock="{{ '1' if mock_mode else '0' }}"
+  data-screen="{{ initial_screen or '' }}"
+  data-site-id="{{ platform_site_id or 'lemma.id' }}"
+  data-dev-root-pubkey="{{ dev_network_root_pubkey or '' }}">
+
+  <!-- ============ State A: create ============ -->
+  <section class="sf-state" id="sf-state-create" hidden>
+    <div class="sf-card">
+      {{ atom_mark() }}
+      <h1 class="sf-h1">Sign in without an account, an email, or a password.</h1>
+      <p class="sf-lead">Create a lemma.id on this device, then use it to sign in to this very site. About 15&nbsp;seconds.</p>
+      <button class="sf-btn" type="button" id="sf-create-btn">
+        <span class="sf-btn-label">Create your lemma.id</span>
+      </button>
+      <p class="sf-caption">Works with Face&nbsp;ID, Windows&nbsp;Hello, or your fingerprint. Nothing about you leaves the device.</p>
+      <p class="sf-status" id="sf-create-status" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- ============ State B: sign in ============ -->
+  <section class="sf-state" id="sf-state-signin" hidden>
+    <div class="sf-card">
+      {{ atom_mark() }}
+      <p class="sf-done-line"><span class="sf-done-check" aria-hidden="true">&#10003;</span> Your lemma.id is ready on this device.</p>
+      <h1 class="sf-h1">Now use it to sign in &mdash; to this very site.</h1>
+      <p class="sf-lead">lemma.id runs on its own product. Your device signs a proof; this site verifies it and learns nothing else about you.</p>
+      <button class="sf-btn" type="button" id="sf-signin-btn">
+        <span class="sf-btn-label">Sign in with lemma.id</span>
+      </button>
+      <p class="sf-caption">No form to fill. No verification email to wait for.</p>
+      <p class="sf-status" id="sf-signin-status" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- ============ Success beat ============ -->
+  <section class="sf-state" id="sf-state-success" hidden>
+    <div class="sf-card">
+      {{ atom_mark('is-unlocked sf-mark-pop') }}
+      <h1 class="sf-h1">Signed in &mdash; <span id="sf-elapsed">0.9s</span>.</h1>
+      <p class="sf-lead">No password. No email code. Nothing to remember.</p>
+      <button class="sf-btn" type="button" id="sf-open-manager-btn">
+        <span class="sf-btn-label">Open your lemma.id manager</span>
+      </button>
+      <p class="sf-caption">The proof your device just signed is the key. See exactly what this site learned about you.</p>
+    </div>
+  </section>
+
+  <!-- ============ /app gate ============ -->
+  <section class="sf-state" id="sf-state-gate" hidden>
+    <div class="sf-card">
+      {{ atom_mark() }}
+      <h1 class="sf-h1">Sign in to open your manager.</h1>
+      <p class="sf-lead">Your lemma.id signs a proof on this device; the manager opens only for a verified proof.</p>
+      <button class="sf-btn" type="button" id="sf-gate-signin-btn">
+        <span class="sf-btn-label">Sign in with lemma.id</span>
+      </button>
+      <p class="sf-caption">Don&rsquo;t have a lemma.id yet? <a class="sf-link" href="/demo">Create one in 15 seconds.</a></p>
+      <p class="sf-status" id="sf-gate-status" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- ============ Manager narration panels (preview screen; the real ones live at /app) ============ -->
+  <section class="sf-state" id="sf-state-manager" hidden>
+    <div class="sf-col sf-col-wide">
+      {% include "demo/_signin_panels.html" %}
+    </div>
+  </section>
+
+  <footer class="sf-foot">
+    <a class="sf-link sf-link-quiet" href="/demo/how-it-works">See how it works under the hood &rarr;</a>
+  </footer>
+</main>
+
+<script src="/sdk/proof-verifier.js" defer></script>
+<script src="/static/js/demo/plain-language.js?v=2" defer></script>
+<script src="/static/js/demo/signin-flow.js?v=3" defer></script>
+{% endblock %}

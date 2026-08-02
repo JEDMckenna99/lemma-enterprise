@@ -165,18 +165,11 @@ def get_bloom_filter():
         try:
             sequence_number = fetch_revocation_sequence_number()
         except Exception as exc:
-            # Local/dev SQLite often lacks revocation_list until Postgres is wired.
-            # Return an empty signed-capable snapshot so clients can proceed.
-            logger.warning("Bloom sequence lookup failed (serving empty filter): %s", exc)
-            empty = {
-                "success": True,
-                "sequence_number": 0,
-                "version": 0,
-                "revoked_ids": [],
-                "valid_until": int(time.time()) + 7 * 24 * 3600,
-                "degraded": True,
-            }
-            return jsonify(empty), 200
+            # Fail closed (Section 5 contract): an unsigned "degraded" snapshot
+            # is rejected by every SDK anyway, so serve an honest 503 instead.
+            # SQLite dev works via get_dbapi_connection and never lands here.
+            logger.warning("Bloom sequence lookup failed (fail closed): %s", exc)
+            return jsonify({"success": False, "error": "revocation_unavailable"}), 503
         cache_ttl_seconds = int(os.getenv("LEMMA_REVOCATION_FILTER_CACHE_TTL_SECONDS", "60"))
         etag = _bloom_etag(sequence_number)
 
@@ -197,10 +190,10 @@ def get_bloom_filter():
             ), 200
 
         # Query database for ALL revoked credentials AND PPIDs (global)
-        from api.database import get_db_connection
+        from api.database import get_dbapi_connection
 
         try:
-            conn = get_db_connection()
+            conn = get_dbapi_connection()
             cursor = conn.cursor()
 
             # Get ALL revoked credential IDs across all sites

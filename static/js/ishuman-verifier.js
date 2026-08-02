@@ -329,7 +329,9 @@ async function verifySessionAssertion(assertion, signatureB64, sitePubkeyB64, ex
 function buildBloomSignatureMessage(snapshot) {
     return new TextEncoder().encode([
         BLOOM_SNAPSHOT_PREFIX,
-        String(snapshot.sequence_number || ''),
+        // ?? not ||: a legitimate sequence_number of 0 (empty revocation list)
+        // must sign as "0" to match the server's canonical message.
+        String(snapshot.sequence_number ?? ''),
         String(snapshot.content_hash || ''),
         String(snapshot.generated_at_unix || ''),
         String(snapshot.valid_until_unix || ''),

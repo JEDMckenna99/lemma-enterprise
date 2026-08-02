@@ -122,7 +122,7 @@ def test_bloom_filter_endpoint_returns_signed_snapshot(revocation_client, monkey
         def close(self):
             return None
 
-    monkeypatch.setattr("api.database.get_db_connection", lambda: _Conn())
+    monkeypatch.setattr("api.database.get_dbapi_connection", lambda: _Conn())
     rev_api._BLOOM_CACHE["payload"] = None
     rev_api._BLOOM_CACHE["count"] = None
     rev_api._BLOOM_CACHE["sequence"] = None

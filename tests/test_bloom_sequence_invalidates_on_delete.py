@@ -31,10 +31,10 @@ def test_fetch_revocation_sequence_number_changes_when_row_count_drops(monkeypat
             return None
 
     # Same MAX(id)=99, but COUNT drops after Unban deletes a row.
-    monkeypatch.setattr(database_mod, "get_db_connection", lambda: _Conn((99, 5, 250)))
+    monkeypatch.setattr(database_mod, "get_dbapi_connection", lambda: _Conn((99, 5, 250)))
     before = bloom_snapshot.fetch_revocation_sequence_number()
 
-    monkeypatch.setattr(database_mod, "get_db_connection", lambda: _Conn((99, 4, 200)))
+    monkeypatch.setattr(database_mod, "get_dbapi_connection", lambda: _Conn((99, 4, 200)))
     after = bloom_snapshot.fetch_revocation_sequence_number()
 
     assert before != after

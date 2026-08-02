@@ -26,7 +26,8 @@ def fixture_ishuman_demo_client(fake_ishuman_db_session_factory, monkeypatch):
 
 
 def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
-    resp = ishuman_demo_client.get("/demo")
+    # Builder hub moved to /demo/how-it-works; /demo is the dogfooded sign-in flow.
+    resp = ishuman_demo_client.get("/demo/how-it-works")
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
@@ -308,7 +309,7 @@ def test_ishuman_demo_js_preserves_ppid_when_backend_denies():
 def test_legacy_demo_ishuman_url_redirects_to_canonical_demo(ishuman_demo_client):
     resp = ishuman_demo_client.get("/demo/ishuman", follow_redirects=False)
     assert resp.status_code == 301
-    assert resp.headers["Location"].endswith("/demo")
+    assert resp.headers["Location"].endswith("/demo/how-it-works")
 
 
 def test_demo_create_button_always_enters_live_issuance():

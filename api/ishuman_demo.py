@@ -262,16 +262,79 @@ def _demo_page_context() -> dict:
     }
 
 
+def _platform_site_id() -> str:
+    """Canonical siteId for the dogfooded sign-in flow (hostname, never site_*)."""
+    from api.site_hostname import normalize_runtime_site_binding
+
+    if os.getenv("ENVIRONMENT", "").strip().lower() == "production":
+        return "lemma.id"
+    return normalize_runtime_site_binding(request.host) or "lemma.id"
+
+
+def _dev_network_root_pubkey() -> str:
+    """Dev-only SDK pin override so the browser trusts the local dev issuer.
+
+    Production returns '' and the SDK keeps its baked-in network root pins.
+    """
+    if os.getenv("LEMMA_DEV_INSECURE_ISSUER") != "1":
+        return ""
+    if os.getenv("ENVIRONMENT", "").strip().lower() == "production":
+        return ""
+    try:
+        from api.bloom_snapshot import _issuer_signing_material
+
+        _, public_key, _ = _issuer_signing_material()
+        return public_key.public_bytes_raw().hex()
+    except Exception:
+        return ""
+
+
+def signin_flow_context() -> dict:
+    """Template context shared by /demo and the /app sign-in gate."""
+    return {
+        "platform_site_id": _platform_site_id(),
+        "dev_network_root_pubkey": _dev_network_root_pubkey(),
+    }
+
+
 @ishuman_demo_bp.route("/demo")
 def lemma_demo_page():
-    """Canonical public demo for lemma.id proof-of-humanity integration."""
+    """The demo IS the product's own front door: create a lemma.id, sign in
+    to lemma.id with it, and the verified presentation opens the manager."""
+    return render_template(
+        "demo/signin.html",
+        mock_mode=False,
+        initial_screen="",
+        **signin_flow_context(),
+    )
+
+
+@ishuman_demo_bp.route("/demo/how-it-works")
+def lemma_demo_builder_page():
+    """Builder lane: the full wizard/Enforce/presale hub for developers."""
     return render_template("demo/lemma.html", **_demo_page_context())
 
 
 @ishuman_demo_bp.route("/demo/ishuman")
 def ishuman_demo_page_legacy_redirect():
     """Legacy URL, isHuman is an assurance tier inside the lemma.id demo, not the demo itself."""
-    return redirect("/demo", code=301)
+    return redirect("/demo/how-it-works", code=301)
+
+
+@ishuman_demo_bp.route("/demo/mock")
+def signin_flow_mock_page():
+    """Design-review mock of the dogfooded sign-in flow (non-production only).
+
+    Renders the real templates/demo/signin.html markup with a fake driver so
+    every screen can be reviewed before any backend wiring exists.
+    Optional ?screen=create|signin|success|gate|manager jumps to one screen.
+    """
+    if not _demo_enabled():
+        return redirect("/demo", code=302)
+    screen = request.args.get("screen", "")
+    if screen not in ("create", "signin", "success", "gate", "manager"):
+        screen = ""
+    return render_template("demo/signin.html", mock_mode=True, initial_screen=screen)
 
 
 def _render_verify_ceremony_page():

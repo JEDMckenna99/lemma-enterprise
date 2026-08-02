@@ -21,6 +21,18 @@ def test_root_is_home_and_app_is_manager(monkeypatch):
     app.config["TESTING"] = True
     with app.test_client() as client:
         root = client.get("/")
+        # /app without a verified sign-in session serves the sign-in gate.
+        gate = client.get("/app")
+
+        # A verified presentation-backed session opens the real manager.
+        from api.lemma_session_auth import SESSION_KEY
+
+        with client.session_transaction() as sess:
+            sess[SESSION_KEY] = {
+                "ppid": "did:lemma:ppid_test",
+                "assurance": "passkey",
+                "signed_in_at": 0,
+            }
         manager = client.get("/app")
         product = client.get("/home")
 
@@ -28,9 +40,14 @@ def test_root_is_home_and_app_is_manager(monkeypatch):
     assert b"Sign in with lemma.id" in root.data
     assert b"Passwordless login" in root.data
     assert b"assurance-levels" in root.data
+    assert gate.status_code == 200
+    assert b'id="sf-state-gate"' in gate.data
+    assert b'id="sf-gate-signin-btn"' in gate.data
+    assert b'id="create-wallet-btn"' not in gate.data
     assert manager.status_code == 200
     assert b'id="create-wallet-btn"' in manager.data
     assert b"Create my lemma.id" in manager.data
+    assert b'id="sf-manager-panels"' in manager.data
     assert product.status_code == 200
     assert b"Passwordless login" in product.data
     assert b"assurance-levels" in product.data
@@ -88,7 +105,7 @@ def test_brand_and_manager_creation_use_canonical_routes():
     assert "LemmaWalletWrap" in manager or "purgeAllDeviceData" in wallet_js
     assert "async listDevices(" in wallet_js
     assert "async revokeDevice(" in wallet_js
-    assert "static VERSION = '2.78.0'" in wallet_js
+    assert "static VERSION = '2.79.0'" in wallet_js
     assert "Never call instance.lock()" in wallet_js
     assert "Safari/iOS-safe" in wallet_js
     assert "_handleDeviceRevoked" in wallet_js

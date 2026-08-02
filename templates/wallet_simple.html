@@ -6,18 +6,21 @@
 {% block preload_scripts %}
 <link rel="preload" href="{{ url_for('static', filename='js/lemma-keys.js') }}?v=8" as="script">
 <link rel="preload" href="{{ url_for('static', filename='js/wallet-at-rest-crypto.js') }}?v=2" as="script">
-<link rel="preload" href="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2693" as="script">
+<link rel="preload" href="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2694" as="script">
 <link rel="preload" href="{{ url_for('static', filename='js/lemma-credential-utils.js') }}?v=2" as="script">
 {% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=12">
+<link rel="stylesheet" href="/static/css/demo/signin-flow.css?v=3">
 <style nonce="{{ csp_nonce }}">
 /* Manager logos stay jewel violet; never green when unlocked */
 .wallet-logo,
 .wallet-logo.is-unlocked { color: #4E3D8F !important; }
 #nav-logo.is-unlocked .nav-logo-icon,
 .nav-logo.is-unlocked .nav-logo-icon { color: #4E3D8F !important; }
+/* Narration panels sit inside the manager column */
+.wallet-container .sf-panels { margin-bottom: 20px; }
 </style>
 {% endblock %}
 
@@ -78,7 +81,11 @@
 
     <!-- UNLOCKED VIEW -->
     <div id="unlocked-view" class="hidden">
-        
+
+        {% if show_signin_panels %}
+        {% include "demo/_signin_panels.html" %}
+        {% endif %}
+
         <div class="card card-elevated" id="proofs-card">
             <h2>What's saved here</h2>
             <div id="proofs-summary" class="proofs-summary">
@@ -256,7 +263,7 @@ async function waitForLemmaWallet(maxMs = 15000) {
     const start = Date.now();
     while (typeof LemmaWallet === 'undefined') {
         if (Date.now() - start > maxMs) {
-            throw new Error('Wallet SDK not loaded');
+            throw new Error('lemma.id SDK not loaded');
         }
         await new Promise((resolve) => setTimeout(resolve, 20));
     }
@@ -1699,6 +1706,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 </script>
 <script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}"></script>
+{% if show_signin_panels %}
+<script src="/static/js/demo/signin-panels.js?v=2" defer></script>
+{% endif %}
 {% endblock %}
 
 {% block wallet_auto_init %}

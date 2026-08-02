@@ -1,0 +1,52 @@
+{# Narration panels: what lemma.id learned + what other sites would see.
+   Shared by the /demo flow's manager preview and the real manager at /app.
+   Values are filled by static/js/demo/signin-flow.js (flow) or
+   static/js/demo/signin-panels.js (manager). #}
+<div class="sf-panels" id="sf-manager-panels">
+  <div class="sf-panel">
+    <h2 class="sf-panel-title">What lemma.id learned about you when you signed in</h2>
+    <dl class="sf-rows">
+      <div class="sf-row">
+        <dt>What this site sees</dt>
+        <dd>
+          <span class="sf-ppid" id="sf-ppid-self">&hellip;</span>
+          <button class="sf-copy" type="button" id="sf-copy-ppid" aria-label="Copy your full ID">Copy</button>
+        </dd>
+      </div>
+      <div class="sf-row">
+        <dt>Proof level</dt>
+        <dd id="sf-assurance-label">&hellip;</dd>
+      </div>
+      <div class="sf-row">
+        <dt>Signed in</dt>
+        <dd id="sf-signin-time">&hellip;</dd>
+      </div>
+    </dl>
+    <p class="sf-panel-note">No email. No name. No password. That random ID is everything this site gets.</p>
+  </div>
+
+  <div class="sf-panel">
+    <h2 class="sf-panel-title">What other sites would see</h2>
+    <dl class="sf-rows">
+      <div class="sf-row">
+        <dt>lemma.id</dt>
+        <dd><span class="sf-ppid" id="sf-ppid-lemma">&hellip;</span></dd>
+      </div>
+      <div class="sf-row">
+        <dt>a-ticket-shop.example</dt>
+        <dd><span class="sf-ppid" id="sf-ppid-shop">&hellip;</span></dd>
+      </div>
+      <div class="sf-row">
+        <dt>a-news-site.example</dt>
+        <dd><span class="sf-ppid" id="sf-ppid-news">&hellip;</span></dd>
+      </div>
+    </dl>
+    <p class="sf-panel-note">Every site gets a different ID from the same lemma.id. Sites can&rsquo;t compare notes about you.</p>
+  </div>
+
+  <div class="sf-next">
+    <a class="sf-link" href="https://tickets-demo.lemma.id" target="_blank" rel="noopener">Try it on a real third-party site &rarr;</a>
+    <a class="sf-link" href="/docs" target="_blank" rel="noopener">Add this to your site &rarr;</a>
+    <button class="sf-link sf-signout" type="button" id="sf-signout-btn">Sign out</button>
+  </div>
+</div>

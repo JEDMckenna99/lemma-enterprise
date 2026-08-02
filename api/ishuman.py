@@ -3533,32 +3533,43 @@ def verify_presentation():
             "bloom_sequence": 0                           # optional, snapshot binding
         }
     """
+    body = request.get_json(silent=True) or {}
+    payload, status = verify_presentation_payload(body)
+    return jsonify(payload), status
+
+
+def verify_presentation_payload(body: dict) -> tuple[dict, int]:
+    """Core server-side presentation verification, callable without HTTP.
+
+    Used by the /api/ishuman/verify-presentation endpoint above and by the
+    platform's own sign-in session endpoint (api/lemma_session_auth.py).
+    Returns (payload, http_status); payload["success"] is the verdict.
+    """
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
     from cryptography.exceptions import InvalidSignature
 
-    body = request.get_json(silent=True) or {}
     credential = body.get("credential")
     if not isinstance(credential, dict):
-        return jsonify({"success": False, "error": "credential_required"}), 400
+        return {"success": False, "error": "credential_required"}, 400
 
     expected_site_id = (body.get("site_id") or "").strip()
     proof = credential.get("proof") or {}
     sig_hex = (proof.get("signatureValueWeb") or proof.get("signatureValue") or "").strip()
     if not sig_hex:
-        return jsonify({"success": False, "error": "missing_signature"}), 400
+        return {"success": False, "error": "missing_signature"}, 400
 
     issuer_did = (credential.get("issuer") or (credential.get("issuerInfo") or {}).get("did") or "").strip()
     client_supplied_pubkey_hex = ((credential.get("issuerInfo") or {}).get("publicKey") or "").strip().lower()
     if not issuer_did:
-        return jsonify({"success": False, "error": "missing_issuer"}), 400
+        return {"success": False, "error": "missing_issuer"}, 400
 
     try:
         from api.trusted_issuers import is_trusted_issuer
         if not is_trusted_issuer(issuer_did):
-            return jsonify({"success": False, "error": "untrusted_issuer"}), 403
+            return {"success": False, "error": "untrusted_issuer"}, 403
     except Exception as exc:
         logger.warning("Trust list check unavailable: %s", exc)
-        return jsonify({"success": False, "error": "trust_list_unavailable"}), 503
+        return {"success": False, "error": "trust_list_unavailable"}, 503
 
     # SECURITY: derive the verification key from the TRUSTED issuer DID, NEVER
     # from the client-supplied issuerInfo.publicKey. Lemma issuer DIDs embed the
@@ -3571,37 +3582,37 @@ def verify_presentation():
     if not issuer_pubkey_hex:
         # Non-did:lemma trusted issuers do not embed a key here; refuse rather
         # than trust a client-provided key.
-        return jsonify({"success": False, "error": "issuer_pubkey_unresolvable"}), 400
+        return {"success": False, "error": "issuer_pubkey_unresolvable"}, 400
     # If the credential also carries issuerInfo.publicKey, it must match the
     # DID-bound key exactly (no silent override).
     if client_supplied_pubkey_hex and client_supplied_pubkey_hex != issuer_pubkey_hex.lower():
-        return jsonify({"success": False, "error": "issuer_pubkey_mismatch"}), 400
+        return {"success": False, "error": "issuer_pubkey_mismatch"}, 400
 
     try:
         pubkey_bytes = bytes.fromhex(issuer_pubkey_hex)
         signature_bytes = bytes.fromhex(sig_hex)
     except ValueError:
-        return jsonify({"success": False, "error": "malformed_signature"}), 400
+        return {"success": False, "error": "malformed_signature"}, 400
 
     try:
         message = _browser_canonical_message(credential)
         digest = hashlib.sha256(message).digest()
         Ed25519PublicKey.from_public_bytes(pubkey_bytes).verify(signature_bytes, digest)
     except InvalidSignature:
-        return jsonify({"success": False, "error": "invalid_signature"}), 400
+        return {"success": False, "error": "invalid_signature"}, 400
     except Exception as exc:  # noqa: BLE001
-        return jsonify({"success": False, "error": f"verify_error:{exc}"}), 400
+        return {"success": False, "error": f"verify_error:{exc}"}, 400
 
     claims = credential.get("claims") or credential.get("credentialSubject") or {}
     assurance = str(claims.get("assurance") or "").strip().lower()
     if not assurance and claims.get("isHuman") in (True, "true", "True", 1, "1"):
         assurance = "ishuman"
     if assurance not in ("passkey", "ishuman"):
-        return jsonify({"success": False, "error": "not_ishuman"}), 400
+        return {"success": False, "error": "not_ishuman"}, 400
 
     required_assurance = (body.get("required_assurance") or "ishuman").strip().lower()
     if not _assurance_meets_policy(assurance, required_assurance):
-        return jsonify({"success": False, "error": "assurance_insufficient"}), 400
+        return {"success": False, "error": "assurance_insufficient"}, 400
     from api.site_hostname import normalize_runtime_site_binding
 
     bound_site_raw = (
@@ -3615,12 +3626,12 @@ def verify_presentation():
     bound_site = normalize_runtime_site_binding(bound_site_raw)
     expected_site = normalize_runtime_site_binding(expected_site_id) if expected_site_id else None
     if expected_site and bound_site and bound_site != expected_site:
-        return jsonify({"success": False, "error": "site_id_mismatch", "bound_site": bound_site}), 400
+        return {"success": False, "error": "site_id_mismatch", "bound_site": bound_site}, 400
 
     try:
         expires_at = int(claims.get("expiresAt") or 0)
         if expires_at and expires_at < int(time.time()):
-            return jsonify({"success": False, "error": "expired"}), 400
+            return {"success": False, "error": "expired"}, 400
     except (TypeError, ValueError):
         pass
 
@@ -3629,9 +3640,9 @@ def verify_presentation():
 
     revocation_status = check_credential_revocation(credential)
     if revocation_status == "revoked":
-        return jsonify({"success": False, "error": "revoked"}), 400
+        return {"success": False, "error": "revoked"}, 400
     if revocation_status == "unavailable":
-        return jsonify({"success": False, "error": "revocation_unavailable"}), 503
+        return {"success": False, "error": "revocation_unavailable"}, 503
 
     session_assertion = body.get("session_assertion") or None
     session_signature = (body.get("session_signature") or "").strip()
@@ -3653,13 +3664,13 @@ def verify_presentation():
             session_status = "valid" if ok else "invalid"
             session_reason = reason
             if not ok:
-                return jsonify({
+                return {
                     "success": False,
                     "error": session_reason,
                     "session_status": session_status,
-                }), 400
+                }, 400
 
-    return jsonify({
+    return {
         "success": True,
         "human": True,
         "assurance": assurance,
@@ -3669,7 +3680,7 @@ def verify_presentation():
         "issuer": issuer_did,
         "session_status": session_status,
         "session_reason": session_reason,
-    })
+    }, 200
 
 
 # ---------------------------------------------------------------------------

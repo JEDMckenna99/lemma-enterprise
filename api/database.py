@@ -200,6 +200,18 @@ class _PooledConnection:
             pass
 
 
+def get_dbapi_connection():
+    """Raw DBAPI connection that works on both Postgres and SQLite.
+
+    Postgres keeps the RLS-capable psycopg2 pool via get_db_connection();
+    SQLite (local dev / tests without Postgres) uses the SQLAlchemy engine's
+    raw connection so portable SQL (e.g. revocation Bloom queries) still works.
+    """
+    if DATABASE_URL.startswith("sqlite"):
+        return engine.raw_connection()
+    return get_db_connection()
+
+
 def get_db_connection(site_id=None):
     """
     Get a raw psycopg2 database connection for IAM / revocation SQL.

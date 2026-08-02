@@ -198,9 +198,9 @@ def fetch_revocation_sequence_number() -> int:
     Mix in ``COUNT(*)`` (and a checksum of ids) so inserts **and** deletes
     change the sequence on every dyno.
     """
-    from api.database import get_db_connection
+    from api.database import get_dbapi_connection
 
-    conn = get_db_connection()
+    conn = get_dbapi_connection()
     cursor = conn.cursor()
     try:
         cursor.execute(

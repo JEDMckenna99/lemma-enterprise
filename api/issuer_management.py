@@ -9,11 +9,27 @@ If KMS is unavailable, new key generation will FAIL rather than create unprotect
 This ensures compliance with FIPS 140-2 Level 2/3 requirements.
 """
 
+import hashlib
 import logging
+import os
 import time
 from typing import Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+
+def _dev_insecure_issuer_enabled() -> bool:
+    """Local-dev-only escape hatch: deterministic in-memory issuers without KMS.
+
+    Requires explicit opt-in (LEMMA_DEV_INSECURE_ISSUER=1) AND a development
+    environment. Production always fails closed — no unencrypted signing key
+    is ever created or persisted there (FIPS 140-2 contract unchanged).
+    """
+    if os.getenv("LEMMA_DEV_INSECURE_ISSUER") != "1":
+        return False
+    if os.getenv("ENVIRONMENT", "").strip().lower() == "production":
+        return False
+    return os.getenv("FLASK_ENV", "").strip().lower() == "development"
 
 _PLATFORM_SITE_ALIASES = {"lemma.id", "www.lemma.id", "lemma_platform"}
 _PLATFORM_CANONICAL_SITE_ID = "lemma_platform"
@@ -126,6 +142,30 @@ class LemmaIssuerManager:
             
             # Create new keypair and encrypt with KMS
             if not is_kms_available():
+                if _dev_insecure_issuer_enabled():
+                    # Deterministic seed: stable across restarts (same
+                    # SESSION_SECRET) so locally issued credentials keep
+                    # verifying. Never written to the database.
+                    seed_material = "lemma-dev-issuer::{}::{}".format(
+                        os.getenv("SESSION_SECRET", "dev"), _issuer_cache_key(site_id)
+                    )
+                    seed = hashlib.sha256(seed_material.encode("utf-8")).digest()
+                    issuer = PyMinimalIssuer.from_seed(list(seed))
+                    logger.warning(
+                        "🚨 INSECURE dev issuer for %s (LEMMA_DEV_INSECURE_ISSUER=1) — "
+                        "in-memory deterministic key, never use outside local dev",
+                        site_id,
+                    )
+                    return issuer, {
+                        'type': site_id,
+                        'name': issuer_name,
+                        'site_id': site_id,
+                        'did': issuer.get_did(),
+                        'public_key_hex': issuer.get_public_key_hex(),
+                        'trust_score': trust_score,
+                        'verified': True,
+                        'storage': 'dev_insecure_deterministic',
+                    }
                 raise RuntimeError(f"KMS not available - cannot create issuer for {site_id}")
             
             issuer = PyMinimalIssuer()

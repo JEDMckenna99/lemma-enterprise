@@ -80,7 +80,7 @@ def test_bloom_filter_sets_etag_and_supports_304(monkeypatch):
         def close(self):
             return None
 
-    monkeypatch.setattr("api.database.get_db_connection", lambda: _Conn())
+    monkeypatch.setattr("api.database.get_dbapi_connection", lambda: _Conn())
     monkeypatch.setattr(
         "api.bloom_snapshot._issuer_signing_material",
         lambda: _fake_bloom_keys(),

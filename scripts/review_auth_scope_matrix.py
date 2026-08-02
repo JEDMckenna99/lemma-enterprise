@@ -43,6 +43,7 @@ PUBLIC_STATE_CHANGING_ALLOWLIST = {
     "/api/auth/exchange-proof",
     "/api/auth/refresh",
     "/api/auth/request-beta-access",
+    "/api/auth/session/logout",
     "/api/auth/signout",
     "/api/agent/validate",
     "/api/recovery/initiate",
@@ -107,6 +108,9 @@ RETIRED_STATE_CHANGING_ROUTES = {
 IN_HANDLER_AUTH_ALLOWLIST = {
     "/api/agent/monitor/log-external",
     "/api/auth/issue-credential",
+    # Dogfooded platform sign-in: auth IS the server-verified signed
+    # presentation in the request body (api/lemma_session_auth.py).
+    "/api/auth/session",
     "/api/demo/ishuman/approve-network-revocation",
     "/api/demo/ishuman/clear-bans",
     "/api/demo/ishuman/clear-site-doubt",

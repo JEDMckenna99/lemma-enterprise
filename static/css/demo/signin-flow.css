@@ -1,0 +1,288 @@
+/* Sign in with lemma.id — dogfooded demo flow.
+   Visual language matches the lemma.id popup (templates/wallet_ishuman_idv.html):
+   canvas background, centered white card, animated atom brand mark,
+   black primary buttons like the rest of lemma.id. */
+
+.sf-page {
+  min-height: calc(100vh - 76px);
+  display: flex;
+  flex-direction: column;
+  background: #F4F4F7;
+}
+
+.sf-state {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 72px 20px 48px;
+}
+
+.sf-state[hidden] { display: none; }
+
+.sf-state.sf-enter { animation: sf-enter 240ms ease-out; }
+@keyframes sf-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Popup-style card */
+.sf-card {
+  background: #FFFFFF;
+  border: 1px solid #E8E8EE;
+  border-radius: 8px;
+  padding: 32px 28px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 8px 24px rgba(18, 18, 26, 0.1);
+  text-align: center;
+}
+
+.sf-col { width: 100%; max-width: 560px; }
+.sf-col-wide { max-width: 640px; }
+
+/* Brand mark — same atom as the popup, same working/unlocked states */
+.sf-mark {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+  color: #4E3D8F;
+  transition: color 0.2s ease;
+}
+
+.sf-mark svg {
+  width: 100px;
+  height: 100px;
+  display: block;
+}
+
+.sf-mark.is-unlocked { color: #1F7A4C; }
+
+.sf-mark.is-working .atom-orbit {
+  animation: sf-orbit-working 1.8s ease-in-out infinite;
+  transform-origin: 60px 60px;
+  will-change: transform;
+}
+.sf-mark.is-working .atom-orbit:nth-child(2) { animation-delay: -0.45s; }
+.sf-mark.is-working .atom-orbit:nth-child(3) { animation-delay: -0.9s; }
+.sf-mark.is-working .atom-orbit:nth-child(4) { animation-delay: -1.35s; }
+
+@keyframes sf-orbit-working {
+  0%, 100% { transform: scale(0.94); }
+  50% { transform: scale(1.08); }
+}
+
+.sf-mark-pop { animation: sf-mark-pop 320ms ease-out; }
+@keyframes sf-mark-pop {
+  from { transform: scale(0.85); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.sf-h1 {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #1A1A24;
+  margin-bottom: 10px;
+}
+
+.sf-lead {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: #5E5E70;
+  margin-bottom: 20px;
+}
+
+/* Primary button — black, like the popup and the rest of lemma.id */
+.sf-btn {
+  display: block;
+  width: 100%;
+  padding: 14px 18px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: #1A1A24;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sf-btn:hover:not(:disabled) {
+  background: #32313F;
+  box-shadow: 0 2px 8px rgba(26, 26, 36, 0.2);
+}
+.sf-btn:disabled { opacity: 0.65; cursor: wait; }
+
+.sf-btn.sf-busy .sf-btn-label { opacity: 0.85; }
+
+.sf-caption {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #5E5E70;
+  margin-top: 14px;
+}
+
+.sf-status {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #454554;
+  margin-top: 12px;
+  min-height: 1.45em;
+}
+
+.sf-status.sf-status-error { color: #C0392B; }
+
+/* State B "ready" line */
+.sf-done-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #1F7A4C;
+  margin-bottom: 12px;
+}
+
+.sf-done-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #E7F5EC;
+  color: #1F7A4C;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Manager narration panels */
+.sf-panels { display: flex; flex-direction: column; gap: 20px; }
+
+.sf-panel {
+  border: 1px solid #E8E8EE;
+  border-radius: 14px;
+  padding: 26px 28px;
+  background: #fff;
+}
+
+.sf-panel-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1A1A24;
+  margin-bottom: 18px;
+}
+
+.sf-rows { display: flex; flex-direction: column; }
+
+.sf-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid #F1F1F5;
+}
+
+.sf-row:last-child { border-bottom: none; }
+
+.sf-row dt {
+  font-size: 15px;
+  color: #6d6d7e;
+  flex-shrink: 0;
+}
+
+.sf-row dd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15.5px;
+  color: #1A1A24;
+  text-align: right;
+}
+
+.sf-ppid {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 13.5px;
+  background: #F4F2FA;
+  color: #3A2D6E;
+  border: 1px solid #E4DFF3;
+  border-radius: 999px;
+  padding: 4px 12px;
+  white-space: nowrap;
+}
+
+.sf-copy {
+  border: 1px solid #E8E8EE;
+  background: #fff;
+  color: #454554;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 7px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.sf-copy:hover { border-color: #c9c9d6; }
+
+.sf-panel-note {
+  margin-top: 18px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.55;
+  color: #1A1A24;
+}
+
+.sf-next {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  padding: 4px 4px 0;
+}
+
+.sf-link {
+  color: #4E3D8F;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.sf-link:hover { text-decoration: underline; }
+
+.sf-signout {
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  color: #6d6d7e;
+  font-weight: 500;
+  margin-left: auto;
+}
+
+.sf-signout:hover { text-decoration: underline; }
+
+.sf-foot {
+  text-align: center;
+  padding: 0 24px 40px;
+}
+
+.sf-link-quiet { color: #6d6d7e; font-size: 14.5px; font-weight: 400; }
+
+@media (max-width: 640px) {
+  .sf-state { padding: 40px 16px 36px; }
+  .sf-card { padding: 28px 20px; }
+  .sf-panel { padding: 20px 18px; }
+  .sf-row { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .sf-row dd { text-align: left; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-state.sf-enter, .sf-mark-pop { animation: none; }
+  .sf-mark.is-working .atom-orbit { animation: none; }
+}

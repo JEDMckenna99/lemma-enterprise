@@ -91,7 +91,7 @@ def test_bloom_filter_db_failure_returns_503_without_signature(revocation_client
     def _boom():
         raise RuntimeError("db down")
 
-    monkeypatch.setattr("api.database.get_db_connection", _boom)
+    monkeypatch.setattr("api.database.get_dbapi_connection", _boom)
     _reset_bloom_cache(rev_api)
 
     resp = revocation_client.get("/api/revocation/bloom-filter")
@@ -135,7 +135,7 @@ def test_bloom_filter_hash_failure_returns_500_no_plaintext(revocation_client, m
             raise OSError("hash failed")
         return real_sha256(data)
 
-    monkeypatch.setattr("api.database.get_db_connection", lambda: _Conn())
+    monkeypatch.setattr("api.database.get_dbapi_connection", lambda: _Conn())
     monkeypatch.setattr("api.revocation_api.hashlib.sha256", _flaky_sha256)
     _reset_bloom_cache(rev_api)
 

@@ -91,7 +91,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.78.0';  // v2.78: iOS-safe remove + fail-closed unlock purge on device_revoked
+    static VERSION = '2.79.0';  // v2.79: user-facing copy says lemma.id (not "wallet")
 
     static DEVICE_IDB_NAMES = ['LemmaWallet', 'LemmaWalletWrap'];
 
@@ -435,7 +435,7 @@ class LemmaWallet {
             if (authResult.reason === 'wallet_locked' || authResult.reason === 'session_expired') {
                 state.hasWallet = true;  // They have a wallet, just locked
                 state.suggestedAction = 'redirect';
-                state.suggestedButtonText = 'Unlock Wallet';
+                state.suggestedButtonText = 'Unlock lemma.id';
             } else {
                 // No lemma for this site
                 state.suggestedAction = 'redirect';
@@ -474,14 +474,14 @@ class LemmaWallet {
             if (walletIdRecord?.value) {
                 state.hasWallet = true;
             state.suggestedAction = 'unlock';
-            state.suggestedButtonText = 'Unlock Wallet';
+            state.suggestedButtonText = 'Unlock lemma.id';
             state.canAddDevice = true;
         } else {
                 // No wallet - offer create or link
             state.suggestedAction = 'create_passkey';
             state.suggestedButtonText = 'Create Passkey';
             state.canLinkDevice = true;
-            state.linkDeviceText = 'Already have a wallet on another device?';
+            state.linkDeviceText = 'Already have a lemma.id on another device?';
             }
         } catch (e) {
             console.warn('[Lemma] Could not check wallet status:', e.message);
@@ -501,7 +501,7 @@ class LemmaWallet {
      *   }
      * 
      * @param {Object} options - Customization options
-     * @param {string} options.text - Custom text (default: "Already have a wallet on another device?")
+     * @param {string} options.text - Custom text (default: "Already have a lemma.id on another device?")
      * @param {string} options.linkText - Custom link text (default: "Link this device")
      * @param {string} options.className - Custom CSS class for styling
      * @returns {string|null} HTML string or null if link option shouldn't be shown
@@ -514,7 +514,7 @@ class LemmaWallet {
             return null;
         }
         
-        const text = options.text || 'Already have a wallet on another device?';
+        const text = options.text || 'Already have a lemma.id on another device?';
         const linkText = options.linkText || 'Link this device';
         const className = options.className || 'lemma-link-device';
         const url = state.linkDeviceUrl || 'https://lemma.id/link';
@@ -837,7 +837,7 @@ class LemmaWallet {
         result.authenticated = false;
         result.needsPasskey = true;
         result.needsRedirect = false;
-        result.message = 'Unlock wallet with passkey';
+        result.message = 'Unlock lemma.id with passkey';
                 return result;
     }
     
@@ -2118,13 +2118,13 @@ class LemmaWallet {
         const createOptions = {
             challenge: this._base64urlToBuffer(enrollBegin.challenge),
             rp: {
-                name: 'Lemma Wallet',
+                name: 'lemma.id',
                 id: enrollBegin.rp_id || rpId,
             },
             user: {
                 id: new TextEncoder().encode(walletId.value),
-                name: 'Wallet User',
-                displayName: 'Lemma Wallet',
+                name: 'lemma.id user',
+                displayName: 'lemma.id',
             },
             pubKeyCredParams: [
                 { alg: -7, type: 'public-key' },
@@ -2367,7 +2367,7 @@ class LemmaWallet {
     async _deriveWalletSigningKey() {
         if (this._walletSigningKey) return this._walletSigningKey;
         if (!this.isUnlocked || !this.isUnlocked()) {
-            throw new Error('Wallet must be unlocked to derive signing key');
+            throw new Error('lemma.id must be unlocked to derive signing key');
         }
         const keys = this._getLemmaKeys();
         const loaded = await this._loadDeviceSigningRecord();
@@ -2585,7 +2585,7 @@ class LemmaWallet {
     async _signalServerUnlock(profile = null) {
         if (!this._isLemmaDomain()) return { success: false, skipped: true };
         if (!this.isUnlocked || !this.isUnlocked()) {
-            throw new Error('Wallet must be unlocked to establish a server session');
+            throw new Error('lemma.id must be unlocked to establish a server session');
         }
         // Prefer IndexedDB when in-memory session is missing walletId (multi-tab restore).
         const walletId = await this._resolveCurrentWalletId();
@@ -2798,7 +2798,7 @@ class LemmaWallet {
 
     async requestWalletChallenge() {
         if (!this.isUnlocked || !this.isUnlocked()) {
-            throw new Error('Wallet must be unlocked to request challenge');
+            throw new Error('lemma.id must be unlocked to request challenge');
         }
         const walletId = this.session?.walletId;
         if (!walletId) throw new Error('wallet_id unavailable');
@@ -2821,7 +2821,7 @@ class LemmaWallet {
 
     async buildWalletAssertion(fieldNames, fieldValues = {}) {
         if (!this.isUnlocked || !this.isUnlocked()) {
-            throw new Error('Wallet must be unlocked to build assertion');
+            throw new Error('lemma.id must be unlocked to build assertion');
         }
         await this._registerSigningKeyIfNeeded();
         const deviceId = this._deviceId || await this._getOrCreateDeviceId();
@@ -2856,7 +2856,7 @@ class LemmaWallet {
      */
     async listDevices({ includeRevoked = false } = {}) {
         if (!this.isUnlocked || !this.isUnlocked()) {
-            throw new Error('Wallet must be unlocked to list devices');
+            throw new Error('lemma.id must be unlocked to list devices');
         }
         const walletId = this.session?.walletId;
         if (!walletId) throw new Error('wallet_id unavailable');
@@ -2901,7 +2901,7 @@ class LemmaWallet {
      */
     async revokeDevice(targetDeviceId) {
         if (!this.isUnlocked || !this.isUnlocked()) {
-            throw new Error('Wallet must be unlocked to revoke a device');
+            throw new Error('lemma.id must be unlocked to revoke a device');
         }
         if (!this._isLemmaDomain || !this._isLemmaDomain()) {
             throw new Error('Device revoke is only available on lemma.id');
@@ -3004,7 +3004,7 @@ class LemmaWallet {
 
     async deriveSiteSigningKeypair(siteDomain) {
         if (!this.isUnlocked || !this.isUnlocked()) {
-            throw new Error('Wallet must be unlocked to derive site signing key');
+            throw new Error('lemma.id must be unlocked to derive site signing key');
         }
         const keys = this._getLemmaKeys();
         const canonicalSite = this._canonicalizeSiteDomainForProof(siteDomain);
@@ -3372,7 +3372,7 @@ class LemmaWallet {
 
         const profile = await this.getActiveProfile();
         if (!profile?.secret && !this.session?.walletLocalSeed) {
-            throw new Error('No wallet found on this device');
+            throw new Error('No lemma.id found on this device');
         }
 
         const walletIdRec = await this._get('passkey', 'walletId');
@@ -3497,7 +3497,7 @@ class LemmaWallet {
 
         const walletIdRec = await this._get('passkey', 'walletId');
         const walletId = walletIdRec?.value || this.session?.walletId || null;
-        if (!walletId) throw new Error('No wallet on this device');
+        if (!walletId) throw new Error('No lemma.id on this device');
 
         const keys = this._getLemmaKeys();
         const idBytes = crypto.getRandomValues(new Uint8Array(24));
@@ -3604,7 +3604,7 @@ class LemmaWallet {
 
         const profile = await this.getActiveProfile();
         if (!profile?.secret && !this.session?.walletLocalSeed) {
-            throw new Error('No wallet found on this device');
+            throw new Error('No lemma.id found on this device');
         }
 
         const walletIdRec = await this._get('passkey', 'walletId');
@@ -5196,7 +5196,7 @@ class LemmaWallet {
      */
     async getAuthProof() {
         if (!this.isUnlocked()) {
-            throw new Error('Wallet must be unlocked to get auth proof');
+            throw new Error('lemma.id must be unlocked to get auth proof');
         }
 
         const passkey = await this._get('passkey', 'primary');
@@ -6407,7 +6407,7 @@ class LemmaWallet {
             return {
                 authorized: false,
                 reason: 'wallet_locked',
-                message: 'Wallet must be unlocked to access this site',
+                message: 'lemma.id must be unlocked to access this site',
                 verifyTimeMs: (performance.now() - startTime).toFixed(1)
             };
         }
@@ -7137,7 +7137,7 @@ class LemmaWallet {
         await this.init();
         
         if (!this.isUnlocked()) {
-            throw new Error('Wallet must be unlocked to get wallet secret');
+            throw new Error('lemma.id must be unlocked to get local identity seed');
         }
         
         // If specific profile requested, get that profile's secret
@@ -7275,7 +7275,7 @@ class LemmaWallet {
         await this.init();
         
         if (!this.isUnlocked()) {
-            throw new Error('Wallet must be unlocked to derive PPID');
+            throw new Error('lemma.id must be unlocked to derive PPID');
         }
         
         if (!siteId) {
@@ -9248,7 +9248,7 @@ class LemmaWallet {
      */
     async export() {
         if (!this.isUnlocked()) {
-            throw new Error('Wallet must be unlocked to export');
+            throw new Error('lemma.id must be unlocked to export');
         }
         
         return {
@@ -9263,7 +9263,7 @@ class LemmaWallet {
      */
     async import(data) {
         if (!this.isUnlocked()) {
-            throw new Error('Wallet must be unlocked to import');
+            throw new Error('lemma.id must be unlocked to import');
         }
 
         if (data.lemmas) {
