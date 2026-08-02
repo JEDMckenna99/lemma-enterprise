@@ -1,8 +1,9 @@
 /**
  * Sign in with lemma.id — dogfooded demo flow state machine.
  *
- * States: create -> signin -> success -> (manager)   plus a standalone `gate`
- * used when /app is opened without a session.
+ * States: create -> signin -> manager   plus a standalone `gate`
+ * used when /app is opened without a session. After sign-in, open the manager
+ * immediately (no interstitial success screen).
  *
  * The same markup runs in two modes:
  *   - mock mode (data-mock="1"): fake driver with realistic timing, no SDK,
@@ -25,7 +26,6 @@
   var SCREENS = {
     create: document.getElementById('sf-state-create'),
     signin: document.getElementById('sf-state-signin'),
-    success: document.getElementById('sf-state-success'),
     gate: document.getElementById('sf-state-gate'),
     manager: document.getElementById('sf-state-manager'),
   };
@@ -75,11 +75,6 @@
     var p = window.LemmaDemoPlain;
     if (p && typeof p.reason === 'function' && reason) return p.reason(reason);
     return 'Something went wrong — try again.';
-  }
-
-  function formatElapsed(ms) {
-    if (!ms && ms !== 0) return '';
-    return (Math.max(ms, 100) / 1000).toFixed(1) + 's';
   }
 
   function getCookie(name) {
@@ -255,7 +250,6 @@
   var createBtn = document.getElementById('sf-create-btn');
   var signinBtn = document.getElementById('sf-signin-btn');
   var gateBtn = document.getElementById('sf-gate-signin-btn');
-  var openManagerBtn = document.getElementById('sf-open-manager-btn');
   var copyBtn = document.getElementById('sf-copy-ppid');
   var signoutBtn = document.getElementById('sf-signout-btn');
 
@@ -297,10 +291,8 @@
 
   if (signinBtn) {
     signinBtn.addEventListener('click', function () {
-      handleSignIn(signinBtn, 'sf-signin-status', function (result) {
-        var elapsedEl = document.getElementById('sf-elapsed');
-        if (elapsedEl && result.timeMs != null) elapsedEl.textContent = formatElapsed(result.timeMs);
-        show('success');
+      handleSignIn(signinBtn, 'sf-signin-status', function () {
+        driver.openManager();
       });
     });
   }
@@ -310,12 +302,6 @@
       handleSignIn(gateBtn, 'sf-gate-status', function () {
         driver.openManager();
       });
-    });
-  }
-
-  if (openManagerBtn) {
-    openManagerBtn.addEventListener('click', function () {
-      driver.openManager();
     });
   }
 
@@ -362,7 +348,7 @@
 
   Promise.all([driver.hasSession(), driver.hasLocalCredential()]).then(function (results) {
     if (results[0]) {
-      show('success');
+      driver.openManager();
     } else if (results[1]) {
       show('signin');
     } else {

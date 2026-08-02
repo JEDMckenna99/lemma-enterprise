@@ -6,11 +6,11 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="/static/css/demo/signin-flow.css?v=3">
+<link rel="stylesheet" href="/static/css/demo/signin-flow.css?v=4">
 {% endblock %}
 
-{% macro atom_mark(extra_class='') -%}
-<div class="sf-mark{% if extra_class %} {{ extra_class }}{% endif %}" aria-hidden="true">
+{% macro atom_mark() -%}
+<div class="sf-mark" aria-hidden="true">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" focusable="false">
     <g stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
       <g class="atom-orbit"><ellipse cx="60" cy="60" rx="38" ry="14"/></g>
@@ -58,19 +58,6 @@
     </div>
   </section>
 
-  <!-- ============ Success beat ============ -->
-  <section class="sf-state" id="sf-state-success" hidden>
-    <div class="sf-card">
-      {{ atom_mark('is-unlocked sf-mark-pop') }}
-      <h1 class="sf-h1">Signed in &mdash; <span id="sf-elapsed">0.9s</span>.</h1>
-      <p class="sf-lead">No password. No email code. Nothing to remember.</p>
-      <button class="sf-btn" type="button" id="sf-open-manager-btn">
-        <span class="sf-btn-label">Open your lemma.id manager</span>
-      </button>
-      <p class="sf-caption">The proof your device just signed is the key. See exactly what this site learned about you.</p>
-    </div>
-  </section>
-
   <!-- ============ /app gate ============ -->
   <section class="sf-state" id="sf-state-gate" hidden>
     <div class="sf-card">
@@ -99,5 +86,5 @@
 
 <script src="/sdk/proof-verifier.js" defer></script>
 <script src="/static/js/demo/plain-language.js?v=2" defer></script>
-<script src="/static/js/demo/signin-flow.js?v=3" defer></script>
+<script src="/static/js/demo/signin-flow.js?v=4" defer></script>
 {% endblock %}

@@ -56,8 +56,6 @@
   display: block;
 }
 
-.sf-mark.is-unlocked { color: #1F7A4C; }
-
 .sf-mark.is-working .atom-orbit {
   animation: sf-orbit-working 1.8s ease-in-out infinite;
   transform-origin: 60px 60px;
@@ -70,12 +68,6 @@
 @keyframes sf-orbit-working {
   0%, 100% { transform: scale(0.94); }
   50% { transform: scale(1.08); }
-}
-
-.sf-mark-pop { animation: sf-mark-pop 320ms ease-out; }
-@keyframes sf-mark-pop {
-  from { transform: scale(0.85); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
 }
 
 .sf-h1 {
@@ -283,6 +275,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sf-state.sf-enter, .sf-mark-pop { animation: none; }
+  .sf-state.sf-enter { animation: none; }
   .sf-mark.is-working .atom-orbit { animation: none; }
 }

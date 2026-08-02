@@ -35,12 +35,13 @@ def test_demo_is_the_dogfooded_signin_flow(demo_client):
 
     assert resp.status_code == 200
     assert 'data-mock="0"' in body
-    # All flow states present in the markup.
+    # All flow states present in the markup (signed-in goes straight to manager).
     assert 'id="sf-state-create"' in body
     assert 'id="sf-state-signin"' in body
-    assert 'id="sf-state-success"' in body
+    assert 'id="sf-state-success"' not in body
     assert 'id="sf-state-gate"' in body
     assert 'id="sf-state-manager"' in body
+    assert 'sf-open-manager-btn' not in body
     # Real SDK, not the mock driver.
     assert "/sdk/proof-verifier.js" in body
     assert "signin-flow.js" in body
