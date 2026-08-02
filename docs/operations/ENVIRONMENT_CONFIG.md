@@ -124,7 +124,7 @@ Webhook endpoint (legacy): `/api/webhooks/stripe-identity`
 | `LEMMA_REVOCATION_FILTER_CACHE_TTL_SECONDS` | `60` | In-process + HTTP `max-age` for bloom filter. |
 | `LEMMA_REVOCATION_FILTER_SWR_SECONDS` | `300` | `stale-while-revalidate` for bloom HTTP cache. |
 | `LEMMA_DIDIT_CIRCUIT_FAILURES` / `LEMMA_DIDIT_CIRCUIT_RECOVERY_SECONDS` | `5` / `60` | Didit outbound circuit breaker. |
-| `LEMMA_BILLING_ENFORCEMENT`           | unset   | When `"1"`, blocks isHuman issuance (`derive-site-proof`) for customers without active billing. **Do not enable in production without an explicit go-live decision.** |
+| `LEMMA_BILLING_ENFORCEMENT`           | unset   | When `"1"`, blocks **isHuman** / paid-tier issuance (`derive-site-proof` with `required_assurance=ishuman`) for sites without active billing. Free passkey Sign in with lemma.id is never gated. |
 
 ### PPID assurance and authz proof flags
 

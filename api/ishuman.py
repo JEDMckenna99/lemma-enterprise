@@ -2237,9 +2237,15 @@ def _bill_site_credential_event(
     credential_id: str,
     issue_mode: Optional[str] = None,
     is_cached_reissue: bool = False,
+    required_assurance: str = "ishuman",
 ) -> None:
     """Classify and record a billable site-credential event (issuance / MAU / doubt)."""
     if not ppid or not credential_id:
+        return
+    from billing.billing_access import is_billable_assurance
+
+    # Free passkey Sign in with lemma.id is not metered.
+    if not is_billable_assurance(required_assurance):
         return
     from billing.credential_billing import record_credential_billing_event
 
@@ -2431,7 +2437,11 @@ def derive_site_proof():
 
                 from billing.billing_access import check_site_billing_allows_issuance
 
-                billing_deny = check_site_billing_allows_issuance(db, target_site)
+                billing_deny = check_site_billing_allows_issuance(
+                    db,
+                    target_site,
+                    required_assurance=required_assurance,
+                )
                 if billing_deny:
                     return jsonify({
                         "success": False,
@@ -2461,6 +2471,7 @@ def derive_site_proof():
                     credential_id=credential["id"],
                     issue_mode=issue_mode,
                     is_cached_reissue=False,
+                    required_assurance=required_assurance,
                 )
                 return _finalize_site_proof_response(
                     db,
@@ -2521,7 +2532,11 @@ def derive_site_proof():
 
         from billing.billing_access import check_site_billing_allows_issuance
 
-        billing_deny = check_site_billing_allows_issuance(db, target_site)
+        billing_deny = check_site_billing_allows_issuance(
+            db,
+            target_site,
+            required_assurance=required_assurance,
+        )
         if billing_deny:
             return jsonify({
                 "success": False,
@@ -2580,6 +2595,7 @@ def derive_site_proof():
             credential_id=credential["id"],
             issue_mode=issue_mode,
             is_cached_reissue=False,
+            required_assurance=required_assurance,
         )
         return _finalize_site_proof_response(
             db,

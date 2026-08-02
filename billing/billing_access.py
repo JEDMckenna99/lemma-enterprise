@@ -19,19 +19,31 @@ def billing_enforcement_enabled() -> bool:
     )
 
 
-def check_site_billing_allows_issuance(db, target_site: str) -> Optional[str]:
+def is_billable_assurance(required_assurance: Optional[str]) -> bool:
+    """True for paid/isHuman issuance; False for free passkey Sign in with lemma.id."""
+    return (required_assurance or "ishuman").strip().lower() != "passkey"
+
+
+def check_site_billing_allows_issuance(
+    db,
+    target_site: str,
+    *,
+    required_assurance: str = "ishuman",
+) -> Optional[str]:
     """
     Return an error code when new credential issuance must be blocked, else None.
 
-    When enforcement is enabled, only registered sites (Section 3 registration path)
-    with an active metered subscription may issue billable credentials. Unregistered
-    hostnames are blocked. Managed platform/demo sites (lemma.id + isHuman demos)
-    are always exempt — the product cannot bill itself to let people sign in.
+    Billing applies only to isHuman / paid-tier issuance. Free ``passkey``
+    Sign in with lemma.id is never gated (no registration or Stripe required).
 
-    Free-tier "Sign in with lemma.id" (passkey login, no site registration) requires
-    ``LEMMA_BILLING_ENFORCEMENT`` to stay off — enabling enforcement blocks issuance
-    for unregistered hostnames and breaks the no-registration login product.
+    When enforcement is enabled for billable assurance, only registered sites
+    with an active metered subscription may issue. Unregistered hostnames are
+    blocked for isHuman. Managed platform/demo sites (lemma.id + isHuman demos)
+    are always exempt — the product cannot bill itself to let people sign in.
     """
+    if not is_billable_assurance(required_assurance):
+        return None
+
     if not billing_enforcement_enabled():
         return None
 

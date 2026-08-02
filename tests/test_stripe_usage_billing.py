@@ -227,6 +227,61 @@ def test_billing_gate_blocks_unregistered_host(monkeypatch, fake_ishuman_db_sess
     monkeypatch.setenv("LEMMA_BILLING_ENFORCEMENT", "1")
     db = fake_ishuman_db_session_factory.session_local()
     assert check_site_billing_allows_issuance(db, "unregistered.example") == "billing_site_unregistered"
+    assert (
+        check_site_billing_allows_issuance(
+            db,
+            "unregistered.example",
+            required_assurance="ishuman",
+        )
+        == "billing_site_unregistered"
+    )
+
+
+@pytest.mark.unit
+def test_billing_gate_allows_free_passkey_without_registration(monkeypatch, fake_ishuman_db_session_factory):
+    """Free Sign in with lemma.id must work for any hostname under enforcement."""
+    from api.database import Site
+
+    monkeypatch.setenv("LEMMA_BILLING_ENFORCEMENT", "1")
+    db = fake_ishuman_db_session_factory.session_local()
+
+    assert (
+        check_site_billing_allows_issuance(
+            db,
+            "unregistered.example",
+            required_assurance="passkey",
+        )
+        is None
+    )
+
+    store = fake_ishuman_db_session_factory.store
+    store.data[Site.__name__].append(
+        Site(
+            site_id="site_new",
+            site_domain="new.example",
+            company_name="New Co",
+            admin_email="newdev@example.com",
+            oauth_client_id="oauth_test",
+            oauth_client_secret="secret_test",
+        )
+    )
+    assert (
+        check_site_billing_allows_issuance(
+            db,
+            "new.example",
+            required_assurance="passkey",
+        )
+        is None
+    )
+    # isHuman on the same unbilled registered site stays gated.
+    assert (
+        check_site_billing_allows_issuance(
+            db,
+            "new.example",
+            required_assurance="ishuman",
+        )
+        == "billing_setup_required"
+    )
 
 
 @pytest.mark.unit
