@@ -25,7 +25,8 @@ def check_site_billing_allows_issuance(db, target_site: str) -> Optional[str]:
 
     When enforcement is enabled, only registered sites (Section 3 registration path)
     with an active metered subscription may issue billable credentials. Unregistered
-    hostnames are blocked. Managed isHuman demo sites are always exempt.
+    hostnames are blocked. Managed platform/demo sites (lemma.id + isHuman demos)
+    are always exempt — the product cannot bill itself to let people sign in.
 
     Free-tier "Sign in with lemma.id" (passkey login, no site registration) requires
     ``LEMMA_BILLING_ENFORCEMENT`` to stay off — enabling enforcement blocks issuance
@@ -34,13 +35,20 @@ def check_site_billing_allows_issuance(db, target_site: str) -> Optional[str]:
     if not billing_enforcement_enabled():
         return None
 
+    from api.platform_owner import is_platform_site
+    from api.platform_sites import is_demo_site, is_managed_platform_site
+
+    # Hostname check first so platform dogfood/sign-in cannot fail closed on
+    # a missing/mis-linked sites row while enforcement is on.
+    if is_platform_site(target_site):
+        return None
+
     ctx = get_registered_site_billing_context(db, target_site)
     if not ctx.get("is_registered_site"):
         return "billing_site_unregistered"
 
-    from api.platform_sites import is_demo_site
-
-    if is_demo_site(ctx.get("site_id")):
+    site_id = ctx.get("site_id")
+    if is_demo_site(site_id) or is_managed_platform_site(site_id) or is_platform_site(site_id):
         return None
 
     if not ctx.get("customer"):

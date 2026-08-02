@@ -199,6 +199,30 @@ def test_billing_gate_allows_demo_sites(monkeypatch, fake_ishuman_db_session_fac
 
 
 @pytest.mark.unit
+def test_billing_gate_allows_platform_site_without_customer(monkeypatch, fake_ishuman_db_session_factory):
+    """lemma.id must never require Stripe to issue its own site proofs."""
+    from api.database import Site
+
+    monkeypatch.setenv("LEMMA_BILLING_ENFORCEMENT", "1")
+
+    store = fake_ishuman_db_session_factory.store
+    store.data[Site.__name__].append(
+        Site(
+            site_id="lemma.id",
+            site_domain="lemma.id",
+            company_name="Lemma",
+            admin_email="admin@lemma.id",
+            oauth_client_id="oauth_test",
+            oauth_client_secret="secret_test",
+        )
+    )
+    db = fake_ishuman_db_session_factory.session_local()
+
+    assert check_site_billing_allows_issuance(db, "lemma.id") is None
+    assert check_site_billing_allows_issuance(db, "lemma_platform") is None
+
+
+@pytest.mark.unit
 def test_billing_gate_blocks_unregistered_host(monkeypatch, fake_ishuman_db_session_factory):
     monkeypatch.setenv("LEMMA_BILLING_ENFORCEMENT", "1")
     db = fake_ishuman_db_session_factory.session_local()
