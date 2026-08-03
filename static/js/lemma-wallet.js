@@ -2099,6 +2099,7 @@ class LemmaWallet {
         }
 
         const deviceLabel = await this._getStoredDeviceName().catch(() => this.constructor.friendlyDeviceLabel());
+        this._restoreStashedEnrollmentGrant(walletId.value);
         const enrollBeginResponse = await fetch('/api/wallet/device-enroll/begin', {
             method: 'POST',
             credentials: 'include',
@@ -2240,7 +2241,7 @@ class LemmaWallet {
             throw new Error(enrollComplete.error || `device-enroll complete failed (${enrollCompleteResponse.status})`);
         }
         this._signingKeyRegistered = true;
-        this._pendingEnrollmentGrant = null;
+        this._clearStashedEnrollmentGrant();
         this._deviceId = deviceId;
 
         // device-enroll/complete issues the server session from the registration
@@ -2421,9 +2422,52 @@ class LemmaWallet {
         }
     }
 
+    _stashEnrollmentGrant(grant, walletId = null) {
+        const value = String(grant || '').trim();
+        if (!value || typeof sessionStorage === 'undefined') return;
+        try {
+            sessionStorage.setItem('lemma_enrollment_grant', JSON.stringify({
+                grant: value,
+                walletId: walletId || null,
+                at: Date.now(),
+            }));
+        } catch (_) { /* private mode */ }
+    }
+
+    _restoreStashedEnrollmentGrant(walletId = null) {
+        if (this._pendingEnrollmentGrant) return this._pendingEnrollmentGrant;
+        if (typeof sessionStorage === 'undefined') return null;
+        try {
+            const raw = sessionStorage.getItem('lemma_enrollment_grant');
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            const grant = String(parsed?.grant || '').trim();
+            if (!grant) return null;
+            // 5 minute TTL matches server DEVICE_ENROLLMENT_GRANT_TTL_SECONDS
+            if (parsed?.at && Date.now() - Number(parsed.at) > 300000) {
+                sessionStorage.removeItem('lemma_enrollment_grant');
+                return null;
+            }
+            if (walletId && parsed?.walletId && parsed.walletId !== walletId) {
+                return null;
+            }
+            this._pendingEnrollmentGrant = grant;
+            return grant;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    _clearStashedEnrollmentGrant() {
+        this._pendingEnrollmentGrant = null;
+        if (typeof sessionStorage === 'undefined') return;
+        try { sessionStorage.removeItem('lemma_enrollment_grant'); } catch (_) { /* ignore */ }
+    }
+
     async ensureDeviceEnrollmentAfterSeedTransfer(result) {
         await this.init();
         this._pendingEnrollmentGrant = result?.enrollmentGrant || this._pendingEnrollmentGrant || null;
+        this._stashEnrollmentGrant(this._pendingEnrollmentGrant, result?.walletId || this.session?.walletId || null);
         if (!this.session?.walletLocalSeed || !this.session?.personRootProxy) {
             throw new Error('Seed transfer incomplete');
         }
@@ -2441,7 +2485,11 @@ class LemmaWallet {
         await this._persistPersonRootSeedsAtRest();
         this._walletSigningKey = null;
         this._signingKeyRegistered = false;
-        await this._registerSigningKeyIfNeeded();
+        // Defer signing-key registration to registerPasskey()/device-enroll so
+        // the one-time enrollment grant is not consumed early.
+        if (!this._pendingEnrollmentGrant) {
+            await this._registerSigningKeyIfNeeded();
+        }
         if (result?.masterCredentialId) {
             try {
                 await this.reissueMasterCredential();
@@ -2578,7 +2626,9 @@ class LemmaWallet {
             throw error;
         }
         this._signingKeyRegistered = true;
-        this._pendingEnrollmentGrant = null;
+        // Keep any pending enrollment grant for device-enroll/passkey. Do not
+        // clear it here — register-signing-key may not have consumed it
+        // (idempotent re-register), and link flows need it for passkey enroll.
         return data;
     }
 
@@ -3195,6 +3245,7 @@ class LemmaWallet {
         }
         const data = await res.json();
         this._pendingEnrollmentGrant = data.enrollment_grant || null;
+        this._stashEnrollmentGrant(data.enrollment_grant, data.wallet_id || null);
         const bundle = data.bundle || {};
         const keys = this._getLemmaKeys();
         const toHex = (bytes) => Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -3303,6 +3354,7 @@ class LemmaWallet {
         }
         const data = await res.json();
         this._pendingEnrollmentGrant = data.enrollment_grant || null;
+        this._stashEnrollmentGrant(data.enrollment_grant, data.wallet_id || null);
         const bundle = data.bundle || {};
         const keys = this._getLemmaKeys();
         let payload;
@@ -3338,8 +3390,9 @@ class LemmaWallet {
         }
 
         this._pendingLinkReceive = null;
+        const enrollmentGrant = this._pendingEnrollmentGrant;
         const result = await this._completeLinkFromPayload(payload);
-        return { ...result, ready: true };
+        return { ...result, ready: true, enrollmentGrant };
     }
 
     /**
@@ -3484,13 +3537,11 @@ class LemmaWallet {
 
     /**
      * SENDER (manager): create a push offer. QR/link carry only transfer_id.
-     * Requires a fresh passkey. Receiver must register before confirmLinkPushDeposit.
+     * Unlocked session + wallet assertion is enough to create the offer; the
+     * fresh passkey happens once at confirmLinkPushDeposit (actual send).
      */
     async beginLinkPush() {
         await this.init();
-        await this._requireFreshPasskeyAuth({
-            reason: 'Verify to create a transfer link for another device',
-        });
         if (!this.isUnlocked()) {
             await this.unlock({ force: true, isHumanIssuance: false });
         }
@@ -8474,7 +8525,12 @@ class LemmaWallet {
 
         this._walletSigningKey = null;
         this._signingKeyRegistered = false;
-        await this._registerSigningKeyIfNeeded();
+        // Defer signing-key registration when a link enrollment grant is pending.
+        // register-signing-key consumes the one-time grant; device-enroll needs
+        // that same grant to create the passkey on this browser.
+        if (!this._pendingEnrollmentGrant) {
+            await this._registerSigningKeyIfNeeded();
+        }
 
         let humanProofRestored = false;
         let credentialsImported = 0;
@@ -8514,7 +8570,10 @@ class LemmaWallet {
                 }
             }
 
-            if (!serverSessionSet) {
+            // Skip signal-unlock while enrollment grant is pending — it would
+            // register the signing key and burn the grant before passkey enroll.
+            // device-enroll/complete establishes the server session instead.
+            if (!serverSessionSet && !this._pendingEnrollmentGrant) {
                 try {
                     await this._signalServerUnlock({ id: profileId, name: profileName });
                     console.log('[Lemma] Server session established for linked device');

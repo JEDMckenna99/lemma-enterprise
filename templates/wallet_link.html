@@ -292,29 +292,72 @@ async function pollForSyncTransfer(transferId) {
     }
 }
 
-async function finishLinkSuccess(result, statusEl, mode) {
-    const waitEl = statusEl || document.getElementById('receive-wait-status');
-    waitEl.innerHTML = '<strong>Device Added!</strong><br><br>' +
-        (result.humanProofRestored
-            ? 'Your lemma.id and human proof are ready on this device.'
-            : 'Your lemma.id is now on this device.') +
-        '<br><br><span id="passkey-status">Creating passkey...</span>';
-    waitEl.className = 'status-box success';
+async function finishPasskeyOnNewDevice(result, waitEl, mode) {
+    if (result?.enrollmentGrant) {
+        wallet._pendingEnrollmentGrant = result.enrollmentGrant;
+    } else if (typeof wallet._restoreStashedEnrollmentGrant === 'function') {
+        wallet._restoreStashedEnrollmentGrant(result?.walletId || null);
+    }
+
+    waitEl.innerHTML =
+        '<strong>Create a passkey for this browser</strong><br><br>' +
+        'Approve the passkey prompt now so you can open lemma.id on this device.' +
+        '<br><br><span id="passkey-status">Waiting for passkey...</span>';
+    waitEl.className = 'status-box info';
+
     try {
-        await wallet.registerPasskey();
+        await wallet.registerPasskey({ force: true });
         if (typeof wallet.fetchAndStoreSeedEnvelopes === 'function') {
             try { await wallet.fetchAndStoreSeedEnvelopes(); } catch (_) {}
         }
-        const passkeyEl = document.getElementById('passkey-status');
-        if (passkeyEl) passkeyEl.textContent = 'Passkey created, you can sign in with biometrics.';
+        waitEl.innerHTML =
+            '<strong>Device ready</strong><br><br>' +
+            (result?.humanProofRestored
+                ? 'Your lemma.id and human proof are ready on this device.'
+                : 'Your lemma.id is ready on this device.') +
+            '<br><br>Passkey created — you can sign in with biometrics.';
+        waitEl.className = 'status-box success';
+        if (mode === 'pull') {
+            document.getElementById('pull-complete-actions')?.classList.remove('hidden');
+        }
+        if (mode === 'push') {
+            document.getElementById('push-complete-actions')?.classList.remove('hidden');
+        }
+        return true;
     } catch (passkeyErr) {
-        console.warn('Passkey after pull receive:', passkeyErr);
-        const passkeyEl = document.getElementById('passkey-status');
-        if (passkeyEl) passkeyEl.textContent = 'Add a passkey from wallet settings for faster sign-in.';
+        console.warn('Passkey after device link:', passkeyErr);
+        waitEl.innerHTML =
+            '<strong>Passkey still needed</strong><br><br>' +
+            'lemma.id arrived on this device, but a passkey is required before you can use it here.' +
+            '<br><br><span id="passkey-status">' +
+            (passkeyErr?.message || 'Passkey setup was cancelled or failed.') +
+            '</span>';
+        waitEl.className = 'status-box warning';
+        const actionsId = mode === 'sync' ? 'sync-complete-actions'
+            : (mode === 'push' ? 'push-complete-actions' : 'pull-complete-actions');
+        const actions = document.getElementById(actionsId);
+        if (actions) {
+            actions.classList.remove('hidden');
+            actions.innerHTML =
+                '<button type="button" class="btn btn-primary btn-full" id="retry-passkey-btn">Create passkey now</button>' +
+                '<a class="btn btn-secondary btn-full" href="/app" style="margin-top: 10px;">Go to lemma.id</a>';
+            document.getElementById('retry-passkey-btn')?.addEventListener('click', async () => {
+                const btn = document.getElementById('retry-passkey-btn');
+                if (btn) { btn.disabled = true; btn.textContent = 'Waiting for passkey...'; }
+                try {
+                    await finishPasskeyOnNewDevice(result, waitEl, mode);
+                } finally {
+                    if (btn) { btn.disabled = false; btn.textContent = 'Create passkey now'; }
+                }
+            });
+        }
+        return false;
     }
-    if (mode === 'pull') {
-        document.getElementById('pull-complete-actions')?.classList.remove('hidden');
-    }
+}
+
+async function finishLinkSuccess(result, statusEl, mode) {
+    const waitEl = statusEl || document.getElementById('receive-wait-status');
+    await finishPasskeyOnNewDevice(result, waitEl, mode);
 }
 
 async function finishSyncSuccess(result, statusEl) {
@@ -364,7 +407,6 @@ async function startPushFromHash() {
             if (result.ready) {
                 pushPollAbort = true;
                 await finishLinkSuccess(result, waitEl, 'push');
-                document.getElementById('push-complete-actions')?.classList.remove('hidden');
                 return true;
             }
             await new Promise((r) => setTimeout(r, 2000));

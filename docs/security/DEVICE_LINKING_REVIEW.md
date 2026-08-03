@@ -20,8 +20,10 @@ Unlocked `/app` → **Generate QR Code** / **Send Transfer Link** → `beginLink
 - QR/link carry only `{ v:2, mode:push, transfer_id }`, never secrets.
 - Empty device opens link → `acceptLinkPushOffer` registers its pubkey.
 - Both screens show the same **6-digit confirmation code**.
-- Sender confirms codes match → fresh passkey → `confirmLinkPushDeposit`.
-- Receiver claims once, then `registerPasskey()`.
+- Sender confirms codes match → **one** fresh passkey → `confirmLinkPushDeposit`
+  (creating the offer does not require a separate passkey when already unlocked).
+- Receiver claims once, keeps the enrollment grant, then is prompted immediately
+  for `registerPasskey()` / device-enroll on the new browser.
 
 **Why confirm code stays:** passkey proves the *sender*; the code binds the *receiver*
 so a stolen transfer link cannot race-register and receive the deposit.

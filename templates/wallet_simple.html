@@ -6,7 +6,7 @@
 {% block preload_scripts %}
 <link rel="preload" href="{{ url_for('static', filename='js/lemma-keys.js') }}?v=8" as="script">
 <link rel="preload" href="{{ url_for('static', filename='js/wallet-at-rest-crypto.js') }}?v=2" as="script">
-<link rel="preload" href="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2694" as="script">
+<link rel="preload" href="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2695" as="script">
 <link rel="preload" href="{{ url_for('static', filename='js/lemma-credential-utils.js') }}?v=2" as="script">
 {% endblock %}
 
@@ -120,9 +120,9 @@
             <div class="add-device-divider" aria-hidden="true">or send from here</div>
 
             <p class="card-intro" style="margin-top: 0;">
-                Generate a QR or transfer link on <strong>this</strong> device. Open it on the empty browser,
-                check that both screens show the same confirmation code, then tap
-                <strong>Codes match. Send with passkey</strong> on <strong>this</strong> screen.
+                Generate a QR or transfer link on <strong>this</strong> device (no passkey yet if you're already open).
+                Open it on the empty browser, check that both screens show the same confirmation code, then tap
+                <strong>Codes match. Send with passkey</strong> once on <strong>this</strong> screen.
             </p>
             <button id="show-qr-btn" type="button" class="btn btn-secondary btn-full">Generate QR Code</button>
             <button id="show-link-btn" type="button" class="btn btn-secondary btn-full" style="margin-top: 10px;">

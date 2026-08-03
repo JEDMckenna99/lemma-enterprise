@@ -41,10 +41,23 @@ def test_push_transfer_uses_offer_register_not_secret_in_url():
     assert "async acceptLinkPushOffer" in source
     assert "async confirmLinkPushDeposit" in source
     idx = source.index("async beginLinkPush")
-    chunk = source[idx:idx + 3500]
+    end = source.index("async getLinkPushStatus", idx)
+    chunk = source[idx:end]
     assert "mode: 'push'" in chunk or 'mode: "push"' in chunk
     assert "walletSecret" not in chunk
     assert "confirm_code" in chunk or "confirmCode" in chunk
+    # Offer creation should not force a second passkey when already unlocked.
+    assert "_requireFreshPasskeyAuth" not in chunk
+
+
+@pytest.mark.unit
+def test_link_completion_defers_signing_key_when_enrollment_grant_pending():
+    source = WALLET_JS.read_text(encoding="utf-8")
+    idx = source.index("async _completeLinkFromPayload")
+    chunk = source[idx:idx + 8000]
+    assert "if (!this._pendingEnrollmentGrant)" in chunk
+    assert "_registerSigningKeyIfNeeded" in chunk
+    assert "device-enroll needs" in chunk or "enrollment grant" in chunk.lower()
 
 
 @pytest.mark.unit
