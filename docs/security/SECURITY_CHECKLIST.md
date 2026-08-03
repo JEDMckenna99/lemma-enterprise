@@ -13,7 +13,7 @@ that share `lemma-wallet.js` and passkey infrastructure:
 |---------|------------|------------------------|----------------|
 | **Platform login & IAM** | Developer/admin login, passkey unlock, permissions, API keys, agent control plane | `/unlock`, `/platform`, `/register`, `developer_access` proofs | [`IAM_ONLY_INTEGRATION_GUIDE.md`](../integration/IAM_ONLY_INTEGRATION_GUIDE.md) |
 | **isHuman (proof of humanity)** | IDV + site proofs for relying sites; verifier SDK on customer origins | `/verify` (canonical ceremony UI; `/wallet/ishuman-idv` redirects), `/api/ishuman/*`, `ishuman-verifier.js` | [`THREAT_MODEL.md`](THREAT_MODEL.md), [`ISHUMAN_LOCAL_FIRST_IMPLEMENTATION_OUTLINE.md`](ISHUMAN_LOCAL_FIRST_IMPLEMENTATION_OUTLINE.md) |
-| **Shared wallet crypto** | IndexedDB, PRF at-rest encryption, revocation bloom, device link | `lemma-wallet.js`, `/link`, `/api/v1/revocation/*` | [`ARCHITECTURE_WALLET_FIRST.md`](../architecture/ARCHITECTURE_WALLET_FIRST.md) |
+| **Shared wallet crypto** | IndexedDB, PRF at-rest encryption, revocation bloom, device link | `lemma-wallet.js`, `/link`, `/api/v1/revocation/*` | [`LEMMA_ID_BROWSER_STORAGE_CONTRACT.md`](LEMMA_ID_BROWSER_STORAGE_CONTRACT.md), [`ARCHITECTURE_WALLET_FIRST.md`](../architecture/ARCHITECTURE_WALLET_FIRST.md) |
 
 **What the 2026-06 hardening program mostly targeted**
 

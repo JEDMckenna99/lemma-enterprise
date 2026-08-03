@@ -95,8 +95,9 @@ Internal product proposals, **not shipped**. Do not link from integrator-facing 
 |----------|-------------|
 | [lemma.id-first architecture (historical doc name)](architecture/ARCHITECTURE_WALLET_FIRST.md) | How local-credential auth differs from OAuth; see doc banner for terminology |
 | [lemma.id Presentation Model](product/LEMMA_ID_PRESENTATION_MODEL.md) | Platform identity + permission contract |
+| [Browser storage contract](security/LEMMA_ID_BROWSER_STORAGE_CONTRACT.md) | Canonical IndexedDB / localStorage / cookie inventory + encryption rules |
 | [Threat Model](security/THREAT_MODEL.md) | Security analysis and mitigations |
-| [isHuman local-first outline](security/ISHUMAN_LOCAL_FIRST_IMPLEMENTATION_OUTLINE.md) | Local verification design |
+| [isHuman local-first outline](security/ISHUMAN_LOCAL_FIRST_IMPLEMENTATION_OUTLINE.md) | Local verification design (historical phases; storage inventory superseded) |
 | [Security Checklist](security/SECURITY_CHECKLIST.md) | Launch and audit verification checklist |
 
 ## Quick links

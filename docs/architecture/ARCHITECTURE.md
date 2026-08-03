@@ -71,15 +71,20 @@
 
 ## Data Storage
 
-### User's Browser (IndexedDB)
+### User's Browser (lemma.id)
 
-| Data | Description |
+> **Superseded inventory.** The tables below are a historical snapshot (2026-01).
+> Canonical browser storage (IndexedDB stores, `enc_v1` / daily-unlock wrap,
+> localStorage keys, cookies, Cache Storage, migration rules):
+> [`docs/security/LEMMA_ID_BROWSER_STORAGE_CONTRACT.md`](../security/LEMMA_ID_BROWSER_STORAGE_CONTRACT.md).
+
+| Data (historical) | Description |
 |------|-------------|
-| `wallet_secret` | 32-byte hex - NEVER transmitted |
+| `wallet_secret` / profile `secret` | 32-byte hex identity seed — must be PRF-encrypted at rest after migration |
 | `passkey` | WebAuthn credential ID + public key |
 | `lemmas` | Signed credentials from issuers |
-| `revocations` | Bloom filter cache |
-| `session` | Auth state (unlocked_at, expires_at) |
+| `revocations` | Revocation list / bloom cache |
+| `session` | Unlock state (may include in-memory secret while unlocked) |
 
 ### PostgreSQL
 
@@ -94,13 +99,13 @@
 | Data | Description |
 |------|-------------|
 | `transfer_session` | Encrypted wallet (5 min TTL) |
-| `wallet_session` | Unlock timestamp (24 hour TTL) |
+| `wallet_session` | Unlock timestamp (server session; client daily unlock is separate — see storage contract) |
 
 ## Privacy Guarantees
 
 | Property | Mechanism | Result |
 |----------|-----------|--------|
-| **Pairwise Unlinkability** | PPID = HMAC(wallet_secret, site_domain) | Same user has different ID per site |
+| **Pairwise Unlinkability** | PPID = HMAC(identity seed or person_root path, site_domain) | Same user has different ID per site |
 | **No Central Tracking** | Verification is local (Ed25519 in WASM) | Lemma cannot see which sites user visits |
-| **Wallet Secret Protection** | Never leaves IndexedDB, derived from passkey | Only user can derive their PPIDs |
+| **Identity seed protection** | PRF `enc_v1` at rest + wrapped daily unlock; see storage contract | Disk dump without passkey should not yield usable seed after migration |
 | **Revocation Privacy** | Bloom filter (probabilistic, no queries) | Lemma cannot see revocation checks |

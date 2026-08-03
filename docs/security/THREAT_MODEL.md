@@ -9,7 +9,7 @@
 | Actor              | Description                                                                                  |
 | ------------------ | -------------------------------------------------------------------------------------------- |
 | Real human (user)  | The person being verified; holds a browser wallet protected by a passkey.                    |
-| Wallet             | Browser process + IndexedDB + passkey (PRF-derived at-rest key). See `static/js/lemma-wallet.js`. |
+| Wallet             | Browser process + IndexedDB + passkey (PRF-derived at-rest key). See `static/js/lemma-wallet.js` and canonical storage inventory [`LEMMA_ID_BROWSER_STORAGE_CONTRACT.md`](LEMMA_ID_BROWSER_STORAGE_CONTRACT.md). |
 | Relying site       | Customer frontend SDK (`static/js/ishuman-verifier.js`) + backend verifier package.          |
 | Lemma.id network   | Credential issuer, trust-list publisher, Bloom snapshot publisher (`api/*.py`).              |
 | IDV provider       | Didit (default upstream IDV rail); Stripe Identity retained for legacy document-root recovery only. |

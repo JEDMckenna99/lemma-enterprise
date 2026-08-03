@@ -16,6 +16,10 @@ Or locally: `docs/integration/ISHUMAN_AGENT_INTEGRATION.md`
 
 `docs/security/HUMAN_AUTH_SECURITY_CONTRACT.md`
 
+**Browser storage contract** (IndexedDB / localStorage / cookies — when changing lemma.id persistence):
+
+`docs/security/LEMMA_ID_BROWSER_STORAGE_CONTRACT.md`
+
 **Production readiness checklist:**
 
 `docs/status/HUMAN_BACKED_AUTHENTICATOR_PRODUCTION_READINESS.md`
@@ -84,7 +88,7 @@ Platform operators use the **same lemma.id + isHuman flow** as all users. Admin/
 - Canonical admin permission id: `admin_access` (preserve requested level separately as `permission_level`).
 - Skip empty site fields before strict canonicalization; sparse master credentials are valid.
 
-Contract doc: `docs/product/LEMMA_ID_PRESENTATION_MODEL.md`
+Contract docs: `docs/product/LEMMA_ID_PRESENTATION_MODEL.md` (proofs), `docs/security/LEMMA_ID_BROWSER_STORAGE_CONTRACT.md` (on-device persistence)
 
 ## Cursor Cloud specific instructions
 

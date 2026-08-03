@@ -102,6 +102,7 @@ Frontend helpers (`lemma-credential-utils.js`):
 
 - Integration guide: `docs/integration/ISHUMAN_AGENT_INTEGRATION.md`
 - Human-auth security contract: `docs/security/HUMAN_AUTH_SECURITY_CONTRACT.md`
+- Browser storage contract (IndexedDB / localStorage / cookies): `docs/security/LEMMA_ID_BROWSER_STORAGE_CONTRACT.md`
 - Trust core spec: `docs/architecture/LEMMA_TRUST_CORE_SPEC.md`
 - Agent guardrails: `AGENTS.md` (repo root) and `docs/integration/ISHUMAN_AGENT_INTEGRATION.md`
 

@@ -5,6 +5,10 @@
 > touching code. The codebase is currently at SDK 1.5.6, deployed to
 > production on Heroku. The design works end-to-end but carries debt from
 > being built across multiple phases. This document proposes a v2 refactor.
+>
+> **Browser storage inventory** (what IndexedDB / localStorage hold, encryption
+> rules): use [`docs/security/LEMMA_ID_BROWSER_STORAGE_CONTRACT.md`](../security/LEMMA_ID_BROWSER_STORAGE_CONTRACT.md)
+> — not the historical storage claims scattered through this design doc.
 
 ---
 

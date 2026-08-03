@@ -91,7 +91,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.79.0';  // v2.79: user-facing copy says lemma.id (not "wallet")
+    static VERSION = '2.80.0';  // v2.80: fail-closed PRF at-rest storage (no plaintext IDB writes)
 
     static DEVICE_IDB_NAMES = ['LemmaWallet', 'LemmaWalletWrap'];
 
@@ -2158,9 +2158,10 @@ class LemmaWallet {
 
         await this._put('passkey', passkeyRecord);
         console.log('[Lemma] Passkey created locally');
-        if (prfBound) {
-            await this._migratePlaintextStores();
+        if (!prfBound) {
+            throw new Error('prf_required_for_encrypted_storage');
         }
+        await this._migratePlaintextStores();
 
         // Get wallet secret for PPID derivation
         // CRITICAL: Check multiple sources for the secret (profiles, secrets, session)
@@ -4972,14 +4973,10 @@ class LemmaWallet {
         }
 
         const prfBound = await this._bindAtRestKeyFromCredential(credential, walletId);
-        if (prfBound) {
-            await this._migratePlaintextStores();
-        } else {
-            const meta = await this._getWalletMeta();
-            if (meta.migrationComplete) {
-                throw new Error('prf_required_for_encrypted_storage');
-            }
+        if (!prfBound) {
+            throw new Error('prf_required_for_encrypted_storage');
         }
+        await this._migratePlaintextStores();
 
         // Get wallet secret for PPID derivation
         let walletSecretRecord = await this._get('secrets', 'master');
@@ -6924,11 +6921,12 @@ class LemmaWallet {
         this._atRestKey = await mod.importStorageKey(prfBytes);
         this._atRestKeyReady = true;
         // Stash the raw 32-byte PRF key material so the daily-unlock bundle can
-        // carry it for 24h. The bundle already persists walletSecret in plaintext
-        // localStorage for the same window, so this does not weaken the at-rest
-        // posture, it just lets ONE passkey/day cover every encrypted read/write
-        // (master storage + per-site proof derivation) instead of re-prompting on
-        // each fresh popup page load that lacks the in-memory CryptoKey.
+        // carry it for the session window (≤10h). Sensitive fields are wrapped
+        // under a non-extractable device key (wrap_v1) — see
+        // docs/security/LEMMA_ID_BROWSER_STORAGE_CONTRACT.md. This lets ONE
+        // passkey/day cover every encrypted read/write (master storage +
+        // per-site proof derivation) instead of re-prompting on each fresh
+        // popup page load that lacks the in-memory CryptoKey.
         try {
             this._atRestKeyRaw = mod.bufferToBase64url(prfBytes.slice(0, 32));
         } catch (e) {
@@ -6950,16 +6948,6 @@ class LemmaWallet {
         }
         const mod = this._walletAtRest();
         if (!this._atRestKey || !mod) {
-            if (storeName === 'ishuman_cache') {
-                throw new Error('storage_key_unavailable');
-            }
-            const meta = await this._getWalletMeta();
-            if (meta.migrationComplete) {
-                throw new Error('storage_key_unavailable');
-            }
-            if (this._canPersistWalletSecret()) {
-                return value;
-            }
             throw new Error('storage_key_unavailable');
         }
         const recordId = value?.id || value?.did || 'record';

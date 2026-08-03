@@ -4,7 +4,8 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 **Demo URL:** `https://lemma.id/demo/ishuman`  
 **Companion plan:** `docs/demo/ISHUMAN_DEMO_IMPLEMENTATION_OUTLINE.md`  
-**Threat model reference:** `docs/security/THREAT_MODEL.md`
+**Threat model reference:** `docs/security/THREAT_MODEL.md`  
+**Browser storage contract (canonical inventory):** `docs/security/LEMMA_ID_BROWSER_STORAGE_CONTRACT.md`
 
 ---
 
@@ -210,19 +211,27 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 **Status:** complete (2026-05-21)
 
+> **Inventory superseded.** Store-by-store rules, daily-unlock wrap (`wrap_v1`),
+> DevTools triage, and invariants live in
+> [`LEMMA_ID_BROWSER_STORAGE_CONTRACT.md`](LEMMA_ID_BROWSER_STORAGE_CONTRACT.md).
+> Keep this section as implementation history only. Notes below that mention
+> sessionStorage lock bundles or 24h plaintext localStorage are stale relative
+> to current code (localStorage + device wrap, ≤10h).
+
 ### 5.1 PRF-derived storage key plumbing
 
 **Implemented**
 
-- New [static/js/wallet-at-rest-crypto.js](static/js/wallet-at-rest-crypto.js):
+- New [static/js/wallet-at-rest-crypto.js](../../static/js/wallet-at-rest-crypto.js):
   - `buildRegistrationPrfExtensions` / `buildAuthenticationPrfExtensions`
   - `extractPrfBytes`, `importStorageKey`
   - AES-GCM envelope `enc_v1` via `encryptEnvelope` / `decryptEnvelope`
-- [static/js/lemma-wallet.js](static/js/lemma-wallet.js) (v5 IDB):
+  - Device wrap key + `wrap_v1` for daily-unlock localStorage (added after initial P5)
+- [static/js/lemma-wallet.js](../../static/js/lemma-wallet.js) (IDB v7+):
   - Binds PRF output on `registerPasskey`, `unlock`, and `_requireFreshPasskeyAuth`
-  - Lazy migration from plaintext sensitive stores (`secrets`, `profiles`, `session`, `lemmas`)
+  - Lazy migration from plaintext sensitive stores (`secrets`, `profiles`, `session`, `lemmas`, `ishuman_cache`)
   - `wallet_meta` tracks `prfEnabled` / `migrationComplete`
-- [api/passkey_auth.py](api/passkey_auth.py):
+- [api/passkey_auth.py](../../api/passkey_auth.py):
   - Server passkey begin endpoints merge PRF `extensions`
   - Client (`lemma-wallet.js`) forwards PRF salts and `clientExtensionResults`
 
@@ -232,6 +241,7 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 - Legacy plaintext records migrate once after successful PRF unlock.
 - Encrypted stores fail closed without PRF key (`envelope_invalid` / `prf_required_for_encrypted_storage`).
 - Bridge credential store/get paths continue via wallet abstraction (no bridge rewrite required).
+- See storage contract §9 for the full invariant list (including daily-unlock fail-closed).
 
 ### 5.3 Validation evidence
 
@@ -274,8 +284,8 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 **Implemented**
 
-- [static/js/lemma-wallet.js](static/js/lemma-wallet.js) (v2.52.0):
-  - Tab-scoped `sessionStorage` lock bundle `lemma_ishuman_lock:v1` after isHuman passkey unlock (24h rolling TTL)
+- [static/js/lemma-wallet.js](../../static/js/lemma-wallet.js):
+  - Daily unlock bundle `lemma_ishuman_lock:v1` in **localStorage** (≤10h), sensitive material under device `wrap_v1` (see storage contract)
   - Encrypted `ishuman_cache` IndexedDB store (v7) for lock-period bridge reads without re-passkey while lock valid
   - `ensureIsHumanIssuanceReady({ isHumanIssuance: true })` for IDV popup / bridge issuance
 - [templates/wallet_bridge.html](templates/wallet_bridge.html):

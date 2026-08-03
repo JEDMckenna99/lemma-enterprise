@@ -122,3 +122,48 @@ def test_passkey_register_begin_merges_prf(monkeypatch):
         assert payload.get("prf_requested") is True
         assert "extensions" in payload["options"]
         assert "prf" in payload["options"]["extensions"]
+
+
+def _method_body(source: str, marker: str, end_marker: str) -> str:
+    start = source.index(marker)
+    end = source.index(end_marker, start)
+    return source[start:end]
+
+
+@pytest.mark.unit
+def test_encrypt_stored_value_never_plaintext_fallback(wallet_js):
+    """Sensitive stores must fail closed when the PRF at-rest key is missing."""
+    body = _method_body(
+        wallet_js,
+        "async _encryptStoredValue(",
+        "\n    async _decryptStoredValue(",
+    )
+    assert "_canPersistWalletSecret()" not in body
+    assert "if (this._canPersistWalletSecret())" not in body
+    assert "throw new Error('storage_key_unavailable')" in body
+
+
+@pytest.mark.unit
+def test_local_unlock_requires_prf_before_sensitive_puts(wallet_js):
+    """Local passkey unlock must fail when PRF output is unavailable."""
+    body = _method_body(
+        wallet_js,
+        "const prfBound = await this._bindAtRestKeyFromCredential(credential, walletId);",
+        "// Get wallet secret for PPID derivation",
+    )
+    assert "if (!prfBound)" in body
+    assert "throw new Error('prf_required_for_encrypted_storage')" in body
+    assert "if (meta.migrationComplete)" not in body
+
+
+@pytest.mark.unit
+def test_register_passkey_requires_prf_before_secrets(wallet_js):
+    """Passkey registration must bind PRF before persisting secrets/session."""
+    body = _method_body(
+        wallet_js,
+        "async registerPasskey(",
+        "\n    async unlock(",
+    )
+    assert "if (!prfBound)" in body
+    assert "throw new Error('prf_required_for_encrypted_storage')" in body
+    assert body.index("await this._migratePlaintextStores();") < body.index("_put('secrets'")

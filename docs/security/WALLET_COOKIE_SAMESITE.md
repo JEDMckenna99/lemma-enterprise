@@ -2,6 +2,9 @@
 
 Status: living record for production-readiness Section 2.
 
+Full browser storage inventory (IndexedDB, localStorage, Cache Storage, and how
+cookies fit): [`LEMMA_ID_BROWSER_STORAGE_CONTRACT.md`](LEMMA_ID_BROWSER_STORAGE_CONTRACT.md).
+
 ## Why `SameSite=None` still exists
 
 Cross-site wallet unlock and session-sync require the lemma.id session cookie

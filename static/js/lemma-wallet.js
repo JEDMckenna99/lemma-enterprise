@@ -91,7 +91,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.79.0';  // v2.79: user-facing copy says lemma.id (not "wallet")
+    static VERSION = '2.80.0';  // v2.80: fail-closed PRF at-rest storage (no plaintext IDB writes)
 
     static DEVICE_IDB_NAMES = ['LemmaWallet', 'LemmaWalletWrap'];
 
