@@ -248,7 +248,7 @@
     <script src="/static/js/lemma-keys.js?v=8" nonce="{{ csp_nonce }}"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
-    <script src="/static/js/lemma-wallet.js?v=2693" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-wallet.js?v=2694" nonce="{{ csp_nonce }}"></script>
     
     <script nonce="{{ csp_nonce }}">
         const token = '{{ token }}';
@@ -321,7 +321,7 @@
 
             try {
                 if (!wallet) {
-                    throw new Error('Wallet SDK unavailable. Use a passkey-capable browser.');
+                    throw new Error('lemma.id SDK unavailable. Use a passkey-capable browser.');
                 }
 
                 let ppid = null;
@@ -343,7 +343,7 @@
                 }
 
                 if (!ppid || !passkeyCredentialId) {
-                    throw new Error('Replacement passkey and wallet PPID are required to complete recovery.');
+                    throw new Error('Replacement passkey and lemma.id PPID are required to complete recovery.');
                 }
 
                 const response = await fetch('/api/recovery/complete', {

@@ -333,25 +333,25 @@ def test_unlock_popup_ishuman_flag():
     assert "isHumanIssuance" in popup_html
     assert "ishuman" in popup_html
     assert "isHumanCredentials" in popup_html
-    assert "Wallet status check timed out" in popup_html
+    assert "status check timed out" in popup_html
 
 
 @pytest.mark.browser
 def test_idv_popup_handles_encrypted_master_without_raw_error():
     idv_html = IDV_HTML.read_text(encoding="utf-8")
-    assert "Unlock wallet with passkey to read encrypted human proof." in idv_html
+    assert "Unlock lemma.id with passkey to read encrypted human proof." in idv_html
     assert "envelope_invalid" in idv_html
 
 
 @pytest.mark.browser
 def test_wallet_pages_use_current_wallet_bundle():
     wallet_pages = {
-        IDV_HTML: "2693",
-        POPUP_HTML: "2693",
-        WALLET_UNLOCK_HTML: "2693",
-        RECOVER_COMPLETE_HTML: "2693",
-        MODERN_LAYOUT_HTML: "2693",
-        WALLET_SIMPLE_HTML: "2693",
+        IDV_HTML: "2694",
+        POPUP_HTML: "2694",
+        WALLET_UNLOCK_HTML: "2694",
+        RECOVER_COMPLETE_HTML: "2694",
+        MODERN_LAYOUT_HTML: "2694",
+        WALLET_SIMPLE_HTML: "2694",
     }
     for path, version in wallet_pages.items():
         source = path.read_text(encoding="utf-8")

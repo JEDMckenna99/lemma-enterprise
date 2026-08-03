@@ -1,4 +1,4 @@
-{% extends "admin/layout.html" %}
+﻿{% extends "admin/layout.html" %}
 {% set active_page = 'agent_delegation' %}
 
 {% block title %}Agent Delegation - lemma.id Admin{% endblock %}
@@ -181,7 +181,7 @@ async function resolveOperatorAccess() {
             if (!authResult?.authenticated) {
                 return {
                     ok: false,
-                    message: 'Unlock your wallet at <a href="/unlock">/unlock</a>, then refresh this page.',
+                    message: 'Unlock your lemma.id at <a href="/unlock">/unlock</a>, then refresh this page.',
                 };
             }
         } catch (_) {

@@ -71,7 +71,7 @@ Content-Type: application/json
 ### Complete Recovery
 
 After opening the email link, register or unlock a **replacement passkey** in the
-browser. The completion call must include the wallet-derived PPID and passkey
+browser. The completion call must include the lemma.id-derived PPID and passkey
 credential id — email token alone is not sufficient.
 
 ```bash
@@ -94,7 +94,7 @@ The legacy `/api/recovery/complete-wallet` path is disabled; use passkey recover
 
 1. **Store API keys securely** - Use a password manager or secrets vault
 2. **Keep admin email current** - Update it if your email changes
-3. **Enable multiple devices** - Link your wallet across devices to avoid lockout
+3. **Enable multiple devices** - Link your lemma.id across devices to avoid lockout
 4. **Rotate keys periodically** - If you suspect a key was compromised
 
 ## If You Can't Recover
@@ -111,7 +111,7 @@ This recovery system is for **developer accounts** on Lemma.id.
 
 For end-users on your platform who lose their passkeys:
 
-1. **Primary recovery**: Users link wallets across multiple devices (passkeys sync automatically)
+1. **Primary recovery**: Users link lemma.id across multiple devices (passkeys sync automatically)
 2. **Custom recovery**: Build your own email-based recovery using your internal user IDs
 
 ### Building Custom Recovery

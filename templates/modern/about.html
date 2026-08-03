@@ -12,7 +12,7 @@
         <div style="max-width: 860px; margin: 0 auto; text-align: center;">
             <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">About Lemma</p>
             <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Fraud is an economic<br>problem, not a tech one.</h1>
-            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">The industry already knows how to detect abuse. What it can't do is make a ban stick when the next account is free. lemma.id fixes the economics: users hold a private proof wallet, each site sees its own private ID, and a site can require a verified human behind an account when that's what actually matters. Nobody has to build a central identity database to get there.</p>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">The industry already knows how to detect abuse. What it can't do is make a ban stick when the next account is free. lemma.id fixes the economics: users hold a private lemma.id, each site sees its own private ID, and a site can require a verified human behind an account when that's what actually matters. Nobody has to build a central identity database to get there.</p>
             <p style="font-size: var(--font-size-lg); font-weight: 500; margin: 0 auto; color: var(--gray-600); max-width: 760px;">For users the deal is simple: verify once, then show each site a proof that says "same returning person as last time" without saying who you are.</p>
         </div>
     </div>
@@ -69,11 +69,11 @@
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px;">
             <div class="card">
                 <h3 class="card-title">Local hot path</h3>
-                <p>Credentials live in the user's browser wallet. Once setup and revocation sync are done, a site validates signatures on its own machines. There's no identity provider in the loop on every access decision.</p>
+                <p>Credentials live in the user's lemma.id. Once setup and revocation sync are done, a site validates signatures on its own machines. There's no identity provider in the loop on every access decision.</p>
             </div>
             <div class="card">
                 <h3 class="card-title">Verify once, reuse everywhere</h3>
-                <p>Today, lemma.id uses Didit for the underlying identity verification, and Lemma issues the reusable credentials on top: the wallet, the SDK, the revocation infrastructure. A site that needs one-person-one-account gets it without ever storing an identity document, and users don't redo KYC for every site that asks.</p>
+                <p>Today, lemma.id uses Didit for the underlying identity verification, and Lemma issues the reusable credentials on top: the local identity store, the SDK, the revocation infrastructure. A site that needs one-person-one-account gets it without ever storing an identity document, and users don't redo KYC for every site that asks.</p>
             </div>
             <div class="card">
                 <h3 class="card-title">Less to correlate</h3>
@@ -124,7 +124,7 @@
 
                 <p style="margin-bottom: 24px;">That's what we're building. One user-held lemma.id, a private PPID for every site, and three levels of proof, lemma.id continuity, presence, and human proof, wherever one account genuinely has to mean one person. The same primitive, working the same way, everywhere on the web.</p>
 
-                <p>The verification itself currently runs through Didit. Lemma's job is everything around it: the reusable credentials, the wallet, the SDK, and revocation. A site adds the SDK and gets human-grade signal without ever holding an identity document. A user verifies once and carries it with them, and no site ever sees more than its own private proof.</p>
+                <p>The verification itself currently runs through Didit. Lemma's job is everything around it: the reusable credentials, the user-held lemma.id, the SDK, and revocation. A site adds the SDK and gets human-grade signal without ever holding an identity document. A user verifies once and carries it with them, and no site ever sees more than its own private proof.</p>
             </div>
         </div>
     </div>

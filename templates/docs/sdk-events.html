@@ -1,12 +1,12 @@
 {% extends "docs/layout.html" %}
 {% set active_page = 'sdk-events' %}
 {% set hero_title = 'Events & Callbacks' %}
-{% set hero_subtitle = 'React to wallet state changes' %}
+{% set hero_subtitle = 'React to lemma.id state changes' %}
 
 {% block docs_content %}
 <div class="docs-section">
     <h2>Event Listeners</h2>
-    <p>Subscribe to browser events emitted by the wallet to update your UI in real-time.</p>
+    <p>Subscribe to browser events emitted by the lemma.id SDK to update your UI in real-time.</p>
     
     <div class="code-block">
         <div class="code-header">
@@ -14,13 +14,13 @@
             <button class="copy-btn">Copy</button>
         </div>
         <code>window.addEventListener('lemma-wallet-locked', async () => {
-  // Clear app session when wallet locks anywhere
+  // Clear app session when lemma.id locks anywhere
   await fetch('/api/auth/logout', { method: 'POST' });
   window.location.reload();
 });
 
 window.addEventListener('lemma:session-restored', async () => {
-  // Wallet was unlocked on another tab/device
+  // lemma.id was unlocked on another tab/device
   const result = await wallet.getAuthenticatedPPID();
   if (result.authenticated) {
     // Refresh UI and session if needed
@@ -59,7 +59,7 @@ window.addEventListener('lemma:session-expired', (e) => {
             <tr>
                 <td><code>lemma-wallet-locked</code></td>
                 <td>-</td>
-                <td>Wallet/session locked or invalidated</td>
+                <td>lemma.id unlock session locked or invalidated</td>
             </tr>
             <tr>
                 <td><code>lemma:session-expired</code></td>

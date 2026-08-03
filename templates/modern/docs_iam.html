@@ -300,7 +300,7 @@ init();
                         <li><strong>Wallet created/unlocked</strong> → Local passkey verification (typically low-latency)</li>
                         <li><strong>Permission requested</strong> → Your site requests credential from Lemma</li>
                         <li><strong>Permission lemma issued</strong> → Ed25519-signed credential</li>
-                        <li><strong>Stored in browser wallet</strong> → Encrypted in IndexedDB</li>
+                        <li><strong>Stored in lemma.id</strong> → Encrypted in IndexedDB</li>
                         <li><strong>Verification (client-side)</strong> → Sub-millisecond via WebCrypto API</li>
                         <li><strong>User stays signed in</strong> → Credential persists until expiry/revocation</li>
                     </ol>
@@ -314,7 +314,7 @@ init();
 <pre>User → Your Site: Click "Sign In"
 Browser → User: Passkey prompt (biometric)
 User → Browser: Authenticate with passkey
-Browser → Wallet: Unlock wallet locally
+Browser → lemma.id: Unlock lemma.id locally
 Your Site → Lemma API: POST /api/wallet-auth/issue
 Lemma → Your Site: Permission lemma (Ed25519 signed)
 Your Site → Wallet: Store credential

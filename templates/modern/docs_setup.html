@@ -118,7 +118,7 @@
         <div class="setup-card">
             <div class="setup-card-header">
                 <span class="step-number">1</span>
-                <h2>Add Lemma Wallet Script</h2>
+                <h2>Add lemma.id SDK Script</h2>
             </div>
             <div class="setup-card-body">
                 <p style="color:var(--gray-600);margin-bottom:16px">Add this single script tag to your HTML:</p>
@@ -253,7 +253,7 @@
                         <span style="font-size:24px">📱</span>
                         <div>
                             <strong>No server sessions</strong>
-                            <p style="margin:4px 0 0;font-size:14px;color:var(--gray-600)">Credentials stored in user's browser wallet, verified locally</p>
+                            <p style="margin:4px 0 0;font-size:14px;color:var(--gray-600)">Credentials stored in user's lemma.id, verified locally</p>
                         </div>
                     </div>
                     <div style="display:flex;gap:12px;align-items:flex-start">
@@ -471,8 +471,8 @@ function updateCodeForSite() {
 
 function generateCodeExamples(domain) {
     // Complete example
-    document.getElementById('code-complete').textContent = `// Lemma Wallet-First Authentication for ${domain}
-// Passkey unlocks wallet → Credentials stored locally → No passwords!
+    document.getElementById('code-complete').textContent = `// lemma.id authentication for ${domain}
+// Passkey unlocks lemma.id → Credentials stored locally → No passwords!
 
 const SITE_ID = '${domain}';
 

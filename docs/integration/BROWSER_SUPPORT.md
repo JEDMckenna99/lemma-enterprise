@@ -1,6 +1,6 @@
 # Browser support — Sign in with lemma.id
 
-Passkey login requires a browser with WebAuthn and (for encrypted wallet storage on lemma.id) PRF support.
+Passkey login requires a browser with WebAuthn and (for encrypted local lemma.id storage on lemma.id) PRF support.
 
 ## Supported browsers (passkey sign-in)
 
@@ -10,15 +10,15 @@ Passkey login requires a browser with WebAuthn and (for encrypted wallet storage
 | Safari | Yes (macOS 13+) | Yes (iOS 16+) | Requires user gesture for popup |
 | Firefox | Yes | Limited | Test popup flow on target devices |
 
-## PRF (encrypted wallet at rest)
+## PRF (encrypted local lemma.id at rest)
 
-PRF extends WebAuthn and is required when the lemma.id wallet encrypts local storage. Without PRF, first-time users on older browsers may see `prf_required_for_encrypted_storage` from the wallet layer.
+PRF extends WebAuthn and is required when the user's local lemma.id encrypts storage at rest. Without PRF, first-time users on older browsers may see `prf_required_for_encrypted_storage` from the lemma.id SDK layer (internal `LemmaWallet` class).
 
 | Platform | PRF |
 |----------|-----|
 | Chrome 118+ | Supported |
 | Safari 17+ | Supported |
-| Firefox | Not yet — use supported browsers for wallet creation |
+| Firefox | Not yet — use supported browsers for first-time lemma.id creation |
 
 ## SDK stable outcomes
 

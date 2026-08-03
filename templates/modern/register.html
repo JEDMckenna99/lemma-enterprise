@@ -542,7 +542,7 @@
                     sessionStorage.removeItem(REGISTER_ERROR_KEY);
                     if (err.error === 'platform_membership_exists') {
                         clearPendingRegistration();
-                        showError('general', 'This wallet is already registered. Redirecting to sign in…');
+                        showError('general', 'This lemma.id is already registered. Redirecting to sign in…');
                         setTimeout(() => { window.location.href = '/login'; }, 1500);
                         return true;
                     }

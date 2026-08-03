@@ -574,9 +574,9 @@
                         <span class="nav-icon">Docs</span>
                         <span>Documentation</span>
                     </a>
-                    <a class="nav-item" href="/wallet">
-                        <span class="nav-icon">Wallet</span>
-                        <span>Your Wallet</span>
+                    <a class="nav-item" href="/app">
+                        <span class="nav-icon">ID</span>
+                        <span>My lemma.id</span>
                     </a>
                 </div>
                 
@@ -1050,7 +1050,7 @@ POST /api/auth/exchange-proof</pre>
                     Via Email
                 </button>
                 <button type="button" class="tab-btn" onclick="switchIssueTab('direct')" id="issue-tab-direct" style="padding: 8px 16px; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 6px; cursor: pointer;">
-                    Direct to My Wallet
+                    Direct to My lemma.id
                 </button>
             </div>
             
@@ -1107,7 +1107,7 @@ POST /api/auth/exchange-proof</pre>
             <div id="issue-tab-direct-content" style="display: none;">
                 <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
                     <p style="margin: 0; font-size: 14px; color: #1e40af;">
-                        <strong>Direct Issue</strong> - Issue a permission credential directly to your current browser's wallet.
+                        <strong>Direct Issue</strong> - Issue a permission credential directly to your current lemma.id.
                         Perfect for giving yourself admin access to your own site.
                     </p>
                 </div>
@@ -1142,7 +1142,7 @@ POST /api/auth/exchange-proof</pre>
                     <div class="modal-actions">
                         <button type="button" class="btn btn-secondary" onclick="closeModal('issue-permission-modal')">Cancel</button>
                         <button type="submit" class="btn btn-primary" id="direct-issue-btn">
-                            Issue to My Wallet
+                            Issue to My lemma.id
                         </button>
                     </div>
                 </form>
@@ -1959,7 +1959,7 @@ POST /api/auth/exchange-proof</pre>
                     document.getElementById('loading-state').innerHTML = `
                         <div style="text-align: center; padding: 60px 20px;">
                             <div class="spinner"></div>
-                            <div style="margin-top: 16px; color: #6b7280;">Unlocking wallet with passkey...</div>
+                            <div style="margin-top: 16px; color: #6b7280;">Unlocking lemma.id with passkey...</div>
                         </div>
                     `;
                     try {
@@ -2096,10 +2096,10 @@ POST /api/auth/exchange-proof</pre>
         function showSetupWallet() {
             document.getElementById('loading-state').innerHTML = `
                 <div style="text-align: center; padding: 60px 20px;">
-                    <div style="font-size: 64px; margin-bottom: 24px;">Wallet</div>
-                    <h2>Set Up Your Wallet</h2>
+                    <div style="font-size: 64px; margin-bottom: 24px;">lemma.id</div>
+                    <h2>Set Up Your lemma.id</h2>
                     <p style="color: #6b7280; margin-bottom: 24px;">
-                        Unlock your passkey wallet, then sign in with your developer account.<br>
+                        Unlock your lemma.id with passkey, then sign in with your developer account.<br>
                         <span style="font-size: 14px;">New developers should register first at Get Started.</span>
                     </p>
                     <a href="/register" class="btn btn-primary" style="margin-right: 12px;">Get Started</a>
@@ -3139,7 +3139,7 @@ POST /api/auth/exchange-proof</pre>
                             <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px; padding: 16px;">
                                 <div style="text-align: center; margin-bottom: 12px;">
                             <div style="font-size: 32px;">Success</div>
-                                    <div style="font-weight: 600; color: #065f46;">Permission Stored in Wallet!</div>
+                                    <div style="font-weight: 600; color: #065f46;">Permission Stored in lemma.id!</div>
                                 </div>
                                 <div style="font-size: 13px; color: #065f46;">
                                     <div><strong>Site:</strong> ${siteDomain}</div>
@@ -3149,12 +3149,12 @@ POST /api/auth/exchange-proof</pre>
                                 </div>
                                     <div style="margin-top: 12px; padding: 8px; background: #d1fae5; border-radius: 4px; font-size: 12px;">
                                     You now have <strong>${permissionLevel}</strong> access to <strong>${siteDomain}</strong>!
-                                    <br>View at <a href="/wallet" style="color: #065f46;">lemma.id/wallet</a>
+                                    <br>View at <a href="/app" style="color: #065f46;">lemma.id/app</a>
                                 </div>
                             </div>
                         `;
                     } else {
-                        throw new Error('Wallet not available');
+                        throw new Error('lemma.id not available');
                     }
                 } else {
                     throw new Error(result.error || 'Failed to issue permission');
@@ -3173,7 +3173,7 @@ POST /api/auth/exchange-proof</pre>
                 `;
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = 'Issue to My Wallet';
+                submitBtn.innerHTML = 'Issue to My lemma.id';
             }
         }
         

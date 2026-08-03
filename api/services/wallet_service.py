@@ -1088,7 +1088,7 @@ def require_wallet_auth(f):
             return jsonify({
                 'success': False,
                 'error': 'Authentication required',
-                'message': 'Unlock your wallet to access this resource'
+                'message': 'Unlock your lemma.id to access this resource'
             }), 401
         
         wallet_id = (session_data or unlock_data).get('wallet_id')

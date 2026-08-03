@@ -34,7 +34,7 @@
 4. **Assurance policy:** Default login to `passkey`. Require `ishuman` only when the action needs one verified human (Sybil-resistant signup, trials, ticketing, payouts, recovery after abuse).
 5. **Optional:** Register a site API key only when the developer needs server-side PPID blocks.
 
-lemma.id runs wallet unlock and proof issuance in a Lemma-hosted popup. IDV (Didit by default) is used only for **isHuman** step-up. **The relying site does not configure webhooks, Didit, or Stripe Identity.**
+lemma.id runs unlock and proof issuance in a Lemma-hosted popup. IDV (Didit by default) is used only for **isHuman** step-up. **The relying site does not configure webhooks, Didit, or Stripe Identity.**
 
 ---
 
@@ -66,7 +66,7 @@ Apply these on every integration. Do not skip or "simplify" them.
 
 - No lemma.id webhook URL on their servers.
 - No API key for basic human verification.
-- No wallet secret on the relying-site backend.
+- No local identity seed (`wallet_secret` field) on the relying-site backend.
 - No storage of legal name, DOB, document images, or selfies.
 
 ---
@@ -147,7 +147,7 @@ PPID from the **verified server result** (`result.ppid`), never from the paralle
 ```
 
 Require `requiredAssurance: 'ishuman'` when Sybil resistance matters (trials, ticketing,
-payouts). The PPID stays stable when upgrading from passkey to isHuman on the same wallet.
+payouts). The PPID stays stable when upgrading from passkey to isHuman on the same lemma.id.
 
 ### Sybil-resistant signup (T2: isHuman)
 
@@ -199,7 +199,7 @@ payouts). The PPID stays stable when upgrading from passkey to isHuman on the sa
 | `valid`, `vc_valid`, `session_valid` | Success |
 | `no_credential`, `site_proof_required`, `wallet_locked` | Needs popup, use `autoProvision: true` |
 | `expired` | Ordinary 30-day renewal; may open the Lemma popup when auto-provisioning |
-| `revoked` | Credential in global revocation bloom, deny now; with `autoProvision: true` the SDK opens fresh-IDV recovery (new credential id, same PPID when wallet/person unchanged) |
+| `revoked` | Credential in global revocation bloom, deny now; with `autoProvision: true` the SDK opens fresh-IDV recovery (new credential id, same PPID when lemma.id/person unchanged) |
 | `invalid_signature` | Hard deny, tampered, corrupted, or unverifiable credential; no automatic recovery |
 | `site_blocked` | Permanent site ban, deny; never starts recovery automatically (only `POST /api/ishuman/site-unblock` clears it) |
 | `doubt_required` | Deny the current action, then deliberately call `verifyFreshForBackend()` |
@@ -430,7 +430,7 @@ result = ctx.verify_action_stamp(
 Developer page                Lemma popup              Developer backend
      |                             |                          |
      | verify({autoProvision})     |                          |
-     |--------------------------->| wallet unlock + IDV      |
+     |--------------------------->| lemma.id unlock + IDV    |
      |                             | issue site credential    |
      |<---------------------------|                          |
      | { human, ppid, presentation }                          |
@@ -442,7 +442,7 @@ Developer page                Lemma popup              Developer backend
 Steps:
 
 1. Client calls `verify({ autoProvision: true })` before a protected action.
-2. If no proof exists, popup at `/verify` runs wallet unlock + live IDV (`/wallet/ishuman-idv` redirects to the same page).
+2. If no proof exists, popup at `/verify` runs lemma.id unlock + live IDV (`/wallet/ishuman-idv` redirects to the same page).
 3. lemma.id issues master + site-bound credential for `siteId`.
 4. SDK validates signature, expiry, revocation locally.
 5. Client sends `presentation` or stamp to **your** backend; backend verifies cryptographically.
@@ -474,7 +474,7 @@ curl -X POST https://lemma.id/api/ishuman/site-block \
   -d '{"ppid":"did:lemma:ppid_...","reason":"Terms violation"}'
 ```
 
-Site blocks are persistent. Fresh IDV, wallet recovery, document renewal, and
+Site blocks are persistent. Fresh IDV, lemma.id recovery, document renewal, and
 credential rotation do not clear them. Only the authenticated
 `POST /api/ishuman/site-unblock` operation removes a site block.
 
@@ -500,7 +500,7 @@ Site blocks are **not** in the global Bloom filter. Mirror blocks locally or use
 Network-wide enumeration revocation is retired. The legacy customer, admin,
 and demo endpoints return HTTP 410 with `network_revocation_retired`.
 
-Site credentials expire after 30 days. Following wallet/master compromise, an
+Site credentials expire after 30 days. Following lemma.id/master compromise, an
 already-issued credential can remain locally valid until expiry unless its
 relying site blocks the PPID.
 
@@ -535,7 +535,7 @@ Most integrations use **only the browser SDK + local backend verify**. These end
 | `GET` | `/api/ishuman/site-binding-check` | None | Read-only hostname canonicalization + registration hint for SDK `siteId` alignment |
 | `GET` | `/api/revocation/bloom-filter` | None | Signed trust list + bloom (backend verifiers cache this) |
 
-Wallet-assertion endpoints (`start-verification`, `derive-site-proof`, etc.) are used by the Lemma popup, **not** by typical relying-site server code.
+Device-signing-assertion endpoints (`start-verification`, `derive-site-proof`, etc.; internal name: wallet assertion) are used by the Lemma popup, **not** by typical relying-site server code.
 
 ---
 
@@ -588,7 +588,7 @@ requires and fails closed if that assurance is unavailable.
 
 ### PPID convergence (provisional → known person)
 
-When a user already verified on wallet A creates a new provisional wallet B and
+When a user already verified on lemma.id A creates a new provisional lemma.id B and
 completes IDV, lemma.id rebinds B to the known person. The site PPID may change.
 lemma.id issues a signed `ppid_convergence.v1` artifact on the next
 `derive-site-proof` for that site. Your backend verifies it alongside the
@@ -601,17 +601,17 @@ presentation and receives `legacy_ppid` + canonical `ppid`.
 3. If found: merge rows to canonical `ppid`, carry forward site blocks/doubts from
    the legacy PPID, then delete or archive the provisional account.
 4. If not found: create a new account for canonical `ppid` (user may have never
-   visited your site with the provisional wallet).
+   visited your site with the provisional lemma.id).
 5. Reject if convergence is invalid, wrong-site, expired, or tampered, fail closed.
 
-Ordinary first IDV on the same wallet preserves PPID and emits **no** convergence artifact.
+Ordinary first IDV on the same lemma.id preserves PPID and emits **no** convergence artifact.
 
 When convergence is present, the backend verifier validates its signed artifact;
-the relying site does not call wallet-internal derivation endpoints directly.
+the relying site does not call lemma.id-internal derivation endpoints directly.
 See [One PPID, assurance tiers, and site-local input burn](https://lemma.id/docs/product/PASSKEY_STAMP_INPUT_BURN.md)
 for the relying-site contract.
 
-**Reference implementation:** [lemma.id integration demo](https://lemma.id/demo), passkey wallet → distinct site PPIDs → Heroku demo sites with local presentation verify → optional isHuman step-up (same PPID) → site-scoped revocation.
+**Reference implementation:** [lemma.id integration demo](https://lemma.id/demo), passkey-backed lemma.id → distinct site PPIDs → Heroku demo sites with local presentation verify → optional isHuman step-up (same PPID) → site-scoped revocation.
 
 ---
 

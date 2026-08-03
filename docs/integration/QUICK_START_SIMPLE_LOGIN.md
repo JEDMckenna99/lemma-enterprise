@@ -1,6 +1,6 @@
 # Quick start: Sign in with lemma.id (passkey login)
 
-Free passwordless login for your site. Users create or unlock a passkey-backed lemma.id wallet in a Lemma-hosted popup; your backend verifies a signed **presentation** and stores the site-private **`ppid`** as the account key. You then issue **your own** session cookie.
+Free passwordless login for your site. Users create or unlock a passkey-backed lemma.id in a Lemma-hosted popup; your backend verifies a signed **presentation** and stores the site-private **`ppid`** as the account key. You then issue **your own** session cookie.
 
 Canonical contract: [ISHUMAN Agent Integration Guide](ISHUMAN_AGENT_INTEGRATION.md)
 
@@ -177,7 +177,7 @@ to know both IDs.
 
 | Tier | Recovery |
 |------|----------|
-| `passkey` (free login) | Durable across device upgrades when passkeys sync (iCloud/Google). Adding a second device via [lemma.id/link](https://lemma.id/link) improves continuity. Guaranteed account recovery is not promised for passkey-only wallets. |
+| `passkey` (free login) | Durable across device upgrades when passkeys sync (iCloud/Google). Adding a second device via [lemma.id/link](https://lemma.id/link) improves continuity. Guaranteed account recovery is not promised for passkey-only lemma.id instances. |
 | `ishuman` (step-up) | Same PPID; IDV-backed recovery on the paid tier. |
 
 Document this honestly to users when you ship passkey-only login. For the full
@@ -215,7 +215,7 @@ if (user.is_new) {
 }
 ```
 
-Returning users match on `ppid` alone. Do not expect lemma.id to supply profile fields unless you build wallet-side share (future work).
+Returning users match on `ppid` alone. Do not expect lemma.id to supply profile fields unless you build lemma.id-side share (future work).
 
 ---
 

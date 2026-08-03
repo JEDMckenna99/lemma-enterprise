@@ -12,6 +12,7 @@ Served without auth per `api/public_docs.py`:
 |-----|-------------|-------------|
 | [integration/QUICK_START_SIMPLE_LOGIN.md](https://lemma.id/docs/integration/QUICK_START_SIMPLE_LOGIN.md) | `integration/QUICK_START_SIMPLE_LOGIN.md` | Sign in with lemma.id quickstart (passkey login) |
 | [integration/SIMPLE_INTEGRATION_GUIDE.md](https://lemma.id/docs/integration/SIMPLE_INTEGRATION_GUIDE.md) | `integration/SIMPLE_INTEGRATION_GUIDE.md` | Full sign-in guide: sessions, account linking, sign-out |
+| [integration/SIGN_IN_TRUST_AND_RECOVERY.md](https://lemma.id/docs/integration/SIGN_IN_TRUST_AND_RECOVERY.md) | `integration/SIGN_IN_TRUST_AND_RECOVERY.md` | Trust, recovery, failure modes, and "what this is not" |
 | [integration/ISHUMAN_AGENT_INTEGRATION.md](https://lemma.id/docs/integration/ISHUMAN_AGENT_INTEGRATION.md) | `integration/ISHUMAN_AGENT_INTEGRATION.md` | Canonical relying-site integration contract |
 | [integration/BROWSER_SUPPORT.md](https://lemma.id/docs/integration/BROWSER_SUPPORT.md) | `integration/BROWSER_SUPPORT.md` | Browser/passkey support matrix + SDK error codes |
 | [ERROR_CODES.md](https://lemma.id/docs/ERROR_CODES.md) | `ERROR_CODES.md` | Error handling reference |
@@ -29,6 +30,7 @@ Free passwordless login; the default integration for relying sites.
 |----------|-------------|----------|
 | [Quick start: Sign in with lemma.id](integration/QUICK_START_SIMPLE_LOGIN.md) | Drop-in button, backend verify, sessions, testing | Developers |
 | [Sign in with lemma.id — integration guide](integration/SIMPLE_INTEGRATION_GUIDE.md) | Architecture, account linking, sign-out, non-features | Developers |
+| [Trust, recovery & failure modes](integration/SIGN_IN_TRUST_AND_RECOVERY.md) | What happens on device loss / lemma outage; "no blockchain" | Developers |
 | [Browser support + error codes](integration/BROWSER_SUPPORT.md) | Passkey/PRF matrix, stable SDK outcomes | Developers |
 | [llms.txt](https://lemma.id/llms.txt) | Pointer file for agents | AI coding agents |
 
@@ -59,7 +61,7 @@ Retained for historical reference. Do not use for new integrations.
 |----------|-------|
 | [IAM-Only Integration](integration/IAM_ONLY_INTEGRATION_GUIDE.md) | IAM without proof-of-human |
 | [Permission Lemmas Guide](integration/PERMISSION_LEMMAS_IAM_DEVELOPER_GUIDE.md) | IAM developer reference |
-| [Integration Guide](integration/INTEGRATION_GUIDE.md) | Wallet-based user authentication (old redirect flow) |
+| [Integration Guide](integration/INTEGRATION_GUIDE.md) | lemma.id-based user authentication, legacy `LemmaWallet` SDK (old redirect flow) |
 
 All superseded by the sign-in docs above and the [ISHUMAN Agent Integration Guide](integration/ISHUMAN_AGENT_INTEGRATION.md).
 
@@ -72,7 +74,7 @@ Not for relying-site integrators. Requires repo access and/or platform credentia
 | Agent Ops | [AGENT_OPS_READINESS.md](AGENT_OPS_READINESS.md), [FIREWALL_QUICKSTART.md](FIREWALL_QUICKSTART.md), `docs/openclaw/` |
 | Operations | [operations/ENVIRONMENT_CONFIG.md](operations/ENVIRONMENT_CONFIG.md), [operations/ISHUMAN_PROD_READINESS_CHECKLIST.md](operations/ISHUMAN_PROD_READINESS_CHECKLIST.md), deploy and incident runbooks |
 | Security (internal) | [security/THREAT_MODEL.md](security/THREAT_MODEL.md), [security/SECURITY_CHECKLIST.md](security/SECURITY_CHECKLIST.md) |
-| Architecture (internal) | [architecture/ARCHITECTURE_WALLET_FIRST.md](architecture/ARCHITECTURE_WALLET_FIRST.md), trust-core and privacy specs |
+| Architecture (internal) | [architecture/ARCHITECTURE_WALLET_FIRST.md](architecture/ARCHITECTURE_WALLET_FIRST.md) (historical filename; product noun is lemma.id), trust-core and privacy specs |
 | Status / plans / research | `docs/status/`, `docs/plans/`, `docs/research/` |
 
 Agent Ops (lemma-cli, Lemma Firewall, runtime control plane) is operator-only and not part of public relying-site docs.
@@ -91,7 +93,7 @@ Internal product proposals, **not shipped**. Do not link from integrator-facing 
 
 | Document | Description |
 |----------|-------------|
-| [Wallet-First Architecture](architecture/ARCHITECTURE_WALLET_FIRST.md) | How wallet-first differs from OAuth |
+| [lemma.id-first architecture (historical doc name)](architecture/ARCHITECTURE_WALLET_FIRST.md) | How local-credential auth differs from OAuth; see doc banner for terminology |
 | [lemma.id Presentation Model](product/LEMMA_ID_PRESENTATION_MODEL.md) | Platform identity + permission contract |
 | [Threat Model](security/THREAT_MODEL.md) | Security analysis and mitigations |
 | [isHuman local-first outline](security/ISHUMAN_LOCAL_FIRST_IMPLEMENTATION_OUTLINE.md) | Local verification design |

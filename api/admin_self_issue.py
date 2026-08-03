@@ -618,7 +618,7 @@ def admin_self_issue():
             'permission_level': permission_level,
             'issue_time_us': issue_time_us,
             'notification_email': expected_email or normalized_user_email,
-            'message': 'Admin credential issued successfully. Store this credential in your browser wallet.'
+            'message': 'Admin credential issued successfully. Store this credential in your lemma.id.'
         })
         
     except Exception as e:
@@ -740,7 +740,7 @@ def _issue_admin_credential_core(
         'permission_level': permission_level,
         'issue_time_us': issue_time_us,
         'notification_email': user_email,
-        'message': 'Admin credential issued successfully. Store this credential in your browser wallet.',
+        'message': 'Admin credential issued successfully. Store this credential in your lemma.id.',
     }
 
 

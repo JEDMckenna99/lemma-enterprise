@@ -1077,7 +1077,7 @@ def _require_delegation_admin_session():
             jsonify({
                 'success': False,
                 'error': 'wallet_session_expired',
-                'message': 'Your wallet unlock session is expired. Unlock lemma.id again.'
+                'message': 'Your lemma.id unlock session is expired. Unlock lemma.id again.'
             }),
             403
         )

@@ -559,7 +559,7 @@ async function bootstrapAdminCredential() {
                     ? 'Admin credential reissued and stored in wallet.'
                     : 'Admin credential issued and stored in wallet.';
             } else {
-                resultEl.textContent = 'Admin credential issued. Wallet SDK not available for automatic storage.';
+                resultEl.textContent = 'Admin credential issued. lemma.id SDK not available for automatic storage.';
             }
         } catch (walletErr) {
             resultEl.textContent = 'Admin credential issued. Store it manually in wallet if needed.';

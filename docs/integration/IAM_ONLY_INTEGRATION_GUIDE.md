@@ -138,11 +138,11 @@ curl -X POST https://lemma.id/api/v1/sites/site_abc123/users/did:lemma:user123/p
   },
   "issue_time_us": 45.23,
   "crypto_engine": "rust_ed25519_oprf",
-  "instructions": "Send this credential to user's browser to store in wallet"
+  "instructions": "Send this credential to user's browser to store in their local lemma.id"
 }
 ```
 
-**💡 Important:** Send the `credential` object to the user's browser to store in their wallet.
+**💡 Important:** Send the `credential` object to the user's browser to store in their local lemma.id.
 
 ---
 

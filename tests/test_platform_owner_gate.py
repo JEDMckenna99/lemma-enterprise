@@ -120,7 +120,7 @@ def test_platform_login_denies_unbound_wallet_when_enforcement_on(monkeypatch):
                 {
                     "success": False,
                     "error": "wallet_id_required",
-                    "message": "Unlock your wallet and retry platform login.",
+                    "message": "Unlock your lemma.id and retry platform login.",
                 },
                 403,
             ),

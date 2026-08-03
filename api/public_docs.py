@@ -19,6 +19,7 @@ PUBLIC_DOC_ALLOWLIST: FrozenSet[str] = frozenset(
         "integration/ISHUMAN_AGENT_INTEGRATION.md",
         "integration/QUICK_START_SIMPLE_LOGIN.md",
         "integration/SIMPLE_INTEGRATION_GUIDE.md",
+        "integration/SIGN_IN_TRUST_AND_RECOVERY.md",
         "integration/BROWSER_SUPPORT.md",
         "ERROR_CODES.md",
         "demo/README.md",

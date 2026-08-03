@@ -5,11 +5,11 @@
 {% block description %}{{ page_description or 'Developer docs for isHuman and lemma.id: add one-verified-human-per-account to your site with the browser SDK, site-private PPIDs, and verification that runs on your own backend.' }}{% endblock %}
 
 {% block preload_scripts %}
-<!-- Docs pages skip wallet preload for faster LCP -->
+<!-- Docs pages skip lemma.id SDK preload for faster LCP -->
 {% endblock %}
 
 {% block wallet_scripts %}
-<!-- Docs pages skip wallet scripts for faster LCP -->
+<!-- Docs pages skip lemma.id SDK scripts for faster LCP -->
 {% endblock %}
 
 {% block auth_scripts %}
@@ -273,8 +273,8 @@ document.addEventListener('DOMContentLoaded', () => {
             title: 'PPID convergence',
             url: '{{ url_for("docs_human_proofs") }}#ppid-convergence',
             category: 'integration',
-            keywords: 'ppid convergence legacy_ppid provisional wallet merge account rebind',
-            excerpt: 'When a provisional wallet completes IDV, merge accounts using ppid_convergence.v1 artifact.'
+            keywords: 'ppid convergence legacy_ppid provisional lemma.id merge account rebind',
+            excerpt: 'When a provisional lemma.id completes IDV, merge accounts using ppid_convergence.v1 artifact.'
         },
         {
             title: 'Site policy and isBlockedLocally',

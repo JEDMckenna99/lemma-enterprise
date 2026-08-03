@@ -16,13 +16,13 @@ presentation = signed credential bundle satisfying the site's policy
 
 Adding `isHuman` after passkey signup **raises assurance** on the **same PPID**. It does not mint a new site subject.
 
-Lemma issues signed credentials and holds wallet ↔ person bindings. **Input burn graphs stay site-local**: Lemma never stores email/phone/card fingerprints or site ban lists.
+Lemma issues signed credentials and holds lemma.id ↔ person bindings. **Input burn graphs stay site-local**: Lemma never stores email/phone/card fingerprints or site ban lists.
 
 ## Assurance tiers
 
 | Tier | When issued | `claims.assurance` | `claims.isHuman` | Recovery |
 |------|-------------|--------------------|------------------|----------|
-| **passkey** | Wallet registered; provisional person_root assigned | `passkey` | `false` | Not promised (disposable pre-anchor wallet) |
+| **passkey** | lemma.id registered; provisional person_root assigned | `passkey` | `false` | Not promised (disposable pre-anchor lemma.id) |
 | **ishuman** | After successful IDV | `ishuman` | `true` | Re-IDV on new device → same person_root → same PPID |
 
 Assurance availability is managed by lemma.id. Relying sites do not configure
@@ -32,7 +32,7 @@ and fail closed when the requested assurance is unavailable.
 ## Lifecycle
 
 ```text
-1. Create passkey wallet → provisional assigned person_root + wallet binding
+1. Create passkey-backed lemma.id → provisional assigned person_root + lemma.id binding
 2. Derive site PPID from person_root (stable from this point)
 3. Issue passkey-assurance site credential when continuity proof is requested
 4. Site stores ppid + local input fingerprints

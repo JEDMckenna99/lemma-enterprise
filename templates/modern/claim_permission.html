@@ -283,7 +283,7 @@
                 <div class="icon">✅</div>
                 <h3>Credentials Claimed!</h3>
                 <div id="success-details">
-                    <p>Your <strong>{{ permission_level }}</strong> access to <strong>{{ site_domain }}</strong> has been stored in your wallet.</p>
+                    <p>Your <strong>{{ permission_level }}</strong> access to <strong>{{ site_domain }}</strong> has been stored in your lemma.id.</p>
                 </div>
                 <div id="credentials-list" style="background: #d1fae5; border-radius: 8px; padding: 12px; margin: 16px 0; text-align: left; font-size: 13px;">
                     <!-- Populated by JS -->
@@ -522,7 +522,7 @@ async function checkWalletState() {
             } else if (info.hasPasskey) {
                 // Has passkey but locked
                 if (btn) {
-                    btn.innerHTML = '<span>🔑</span><span>Unlock Wallet & Claim</span>';
+                    btn.innerHTML = '<span>🔑</span><span>Unlock lemma.id & Claim</span>';
                 }
                 console.log('🔒 Wallet locked - one passkey prompt will be needed');
             }

@@ -874,7 +874,7 @@ async function issueProof() {
       "issue-proof-status",
       "err",
       res.status === 401
-        ? "Wallet unlock required. Open /unlock, unlock your wallet, then retry."
+        ? "lemma.id unlock required. Open /unlock, unlock your lemma.id, then retry."
         : `Issue failed: ${message}`,
     );
     alert(`Issue failed: ${message}`);

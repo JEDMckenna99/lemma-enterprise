@@ -28,7 +28,7 @@
     <ol style="line-height: 1.8; color: var(--gray-700); padding-left: 24px;">
         <li><strong>Set <code>siteId</code></strong> to your site&apos;s canonical hostname (for example <code>app.example.com</code>). It must match the hostname users see in the browser on your domain.</li>
         <li><strong>Add the verifier SDK</strong> to your page (see <a href="#sdk-integration">SDK integration</a> below).</li>
-        <li><strong>Gate a sensitive action</strong> with <code>await verifier.verifyForBackend({ autoProvision: true })</code> for signup and account creation (T2), or <code>verify({ autoProvision: true })</code> for client-only UX gates. The first visit may open a Lemma-hosted popup for passkey wallet unlock, passkey proof issuance, or isHuman IDV step-up depending on <code>requiredAssurance</code>. Fail closed when verification fails (see <code>human</code> and <code>assurance</code> below).</li>
+        <li><strong>Gate a sensitive action</strong> with <code>await verifier.verifyForBackend({ autoProvision: true })</code> for signup and account creation (T2), or <code>verify({ autoProvision: true })</code> for client-only UX gates. The first visit may open a Lemma-hosted popup for lemma.id unlock, passkey proof issuance, or isHuman IDV step-up depending on <code>requiredAssurance</code>. Fail closed when verification fails (see <code>human</code> and <code>assurance</code> below).</li>
         <li><strong>Store <code>ppid</code></strong> on your user or account record. It is an opaque, site-private identifier, not a government ID or email.</li>
         <li><strong>Optional API key:</strong> create one in the <a href="/developer/external-api-keys">API key manager</a> when you need server-side PPID blocks. An API key is <em>not</em> required for the basic human check.</li>
         <li><strong>On confirmed abuse:</strong> call <code>POST /api/ishuman/site-block</code> with your API key (see <a href="#revocation">Revocation</a>). Do not rely on the abuser&apos;s browser to enforce the ban.</li>
@@ -147,7 +147,7 @@ curl -O https://lemma.id/sdk/proof-verifier.py</code>
     <h2>Assurance workflow demo</h2>
     <p>The live demo at <a href="/demo">/demo</a> walks through continuity proof followed by an optional human-proof step-up. These are lemma.id platform capabilities; a relying site chooses <code>requiredAssurance</code> and does not configure platform rollout flags:</p>
     <ol style="line-height: 1.8; color: var(--gray-700); padding-left: 24px;">
-        <li><strong>Passkey wallet</strong>, create an empty lemma.id (provisional person root, no IDV yet).</li>
+        <li><strong>Passkey-backed lemma.id</strong>, create an empty lemma.id (provisional person root, no IDV yet).</li>
         <li><strong>Passkey proof on two sites</strong>, derive distinct PPIDs with <code>assurance: passkey</code> via <code>verifyForBackend({ requiredAssurance: 'passkey' })</code>.</li>
         <li><strong>Demo relying sites</strong>, stamp actions and verify server-side with <code>verifyStamp</code> (see <a href="https://lemma-demo-tickets-1d3d7411af33.herokuapp.com" rel="noopener">ticketing demo</a> and <a href="https://lemma-demo-trials-7090f46cae0d.herokuapp.com" rel="noopener">trials demo</a>).</li>
         <li><strong>Site-local block</strong>, block the ticketing PPID; trials remains valid with lemma.id continuity.</li>
@@ -266,7 +266,7 @@ def checkout():
 
 <div class="docs-section" id="ppid-convergence">
     <h2>PPID convergence (provisional → known person)</h2>
-    <p>When a user already verified on wallet A creates a new provisional wallet B and completes IDV, lemma.id rebinds B to the known person. The site PPID may change. lemma.id issues a signed <code>ppid_convergence.v1</code> artifact on the next <code>derive-site-proof</code> for that site.</p>
+    <p>When a user already verified on lemma.id A creates a new provisional lemma.id B and completes IDV, lemma.id rebinds B to the known person. The site PPID may change. lemma.id issues a signed <code>ppid_convergence.v1</code> artifact on the next <code>derive-site-proof</code> for that site.</p>
     <p><strong>Merge recipe (transactional):</strong></p>
     <ol style="line-height: 1.8; color: var(--gray-700); padding-left: 24px;">
         <li>Verify presentation + convergence artifact (<code>verify_with_policy</code>).</li>
@@ -275,7 +275,7 @@ def checkout():
         <li>If not found: create a new account for canonical <code>ppid</code>.</li>
         <li>Reject if convergence is invalid, wrong-site, expired, or tampered, fail closed.</li>
     </ol>
-    <p style="color: var(--gray-600); font-size: 14px;">Ordinary first IDV on the same wallet preserves PPID and emits no convergence artifact. When convergence is available, the backend verifier validates its signed artifact and returns both the legacy and canonical PPIDs needed for a transactional merge.</p>
+    <p style="color: var(--gray-600); font-size: 14px;">Ordinary first IDV on the same lemma.id preserves PPID and emits no convergence artifact. When convergence is available, the backend verifier validates its signed artifact and returns both the legacy and canonical PPIDs needed for a transactional merge.</p>
 </div>
 
 <div class="docs-section" id="site-policy">
@@ -323,7 +323,7 @@ def checkout():
             <tr><th>You (relying site)</th><th>lemma.id (platform)</th></tr>
         </thead>
         <tbody>
-            <tr><td>Embed <code>proof-verifier.js</code> and call <code>verify()</code></td><td>Hosts the wallet + IDV popup and issues signed credentials</td></tr>
+            <tr><td>Embed <code>proof-verifier.js</code> and call <code>verify()</code></td><td>Hosts the lemma.id + IDV popup and issues signed credentials</td></tr>
             <tr><td>Set <code>siteId</code> to your hostname</td><td>Derives a per-site PPID bound to that hostname</td></tr>
             <tr><td>Store <code>ppid</code> on your user record</td><td>Does not receive your app&apos;s business data or audit logs</td></tr>
             <tr><td>API key, only for <code>site-block</code>, <code>site-unblock</code>, etc.</td><td>Operates upstream IDV (Didit by default) and platform webhooks internally</td></tr>
@@ -545,15 +545,15 @@ if not check.ok:
 
 <div class="docs-section" id="api-reference">
     <h2>API reference</h2>
-    <p>Most integrations use only the browser SDK. These HTTP endpoints support moderation, optional server checks, and the Lemma-hosted wallet popup (which calls some of them on your users&apos; behalf).</p>
+    <p>Most integrations use only the browser SDK. These HTTP endpoints support moderation, optional server checks, and the Lemma-hosted lemma.id popup (which calls some of them on your users&apos; behalf).</p>
     <table class="docs-table">
         <thead>
             <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Auth</th></tr>
         </thead>
         <tbody>
-            <tr><td><code>POST</code></td><td><code>/api/ishuman/start-verification</code></td><td>Create a Didit IDV session.</td><td>Wallet assertion</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/ishuman/start-verification</code></td><td>Create a Didit IDV session.</td><td>Device signing assertion</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/ishuman/verification-status/&lt;session_id&gt;</code></td><td>Poll status after IDV (used by the Lemma popup; not required if you use the SDK only).</td><td>None (unguessable session id)</td></tr>
-            <tr><td><code>POST</code></td><td><code>/api/ishuman/derive-site-proof</code></td><td>Derive site-bound credential from master proof.</td><td>Wallet assertion</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/ishuman/derive-site-proof</code></td><td>Derive site-bound credential from master proof.</td><td>Device signing assertion</td></tr>
             <tr><td><code>POST</code></td><td><code>/api/ishuman/verify-presentation</code></td><td>Optional server-side re-verify (prefer local <code>verifyStamp()</code>).</td><td>None</td></tr>
             <tr><td><code>POST</code></td><td><code>/api/ishuman/site-block</code></td><td>Immediate site-level PPID block.</td><td><code>X-API-Key</code></td></tr>
             <tr><td><code>POST</code></td><td><code>/api/ishuman/site-unblock</code></td><td>Remove site-scoped block.</td><td><code>X-API-Key</code></td></tr>
@@ -566,12 +566,12 @@ if not check.ok:
             <tr><td><code>GET</code></td><td><code>/api/ishuman/stats</code></td><td>Public network statistics.</td><td>None</td></tr>
         </tbody>
     </table>
-    <p style="color: var(--gray-600); font-size: 14px;"><strong>Wallet assertion</strong> proves control of the user&apos;s wallet signing key (Ed25519 challenge/response). It is used by the Lemma wallet popup, not by typical relying-site server code. <strong><code>X-API-Key</code></strong> is your site API key from the <a href="/developer/external-api-keys">API key manager</a>.</p>
+    <p style="color: var(--gray-600); font-size: 14px;"><strong>Device signing assertion</strong> (internal field: <code>wallet_assertion</code>) proves control of the user&apos;s lemma.id device signing key (Ed25519 challenge/response). It is used by the Lemma-hosted lemma.id popup, not by typical relying-site server code. <strong><code>X-API-Key</code></strong> is your site API key from the <a href="/developer/external-api-keys">API key manager</a>.</p>
 </div>
 
 <div class="docs-section" id="revocation">
     <h2>Revocation and abuse controls</h2>
-    <p>Do not rely on the abuser&apos;s browser or wallet to enforce a ban.</p>
+    <p>Do not rely on the abuser&apos;s browser or local lemma.id to enforce a ban.</p>
     <h3>Tier 0: Immediate site deny (your app)</h3>
     <p>Deny the current session or action (403, sign-out, etc.) while your site policy propagates.</p>
     <h3>Tier 1: Site-bound PPID block (canonical abuse path)</h3>
@@ -615,7 +615,7 @@ if not check.ok:
 
     <h2>Privacy model (PPID by site)</h2>
     <ul>
-        <li>Each site&apos;s PPID is derived from the <strong>verified-person root</strong> and the normalized site hostname. Binding to the person root, rather than a wallet secret, email, or device, is what makes a ban survive credential rotation on your site.</li>
+        <li>Each site&apos;s PPID is derived from the <strong>verified-person root</strong> and the normalized site hostname. Binding to the person root, rather than a local identity seed (<code>wallet_secret</code> field), email, or device, is what makes a ban survive credential rotation on your site.</li>
         <li>Derived credentials are site-specific and pairwise-unlinkable; one site&apos;s PPID cannot be correlated with another site&apos;s PPID by the relying sites.</li>
         <li>Relying sites receive only a human verdict and their own site-private PPID. They never receive the user&apos;s name, ID document, date of birth, or other IDV PII.</li>
         <li>Internal site identifiers (<code>site_...</code>, used for API keys and database ownership) are separate from the hostname used as <code>siteId</code> in the SDK.</li>

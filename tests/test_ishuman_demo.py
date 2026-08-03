@@ -244,9 +244,28 @@ def test_ishuman_demo_rotation_check_requires_ppids(ishuman_demo_client):
     assert payload["error"] == "ppids required"
 
 
+@pytest.fixture(name="demo_control_caller")
+def fixture_demo_control_caller(monkeypatch):
+    """Stub presentation *crypto* only; endpoint authorization logic stays real.
+
+    Demo control endpoints require a verified caller presentation. Tests pass
+    ``presentation: {"ppid": ...}`` and this fixture treats that PPID as the
+    verified caller, so caller-vs-target / site-owner checks still run.
+    """
+    import api.ishuman_demo as demo_mod
+
+    def _fake_verify(site_domain, presentation):
+        if isinstance(presentation, dict) and presentation.get("ppid"):
+            return str(presentation["ppid"]), None
+        return None, "presentation_missing"
+
+    monkeypatch.setattr(demo_mod, "_verified_ppid_from_presentation", _fake_verify)
+
+
 def test_ishuman_demo_rotation_check_reads_block_state(
     ishuman_demo_client,
     fake_ishuman_db_session_factory,
+    demo_control_caller,
 ):
     from api.database import SiteBlock
 
@@ -255,7 +274,12 @@ def test_ishuman_demo_rotation_check_reads_block_state(
     fresh_ppid = "did:lemma:ppid_rotation_fresh"
     ishuman_demo_client.post(
         "/api/demo/ishuman/site-block",
-        json={"site_slug": "tickets", "ppid": blocked_ppid, "reason": "demo"},
+        json={
+            "site_slug": "tickets",
+            "ppid": blocked_ppid,
+            "reason": "demo",
+            "presentation": {"ppid": blocked_ppid},
+        },
     )
 
     resp = ishuman_demo_client.post(
@@ -518,6 +542,7 @@ def test_ishuman_demo_config_seeds_sites_without_exposing_api_keys(
 def test_ishuman_demo_site_block_is_scoped_to_seeded_demo_site(
     ishuman_demo_client,
     fake_ishuman_db_session_factory,
+    demo_control_caller,
 ):
     from api.database import SiteBlock
 
@@ -528,6 +553,7 @@ def test_ishuman_demo_site_block_is_scoped_to_seeded_demo_site(
             "site_slug": "tickets",
             "ppid": "did:lemma:ppid_demo_ticket",
             "reason": "automated ticketing behavior",
+            "presentation": {"ppid": "did:lemma:ppid_demo_ticket"},
         },
     )
     payload = resp.get_json()
@@ -544,6 +570,7 @@ def test_ishuman_demo_site_block_is_scoped_to_seeded_demo_site(
 def test_ishuman_demo_clear_bans_lifts_blocks_on_both_demo_sites(
     ishuman_demo_client,
     fake_ishuman_db_session_factory,
+    demo_control_caller,
 ):
     from api.database import SiteBlock
 
@@ -555,6 +582,7 @@ def test_ishuman_demo_clear_bans_lifts_blocks_on_both_demo_sites(
                 "site_slug": slug,
                 "ppid": "did:lemma:ppid_demo_clear",
                 "reason": "clear-bans fixture",
+                "presentation": {"ppid": "did:lemma:ppid_demo_clear"},
             },
         )
         assert blocked.status_code == 200
@@ -564,6 +592,7 @@ def test_ishuman_demo_clear_bans_lifts_blocks_on_both_demo_sites(
         json={
             "ppids": ["did:lemma:ppid_demo_clear"],
             "site_slugs": ["tickets", "trials"],
+            "presentation": {"ppid": "did:lemma:ppid_demo_clear"},
         },
     )
     payload = resp.get_json()
@@ -581,6 +610,8 @@ def test_ishuman_demo_clear_bans_lifts_blocks_on_both_demo_sites(
 def test_ishuman_demo_clear_all_active_demo_bans_without_matching_client_ppid(
     ishuman_demo_client,
     fake_ishuman_db_session_factory,
+    demo_control_caller,
+    monkeypatch,
 ):
     from api.database import SiteBlock
 
@@ -591,17 +622,24 @@ def test_ishuman_demo_clear_all_active_demo_bans_without_matching_client_ppid(
             "site_slug": "tickets",
             "ppid": "did:lemma:ppid_orphan_ban",
             "reason": "orphan ban fixture",
+            "presentation": {"ppid": "did:lemma:ppid_orphan_ban"},
         },
     )
     assert blocked.status_code == 200
 
-    # Client sends a different PPID; nuclear flag must still lift the orphan ban.
+    # Nuclear clear with a non-matching PPID requires a site-owner caller;
+    # an owner's clear_all flag must still lift the orphan ban.
+    monkeypatch.setattr(
+        "api.site_access.verify_site_ownership",
+        lambda _site_id, _ppid: True,
+    )
     resp = ishuman_demo_client.post(
         "/api/demo/ishuman/clear-bans",
         json={
             "ppids": ["did:lemma:ppid_wrong_snapshot"],
             "site_slugs": ["tickets", "trials"],
             "clear_all_active_demo_bans": True,
+            "presentation": {"ppid": "did:lemma:ppid_site_owner"},
         },
     )
     payload = resp.get_json()
@@ -1080,6 +1118,7 @@ def test_assurance_status_unbound_wallet(ishuman_demo_client):
 def test_site_doubt_creates_temporary_challenge(
     ishuman_demo_client,
     fake_ishuman_db_session_factory,
+    demo_control_caller,
     monkeypatch,
 ):
     from api.database import Site, SiteDoubt
@@ -1097,7 +1136,7 @@ def test_site_doubt_creates_temporary_challenge(
 
     resp = ishuman_demo_client.post(
         "/api/demo/ishuman/site-doubt",
-        json={"site_slug": "tickets", "ppid": ppid},
+        json={"site_slug": "tickets", "ppid": ppid, "presentation": {"ppid": ppid}},
     )
     payload = resp.get_json()
     assert resp.status_code == 200
@@ -1112,6 +1151,7 @@ def test_site_doubt_creates_temporary_challenge(
 def test_site_doubt_and_clear_work_in_production(
     ishuman_demo_client,
     fake_ishuman_db_session_factory,
+    demo_control_caller,
     monkeypatch,
 ):
     """Public /demo enforce chips must work on lemma.id (ENVIRONMENT=production)."""
@@ -1130,14 +1170,19 @@ def test_site_doubt_and_clear_work_in_production(
 
     create = ishuman_demo_client.post(
         "/api/demo/ishuman/site-doubt",
-        json={"site_slug": "tickets", "ppid": ppid, "reason": "Demo doubt: require fresh passkey"},
+        json={
+            "site_slug": "tickets",
+            "ppid": ppid,
+            "reason": "Demo doubt: require fresh passkey",
+            "presentation": {"ppid": ppid},
+        },
     )
     assert create.status_code == 200, create.get_json()
     assert create.get_json()["doubt_required"] is True
 
     clear = ishuman_demo_client.post(
         "/api/demo/ishuman/clear-site-doubt",
-        json={"site_slug": "tickets", "ppid": ppid},
+        json={"site_slug": "tickets", "ppid": ppid, "presentation": {"ppid": ppid}},
     )
     assert clear.status_code == 200, clear.get_json()
     assert clear.get_json()["doubt_required"] is False
@@ -1148,6 +1193,7 @@ def test_site_doubt_and_clear_work_in_production(
 def test_clear_site_doubt_clears_only_matching_doubt(
     ishuman_demo_client,
     fake_ishuman_db_session_factory,
+    demo_control_caller,
     monkeypatch,
 ):
     from api.database import Site, SiteDoubt
@@ -1165,11 +1211,11 @@ def test_clear_site_doubt_clears_only_matching_doubt(
 
     ishuman_demo_client.post(
         "/api/demo/ishuman/site-doubt",
-        json={"site_slug": "tickets", "ppid": ppid},
+        json={"site_slug": "tickets", "ppid": ppid, "presentation": {"ppid": ppid}},
     )
     resp = ishuman_demo_client.post(
         "/api/demo/ishuman/clear-site-doubt",
-        json={"site_slug": "tickets", "ppid": ppid},
+        json={"site_slug": "tickets", "ppid": ppid, "presentation": {"ppid": ppid}},
     )
     payload = resp.get_json()
     assert resp.status_code == 200

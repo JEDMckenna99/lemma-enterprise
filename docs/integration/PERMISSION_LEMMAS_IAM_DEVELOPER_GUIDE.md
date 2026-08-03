@@ -12,7 +12,7 @@
 ## Overview
 
 Permission Lemmas IAM is a beta IAM implementation based on signed permission credentials and local verification paths.
-It is intended for teams evaluating wallet-first authorization and locally verifiable permissions.
+It is intended for teams evaluating lemma.id-first authorization and locally verifiable permissions.
 
 Production endpoint (beta): https://lemma.id
 
@@ -213,7 +213,7 @@ Create a new permission definition for a site.
 ```
 
 #### **POST /api/v1/sites/{site_id}/users/{user_did}/permissions**
-Grant a permission to a user (creates permission lemma in their wallet).
+Grant a permission to a user (creates permission lemma in their local lemma.id).
 
 **Headers:**
 - `X-API-Key: site-admin-api-key`
@@ -390,7 +390,7 @@ print(f"Verification time: {result.verification_time_us}µs")
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Your App      │    │  Lemma IAM API  │    │  User Wallet    │
+│   Your App      │    │  Lemma IAM API  │    │  User lemma.id  │
 │                 │    │                 │    │                 │
 │ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │
 │ │ Auth Check  │◄┼────┼►│Access Verify│ │    │ │ PoH Lemma   │ │
@@ -417,7 +417,7 @@ pub struct PermissionLemma {
 }
 ```
 
-### **Wallet Integration**
+### **lemma.id integration (internal: wallet)**
 
 ```rust
 pub struct BackgroundWallet {
@@ -577,7 +577,7 @@ def edit_post(request, post_id):
 - [ ] **Define permissions** for your application
 - [ ] **Integrate OAuth** for "Sign in with Lemma"
 - [ ] **Add access verification** to protected routes
-- [ ] **Test with user wallets** containing permission lemmas
+- [ ] **Test with user lemma.id instances** containing permission lemmas
 - [ ] **Deploy to production** with live API endpoints
 - [ ] **Monitor usage** through the dashboard
 

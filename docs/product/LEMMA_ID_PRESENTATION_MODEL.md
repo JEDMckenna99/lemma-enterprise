@@ -1,14 +1,21 @@
 # lemma.id Presentation Model
 
 Status: Active contract  
-Audience: Platform engineers, wallet SDK maintainers, integration partners
+Audience: Platform engineers, lemma.id SDK maintainers (internal: `LemmaWallet`), integration partners
+
+## Glossary
+
+| Term | Meaning |
+|------|---------|
+| **lemma.id** | Preferred public noun: the user's passkey-protected local identity store and credential holder. |
+| **wallet** (internal) | Legacy code/API name for a lemma.id instance (`LemmaWallet`, `/api/wallet/*`, `wallet_id`, etc.). |
 
 ## Overview
 
-lemma.id separates **identity proof** from **permission proof**. All users, including platform operators, follow the same wallet and isHuman identity flow. Operator privileges are additional lemma.id-scoped permission credentials, not a parallel identity system.
+lemma.id separates **identity proof** from **permission proof**. All users, including platform operators, follow the same lemma.id and isHuman identity flow. Operator privileges are additional lemma.id-scoped permission credentials, not a parallel identity system.
 
 ```
-Unlocked wallet
+Unlocked lemma.id
   → isHuman identity proof (master or site-bound)
     → lemma.id permission proof (optional, e.g. admin_access)
       → platform operator access
@@ -17,17 +24,17 @@ Unlocked wallet
 
 ## Identity proof
 
-An **identity proof** establishes that a wallet holder is human on lemma.id.
+An **identity proof** establishes that a lemma.id holder is human on lemma.id.
 
 | Property | Rule |
 |----------|------|
 | Primary signals | `claims.assurance` (`passkey` \| `ishuman`), legacy `claims.isHuman === true`, or credential id prefix `ishuman_master_` / `ishuman_site_` |
 | Runtime site binding | Normalized hostname; platform binding is `lemma.id` |
 | Sparse site fields | Empty `siteId` / `siteDomain` on master records is valid; skip before canonicalization |
-| PPID derivation | Assigned **person_root** + normalized hostname (canonical). Legacy wallet-secret derivation is provisional-only behind flags. |
-| Assurance | `passkey` = wallet-bound pre-IDV; `ishuman` = IDV-backed. Same PPID across tiers. |
+| PPID derivation | Assigned **person_root** + normalized hostname (canonical). Legacy local-identity-seed derivation is provisional-only behind flags. |
+| Assurance | `passkey` = lemma.id-bound pre-IDV; `ishuman` = IDV-backed. Same PPID across tiers. |
 
-**Complete lemma.id** means the wallet holds a valid isHuman identity proof for the platform (master credential and/or lemma.id site proof).
+**Complete lemma.id** means the user's lemma.id holds a valid isHuman identity proof for the platform (master credential and/or lemma.id site proof).
 
 ## Permission proof
 
@@ -47,21 +54,22 @@ A **permission proof** grants scoped access on a site.
 A **presentation** is the signed credential (or derived session artifact) sent to relying parties and APIs.
 
 The security meaning and limitations of passkeys, isHuman credentials, PPIDs,
-wallet assertions, wallet sessions, action stamps, fresh-passkey attestations,
+device signing assertions (internal: wallet assertions), lemma.id unlock sessions
+(internal: wallet sessions), action stamps, fresh-passkey attestations,
 recovery proofs, and permission credentials are defined in
 `docs/security/HUMAN_AUTH_SECURITY_CONTRACT.md`. In particular, a PPID is an
-account-continuity handle, not an authentication secret, and a wallet session
-does not replace a required wallet-held proof for a protected mutation.
+account-continuity handle, not an authentication secret, and a lemma.id unlock
+session does not replace a required lemma.id-held proof for a protected mutation.
 
 ### Browser headers (platform/admin flows)
 
 Protected platform routes expect:
 
-- `X-Lemma-Credential`, encoded wallet-selected credential
+- `X-Lemma-Credential`, encoded credential selected from the user's lemma.id
 - `X-Credential-ID`, credential id when available
 - `X-Permission-ID`, canonical permission id (`admin_access` for operators)
 
-Wallet unlock is required. Server session cookies improve UX but do not replace wallet-held proofs on protected flows.
+lemma.id unlock is required. Server session cookies improve UX but do not replace lemma.id-held proofs on protected flows.
 
 ### Site binding keys
 
@@ -99,11 +107,11 @@ Frontend helpers (`lemma-credential-utils.js`):
 
 ## Verification (deploy smoke)
 
-After deploying wallet/auth changes:
+After deploying lemma.id/auth changes:
 
 1. Hard refresh lemma.id (or unregister service worker + clear site data if SDK version stuck).
 2. Confirm `lemma-wallet.js?v=2677` (or current bump) and SDK `VERSION` ≥ 2.74.0 in console.
-3. Unlock wallet; manager (`/`) should recognize complete lemma.id without `site domain required` errors.
+3. Unlock lemma.id; manager (`/`) should recognize complete lemma.id without `site domain required` errors.
 4. Admin pages should attach `X-Lemma-Credential` with `X-Permission-ID: admin_access`.
 5. If `Invalid signature` appears on `ishuman_master_*`, hard refresh then unlock; platform login auto-reissues once via `reissueMasterCredential`.
 6. Run targeted tests:

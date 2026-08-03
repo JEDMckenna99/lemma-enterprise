@@ -77,7 +77,11 @@ both client and backend. The PPID does not change when a user upgrades tiers.
 1. `siteId` = canonical hostname (`app.example.com`), not internal `site_...` IDs.
 2. Fail closed when `human` is false.
 3. For signup/account creation and login, verify a signed `presentation` on the server, never trust a bare client `ppid`.
-4. No customer webhooks, no wallet secret on the developer's backend, no KYC field storage.
+4. No customer webhooks, no local identity seed (`wallet_secret`) on the developer's backend, no KYC field storage.
+
+## Terminology
+
+Call the user-held object **lemma.id** (passkey-protected local credential store), not a "wallet." Internal APIs may still say `wallet_*`; that is engineering vocabulary, not product naming.
 
 ## Out of scope for relying-site integration
 

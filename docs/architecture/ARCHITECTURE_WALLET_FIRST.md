@@ -1,8 +1,10 @@
-# Lemma Architecture: Wallet-Based Authentication
+# Lemma Architecture: lemma.id-First Authentication
+
+> **Historical document name.** The preferred product noun is **lemma.id** (the user's passkey-protected local identity store). In this doc, **wallet** means the local lemma.id store and related internal APIs (`LemmaWallet`, `/api/wallet/*`, etc.).
 
 ## Overview
 
-Lemma uses a **wallet-based** authentication model with passkey protection. All authentication flows through the user's wallet on lemma.id, ensuring consistent security and privacy across all devices and sites.
+Lemma uses a **lemma.id-first** authentication model with passkey protection. All authentication flows through the user's local lemma.id on lemma.id, ensuring consistent security and privacy across all devices and sites.
 
 ## Architecture
 
@@ -12,9 +14,9 @@ Lemma uses a **wallet-based** authentication model with passkey protection. All 
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │                     WALLET + REDIRECT FLOW                           │   │
+│   │                   LEMMA.ID + REDIRECT FLOW                           │   │
 │   ├─────────────────────────────────────────────────────────────────────┤   │
-│   │ • Passkey-protected wallet on lemma.id                              │   │
+│   │ • Passkey-protected lemma.id on lemma.id                            │   │
 │   │ • Cross-device session sync via global session                      │   │
 │   │ • Privacy-preserving PPIDs (unique per site, stable person_root)   │   │
 │   │ • Server-issued site credentials (passkey / isHuman assurance)    │   │
@@ -55,7 +57,7 @@ Redirect to lemma.id/wallet/unlock
 User authenticates (if needed)
            │
            ▼
-Encrypt wallet data client-side
+Encrypt lemma.id data client-side
            │
            ▼
 Redirect back to customer site
@@ -64,7 +66,7 @@ Redirect back to customer site
 wallet.checkRedirectReturn()
            │
            ▼
-Decrypt wallet data client-side
+Decrypt lemma.id data client-side
            │
            ▼
 wallet.derivePPID() → Site-specific ID
@@ -75,7 +77,7 @@ Send PPID to customer backend
 
 ### Key Benefits
 
-1. **No password** - Passkey (biometric) unlocks wallet
+1. **No password** - Passkey (biometric) unlocks lemma.id
 2. **One passkey per day** - Global session syncs across devices
 3. **Privacy-preserving** - Each site gets unique PPID
 4. **Broad compatibility** - Redirect flow is designed to reduce browser-specific auth issues
@@ -144,7 +146,7 @@ if (auth.authenticated) {
 ### Privacy Model
 
 ```
-Wallet Secret (client-side only)
+Local identity seed (client-side only; field: wallet_secret)
            │
            ▼
     HMAC-SHA256
@@ -158,7 +160,7 @@ Wallet Secret (client-side only)
 
 - **Same user + same site** → Same PPID (deterministic)
 - **Same user + different site** → Different PPID (unlinkable)
-- **Wallet secret** → Never leaves the client
+- **Local identity seed** (wallet_secret) → Never leaves the client
 - **Cross-site tracking** → Strongly reduced via per-site PPID separation
 
 ### PPID Format
@@ -176,7 +178,7 @@ did:lemma:ppid_4ecdc53ba75e564cf755975e8d1ec55e08a09f3a31ebdb83bf92b8276b57e1e3
 
 | Component | Trust Level | Location |
 |-----------|-------------|----------|
-| Wallet secret | Highest | Client IndexedDB only |
+| Local identity seed | Highest | Client IndexedDB only |
 | Passkey | Highest | Device secure enclave |
 | Global session | Medium | Server (convenience only) |
 | PPID | Public | Derived client-side |
@@ -185,10 +187,10 @@ did:lemma:ppid_4ecdc53ba75e564cf755975e8d1ec55e08a09f3a31ebdb83bf92b8276b57e1e3
 
 | Data | Server Knows? | Notes |
 |------|---------------|-------|
-| Wallet secret | ❌ Never | Only in client IndexedDB |
+| Local identity seed | ❌ Never | Only in client IndexedDB |
 | User's sites | ❌ Never | PPIDs derived locally |
 | Session status | ✅ Yes | For cross-device sync |
-| Wallet ID | ✅ Yes | Pseudonymous identifier |
+| lemma.id instance ID (wallet_id) | ✅ Yes | Pseudonymous identifier |
 
 ### Attack Resistance
 
@@ -197,14 +199,14 @@ did:lemma:ppid_4ecdc53ba75e564cf755975e8d1ec55e08a09f3a31ebdb83bf92b8276b57e1e3
 | Phishing | Passkeys bound to lemma.id origin |
 | Session hijacking | Global session is convenience, not security boundary |
 | Cross-site tracking | Different PPID per site |
-| Server compromise | Wallet secret never on server |
+| Server compromise | Local identity seed never on server |
 
 ## Device Linking
 
 ### Flow
 
 ```
-Device A (has wallet)              Device B (new device)
+Device A (has lemma.id)            Device B (new device)
 ────────────────────              ────────────────────
 
 1. Generate link code
@@ -215,24 +217,24 @@ Device A (has wallet)              Device B (new device)
         │
         ├─────────────────────────► 3. Scan QR or paste link
         │
-        │                           4. Decrypt wallet data
+        │                           4. Decrypt lemma.id data
         │                              (client-side)
         │
-        │                           5. Store wallet secret
+        │                           5. Store local identity seed
         │
         │                           6. Register passkey
         │                              for this device
         │
         ▼                           ▼
    Both devices now share      New passkey created
-   same wallet secret          (device-specific)
+   same local identity seed    (device-specific)
 ```
 
 ### Security
 
 - Link codes expire in 60 seconds
 - Requires fresh passkey verification to generate
-- Encrypted client-side (server never sees wallet secret)
+- Encrypted client-side (server never sees local identity seed)
 - Each device gets its own passkey
 
 ## Component Diagram
@@ -243,7 +245,7 @@ Device A (has wallet)              Device B (new device)
 │  ┌────────────────────────────────────────────────────────────────────────┐ │
 │  │                         LEMMA WALLET SDK                                │ │
 │  │  ┌──────────────┐  ┌──────────────────┐  ┌──────────────────────────┐ │ │
-│  │  │   Passkey    │  │   Wallet Secret  │  │      Session State       │ │ │
+│  │  │   Passkey    │  │   Identity Seed  │  │      Session State       │ │ │
 │  │  │  (Biometric) │  │   (IndexedDB)    │  │      (IndexedDB)         │ │ │
 │  │  └──────────────┘  └──────────────────┘  └──────────────────────────┘ │ │
 │  │         │                   │                        │                │ │
@@ -267,9 +269,9 @@ Device A (has wallet)              Device B (new device)
 │                              LEMMA.ID SERVER                                 │
 │  ┌────────────────────────────────────────────────────────────────────────┐ │
 │  │                         GLOBAL SESSION STORE                            │ │
-│  │  • Wallet ID → Session status (unlocked_at, expires_at)                │ │
+│  │  • lemma.id ID → Session status (unlocked_at, expires_at)                │ │
 │  │  • Used for cross-device sync (NOT for security)                       │ │
-│  │  • Never contains wallet secret or PPIDs                               │ │
+│  │  • Never contains identity seed or PPIDs                               │ │
 │  └────────────────────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -286,7 +288,7 @@ No server configuration required. Just add the SDK:
 
 ### Session Duration
 
-Users configure at `lemma.id/wallet`:
+Users configure at `lemma.id/app`:
 - Minimum: 1 hour
 - Maximum: 24 hours
 - Default: 24 hours
@@ -326,4 +328,4 @@ const userId = auth.ppid;
 | Session sync | Global session in database |
 | Identity | PPID derived client-side |
 | Privacy | PPID separation helps reduce cross-site tracking |
-| Security | Wallet secret never leaves client |
+| Security | Local identity seed never leaves client |

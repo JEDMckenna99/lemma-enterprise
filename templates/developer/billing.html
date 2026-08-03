@@ -1,4 +1,4 @@
-{% extends "developer/layout.html" %}
+﻿{% extends "developer/layout.html" %}
 {% set active_page = 'billing' %}
 {% set page_title = 'Billing' %}
 
@@ -90,8 +90,8 @@ function formatStatus(status) {
 }
 
 function showBillingAuthRequired(messageEl, setupBtn) {
-    messageEl.textContent = 'Unlock your wallet to view billing status and start Stripe Checkout.';
-    setupBtn.textContent = 'Unlock wallet';
+    messageEl.textContent = 'Unlock your lemma.id to view billing status and start Stripe Checkout.';
+    setupBtn.textContent = 'Unlock lemma.id';
     setupBtn.onclick = () => { window.location.href = '/login?return=' + encodeURIComponent('/developer/billing'); };
 }
 
@@ -186,7 +186,7 @@ async function startBillingCheckout() {
         const bodyText = JSON.stringify(payload);
         const headers = await billingAuthHeaders('POST', '/api/billing/usage-checkout', bodyText);
         if (!headers['X-Lemma-Credential'] && !headers['X-Agent-Token']) {
-            window.showToast?.('error', 'Wallet required', 'Unlock your wallet before starting checkout.');
+            window.showToast?.('error', 'lemma.id required', 'Unlock your lemma.id before starting checkout.');
             window.location.href = '/login?return=' + encodeURIComponent('/developer/billing');
             return;
         }

@@ -1,7 +1,7 @@
 {% extends "docs/layout.html" %}
 {% set active_page = 'sdk-methods' %}
 {% set hero_title = 'SDK Methods' %}
-{% set hero_subtitle = 'Complete API reference for the Lemma JavaScript SDK' %}
+{% set hero_subtitle = 'Complete API reference for the lemma.id JavaScript SDK (class: LemmaWallet)' %}
 
 {% block docs_content %}
 <div class="docs-section">
@@ -24,7 +24,7 @@ const result = await wallet.getAuthenticatedPPID();
 // result.authenticated  - boolean: is the user authenticated?
 // result.ppid           - string: "did:lemma:ppid_abc..." (site-specific)
 // result.needsRedirect  - boolean: should you redirect to lemma.id?
-// result.walletId       - string: wallet identifier</code>
+// result.walletId       - string: lemma.id identifier (internal field name)</code>
     </div>
     
     <p><strong>Performance:</strong> Return-visit local checks are typically low-latency; backend verification/session binding may still be part of your flow.</p>
@@ -53,7 +53,7 @@ const result = await wallet.getAuthenticatedPPID();
 // result.authenticated   - boolean
 // result.ppid            - string (PPID)
 // result.needsRedirect   - boolean (user needs to visit lemma.id)
-// result.needsPasskey    - boolean (no wallet on this device)
+// result.needsPasskey    - boolean (no lemma.id on this device)
 // result.lemma           - object (the signed credential)
 // result.claims          - object (credential claims/permissions)
 // result.walletId        - string
@@ -64,7 +64,7 @@ const result = await wallet.getAuthenticatedPPID();
 
 <div class="docs-section" id="unlockWithRedirect">
     <h3><code>unlockWithRedirect(options)</code></h3>
-    <p>Redirect the user to lemma.id to unlock their wallet. On return, the SDK automatically processes the credential.</p>
+    <p>Redirect the user to lemma.id to unlock their lemma.id. On return, the SDK automatically processes the credential.</p>
     
     <div class="code-block">
         <div class="code-header">
@@ -89,7 +89,7 @@ const result = await wallet.getAuthenticatedPPID();
 
 <div class="docs-section" id="getWalletInfo">
     <h3><code>getWalletInfo()</code></h3>
-    <p>Get current wallet state without triggering authentication.</p>
+    <p>Get current lemma.id state without triggering authentication.</p>
     
     <div class="code-block">
         <div class="code-header">
@@ -98,10 +98,10 @@ const result = await wallet.getAuthenticatedPPID();
         </div>
         <code>const info = await wallet.getWalletInfo();
 
-// info.isUnlocked      - boolean: is wallet currently unlocked?
-// info.walletId        - string: wallet identifier (null if no wallet)
+// info.isUnlocked      - boolean: is lemma.id currently unlocked?
+// info.walletId        - string: lemma.id identifier (null if none)
 // info.hasPasskey      - boolean: passkey registered on this device?
-// info.hasWalletSecret - boolean: wallet secret available locally?</code>
+// info.hasWalletSecret - boolean: local identity seed available locally? (field: wallet_secret)</code>
     </div>
 </div>
 
@@ -139,7 +139,7 @@ const result = await wallet.getAuthenticatedPPID();
         <code>// Unlock with local passkey (lemma.id only)
 await wallet.unlock();
 
-// Lock wallet (clears session everywhere via SSE)
+// Lock lemma.id (clears session everywhere via SSE)
 await wallet.lock();</code>
     </div>
 </div>
@@ -153,7 +153,7 @@ await wallet.lock();</code>
             <span>JavaScript</span>
             <button class="copy-btn">Copy</button>
         </div>
-        <code>// Wallet locked (from another device or tab)
+        <code>// lemma.id locked (from another device or tab)
 window.addEventListener('lemma-wallet-locked', () => {
     // Clear your site's session
     fetch('/api/auth/logout', { method: 'POST' });

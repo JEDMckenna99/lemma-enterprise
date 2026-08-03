@@ -228,7 +228,7 @@
                     attempts++;
                 }
                 if (!window.LemmaWallet) {
-                    throw new Error('Wallet SDK failed to load.');
+                    throw new Error('lemma.id SDK failed to load.');
                 }
 
                 wallet = window.globalLemmaWallet || new LemmaWallet({

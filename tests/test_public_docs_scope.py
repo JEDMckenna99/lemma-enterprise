@@ -44,6 +44,7 @@ def test_public_doc_allowlist_serves_approved_markdown(monkeypatch):
             "/docs/integration/ISHUMAN_AGENT_INTEGRATION.md",
             "/docs/integration/QUICK_START_SIMPLE_LOGIN.md",
             "/docs/integration/SIMPLE_INTEGRATION_GUIDE.md",
+            "/docs/integration/SIGN_IN_TRUST_AND_RECOVERY.md",
             "/docs/integration/BROWSER_SUPPORT.md",
             "/docs/ERROR_CODES.md",
             "/docs/demo/README.md",

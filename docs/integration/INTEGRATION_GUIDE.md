@@ -1,8 +1,10 @@
 > **Superseded** by [ISHUMAN Agent Integration Guide](ISHUMAN_AGENT_INTEGRATION.md). This document is retained for historical reference only.
 
+> **Terminology:** The preferred public noun is **lemma.id** (the user's passkey-protected local identity store). This guide retains legacy **`LemmaWallet`** / **`lemma-wallet.js`** identifiers in code samples; those are internal names for the user's lemma.id.
+
 # Lemma Integration Guide
 
-> Complete guide for integrating Lemma's wallet-based user authentication. For agent/runtime auth, use the proof-first developer auth contract and runtime docs instead of this user-login guide.
+> Complete guide for integrating Lemma's lemma.id-based user authentication (legacy `LemmaWallet` SDK). For agent/runtime auth, use the proof-first developer auth contract and runtime docs instead of this user-login guide.
 
 ## Table of Contents
 
@@ -26,7 +28,7 @@
 | User tracking | Cross-site possible | Reduced by per-site PPIDs |
 | Session management | Server-side | Client-side + global sync |
 | Re-authentication | Every device | Once per day, all devices |
-| Wallet secret | Often server-managed | Designed to remain client-side in standard flows |
+| Local identity seed | Often server-managed | Designed to remain client-side in standard flows (`wallet_secret` field) |
 
 ### Architecture
 
@@ -36,7 +38,7 @@
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐    │
-│  │   Passkey   │────▶│   Wallet    │────▶│    PPID     │    │
+│  │   Passkey   │────▶│  lemma.id   │────▶│    PPID     │    │
 │  │ (Biometric) │     │ (IndexedDB) │     │ (Per-Site)  │    │
 │  └─────────────┘     └─────────────┘     └─────────────┘    │
 │                              │                               │
@@ -152,7 +154,7 @@ The redirect flow is broadly compatible across modern browsers, including mobile
 4. User authenticates with passkey (biometric)
    │
    ▼
-5. Redirect back with encrypted wallet data
+5. Redirect back with encrypted lemma.id data
    │
    ▼
 6. wallet.checkRedirectReturn() decrypts locally
@@ -271,7 +273,7 @@ const ppid = await wallet.derivePPID('example.com');
 
 #### `lock()`
 
-Lock wallet on all devices:
+Lock lemma.id on all devices:
 
 ```javascript
 await wallet.lock();
@@ -281,13 +283,13 @@ await wallet.lock();
 
 #### `getWalletInfo()`
 
-Get current wallet state:
+Get current lemma.id state:
 
 ```javascript
 const info = await wallet.getWalletInfo();
 // Returns:
 // {
-//   hasWallet: boolean,      // Has wallet secret
+//   hasWallet: boolean,      // Has local identity seed (field name unchanged)
 //   hasPasskey: boolean,     // Has registered passkey
 //   isUnlocked: boolean,     // Currently authenticated
 //   walletId: string | null,
@@ -297,7 +299,7 @@ const info = await wallet.getWalletInfo();
 
 #### `isUnlocked()`
 
-Quick check if wallet is unlocked:
+Quick check if lemma.id is unlocked:
 
 ```javascript
 if (wallet.isUnlocked()) {
@@ -325,7 +327,7 @@ The SDK automatically monitors session validity on third-party sites:
 // Heartbeat runs automatically
 // - Checks on tab visibility change (fast)
 // - Checks every 5 minutes (backup)
-// - Triggers onSessionExpired if wallet locked elsewhere
+// - Triggers onSessionExpired if lemma.id locked elsewhere
 ```
 
 ---
@@ -427,11 +429,11 @@ if (auth.authenticated) {
 
 ### Device Linking
 
-Users can link devices at `lemma.id/wallet`:
+Users can link devices at `lemma.id/app` (legacy `/wallet` redirects there):
 
 ```javascript
-// Direct user to wallet management
-const linkUrl = 'https://lemma.id/wallet';
+// Direct user to lemma.id management
+const linkUrl = 'https://lemma.id/app';
 
 // Or use SDK method
 const state = await wallet.getAuthState();
@@ -450,11 +452,11 @@ PPID = HMAC-SHA256(wallet_secret, site_domain)
 
 - **Same user + same site** = Same PPID (deterministic)
 - **Same user + different site** = Different PPID (unlinkable)
-- **Wallet secret** is designed to remain on-device in standard flows
+- **Local identity seed** (`wallet_secret`) is designed to remain on-device in standard flows
 
 ### Session Duration
 
-Users can configure session duration (1-24 hours) at `lemma.id/wallet`:
+Users can configure session duration (1-24 hours) at `lemma.id/app`:
 
 ```javascript
 // SDK automatically respects user's preference
@@ -496,7 +498,7 @@ The session might be locked from another device. Check the heartbeat:
 ```javascript
 wallet.onSessionExpired((event) => {
     if (event.reason === 'locked') {
-        // Wallet was locked on another device
+        // lemma.id was locked on another device
     }
 });
 ```
@@ -523,7 +525,7 @@ On development machines without biometric hardware:
 
 1. **Use HTTPS everywhere** - Required for passkeys and secure redirects
 2. **Validate PPID format** - Check `did:lemma:ppid_` prefix
-3. **Don't store wallet secrets** - keep them client-side
+3. **Don't store local identity seeds** (`wallet_secret`) - keep them client-side
 4. **Do not trust PPID alone** - require signed credential verification on protected routes
 
 ---

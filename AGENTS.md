@@ -70,9 +70,13 @@ Verify on the server with `@lemma.id/proof-verifier` or `lemma_proof_verifier.py
 
 See the full guide for trust tiers, abuse APIs, anti-patterns, and framework notes.
 
+## Terminology
+
+The user-held continuous identity object is **lemma.id** (a passkey-protected local credential store). Prefer that noun in user-facing and integrator copy. Internal code may still use `wallet_*` identifiers (`LemmaWallet`, `/api/wallet/*`, `wallet_id`); do not introduce new user-facing "wallet" language.
+
 ## Platform operator identity (lemma.id internal)
 
-Platform operators use the **same wallet + isHuman flow** as all users. Admin/operator access is an additional lemma.id-scoped permission proof, not a separate identity path.
+Platform operators use the **same lemma.id + isHuman flow** as all users. Admin/operator access is an additional lemma.id-scoped permission proof, not a separate identity path.
 
 - Runtime site binding key: normalized hostname (`lemma.id` for the platform).
 - Internal `site_...` ids are ownership/database context only, never the sole runtime credential match key.

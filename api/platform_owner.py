@@ -168,7 +168,7 @@ def enforce_platform_login_wallet(
             {
                 "success": False,
                 "error": "wallet_id_required",
-                "message": "Unlock your wallet and retry platform login.",
+                "message": "Unlock your lemma.id and retry platform login.",
             },
             403,
         )
@@ -203,7 +203,7 @@ def enforce_platform_login_wallet(
             {
                 "success": False,
                 "error": "ppid_or_passkey_required",
-                "message": "Unlock your wallet and retry platform login.",
+                "message": "Unlock your lemma.id and retry platform login.",
             },
             403,
         )
@@ -232,7 +232,7 @@ def enforce_platform_registration_wallet(
             {
                 "success": False,
                 "error": "wallet_id_required",
-                "message": "Unlock your wallet and retry developer registration.",
+                "message": "Unlock your lemma.id and retry developer registration.",
             },
             403,
         )

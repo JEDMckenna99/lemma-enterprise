@@ -187,9 +187,9 @@ Two independent layers:
 | Layer | Who controls | What it does |
 |-------|--------------|--------------|
 | **Site session** | Your backend | Clear your HttpOnly cookie on `POST /logout`. User is signed out of your app only. |
-| **Wallet site disconnect** | User / wallet | Revocation and bloom snapshot updates can invalidate cached site proofs. SDK polling surfaces "sign out everywhere" style disconnect for that site binding. |
+| **lemma.id site disconnect** | User / lemma.id | Revocation and bloom snapshot updates can invalidate cached site proofs. SDK polling surfaces "sign out everywhere" style disconnect for that site binding. |
 
-Document both for support: logging out of your site does not delete the user's lemma.id wallet.
+Document both for support: logging out of your site does not delete the user's lemma.id.
 
 ---
 

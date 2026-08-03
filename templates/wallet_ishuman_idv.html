@@ -228,7 +228,7 @@
     <script src="/static/js/lemma-keys.js?v=8" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
-    <script src="/sdk/lemma-wallet.js?v=2693" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+    <script src="/sdk/lemma-wallet.js?v=2694" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
@@ -487,7 +487,7 @@
 
         function getWalletInstance() {
             if (typeof LemmaWallet === 'undefined') {
-                throw new Error('Wallet SDK failed to load. Allow scripts for lemma.id and refresh.');
+                throw new Error('lemma.id SDK failed to load. Allow scripts for lemma.id and refresh.');
             }
             wallet = wallet || new LemmaWallet();
             return wallet;
@@ -1475,7 +1475,7 @@
                 if (message === 'envelope_invalid'
                     || message === 'storage_key_unavailable'
                     || message === 'prf_required_for_encrypted_storage') {
-                    throw new Error('Unlock wallet with passkey to read encrypted human proof.');
+                    throw new Error('Unlock lemma.id with passkey to read encrypted human proof.');
                 }
                 throw err;
             }
@@ -1631,7 +1631,7 @@
             setStatus('Unlocking your wallet…', 'loading');
             await ensureWalletUnlocked();
             if (typeof wallet.prepareIdvMobileHandoff !== 'function') {
-                throw new Error('Wallet SDK too old. Refresh lemma.id and retry.');
+                throw new Error('lemma.id SDK too old. Refresh lemma.id and retry.');
             }
 
             const pending = wallet.prepareIdvMobileHandoff();
@@ -1718,7 +1718,7 @@
                     btn.textContent = 'Try again';
                 }
             };
-            setStatus('Unlock your wallet, then scan the QR code with your phone.', 'info');
+            setStatus('Unlock your lemma.id, then scan the QR code with your phone.', 'info');
         }
 
         async function verifyOnceTestMode() {
@@ -2454,7 +2454,7 @@
                 if (detail.includes('wallet_id') || detail.includes('challenge')) {
                     setStatus('Wallet session mismatch. Close other lemma.id tabs and retry.', 'error');
                 } else if (detail.includes('envelope_invalid') || detail.includes('encrypted')) {
-                    setStatus('Unlock wallet with passkey to read encrypted human proof.', 'error');
+                    setStatus('Unlock lemma.id with passkey to read encrypted human proof.', 'error');
                 } else {
                     setStatus(detail, 'error');
                 }
@@ -2588,7 +2588,7 @@
                     } catch (pollErr) {
                         console.warn('[isHuman IDV] handoff return master store failed:', pollErr?.message || pollErr);
                         setStatus(
-                            'This wallet is on the device, but its human proof was not stored yet. Retry finish.',
+                            'This lemma.id is on the device, but its human proof was not stored yet. Retry finish.',
                             'error',
                         );
                         const btn = document.getElementById('primary-btn');

@@ -219,7 +219,7 @@ def render_email_template(template_name: str, **kwargs) -> str:
                     <div class="credential-box">
                         <strong>What happens next:</strong>
                         <ul style="margin: 10px 0;">
-                            <li>Your permission credential will be stored in your browser wallet</li>
+                            <li>Your permission credential will be stored in your lemma.id</li>
                             <li>You'll have instant access (verified in <span class="code">182µs</span>)</li>
                             <li>No password needed - just this one-time confirmation</li>
                         </ul>
@@ -258,7 +258,7 @@ def render_email_template(template_name: str, **kwargs) -> str:
                     <ul>
                         {permissions_list}
                     </ul>
-                    <p>Your credential has been stored in your browser wallet and will work automatically when you visit the site.</p>
+                    <p>Your credential has been stored in your lemma.id and will work automatically when you visit the site.</p>
                     <p><a href="{redirect_url}" style="color: #6366f1; text-decoration: none;">Return to {site_domain} →</a></p>
                 </div>
                 <div class="footer" style="text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px;">
@@ -301,7 +301,7 @@ def render_email_template(template_name: str, **kwargs) -> str:
                         <strong style="color: #047857;">What happens when you click:</strong>
                         <ul style="margin: 12px 0 8px 0; padding-left: 20px; color: #065f46;">
                             <li>You'll receive a cryptographic permission credential</li>
-                            <li>It's stored securely in your browser wallet</li>
+                            <li>It's stored securely in your lemma.id</li>
                             <li>Authentication happens in 182µs - instant access!</li>
                             <li>No password needed - Lemma IAM uses email-based auth</li>
                         </ul>
