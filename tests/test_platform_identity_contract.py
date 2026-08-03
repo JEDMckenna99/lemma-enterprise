@@ -276,6 +276,7 @@ def test_noble_curves_vendor_uses_local_hash_imports():
 def test_device_link_bundles_ishuman_credentials_and_unlock_token(wallet_js_source):
     """Cross-device QR/link must carry encrypted human proof + session bootstrap."""
     assert "_importLinkedIsHumanCredentials" in wallet_js_source
+    assert "exportIsHumanCredentialsForTransfer" in wallet_js_source
     assert "ishumanCredentials" in wallet_js_source
     assert "link-unlock-token" in wallet_js_source
     assert "humanProofRestored" in wallet_js_source

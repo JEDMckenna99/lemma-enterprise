@@ -2159,9 +2159,10 @@ class LemmaWallet {
 
         await this._put('passkey', passkeyRecord);
         console.log('[Lemma] Passkey created locally');
-        if (prfBound) {
-            await this._migratePlaintextStores();
+        if (!prfBound) {
+            throw new Error('prf_required_for_encrypted_storage');
         }
+        await this._migratePlaintextStores();
 
         // Get wallet secret for PPID derivation
         // CRITICAL: Check multiple sources for the secret (profiles, secrets, session)
@@ -3457,8 +3458,7 @@ class LemmaWallet {
 
         let ishumanCredentials = [];
         try {
-            await this.syncIsHumanCacheFromWallet();
-            ishumanCredentials = await this.exportIsHumanCredentialsForBridge();
+            ishumanCredentials = await this.exportIsHumanCredentialsForTransfer();
         } catch (e) {
             console.warn('[Lemma] Could not export isHuman credentials for pull send:', e.message);
         }
@@ -3687,8 +3687,7 @@ class LemmaWallet {
 
         let ishumanCredentials = [];
         try {
-            await this.syncIsHumanCacheFromWallet();
-            ishumanCredentials = await this.exportIsHumanCredentialsForBridge();
+            ishumanCredentials = await this.exportIsHumanCredentialsForTransfer();
         } catch (e) {
             console.warn('[Lemma] Could not export isHuman credentials for push send:', e.message);
         }
@@ -4103,18 +4102,125 @@ class LemmaWallet {
     }
 
     /**
+     * Resolve an issuer verifying key for transfer export/import.
+     * Prefers embedded issuerInfo, then local issuer store, then did:lemma hex.
+     */
+    async _resolveIssuerPublicKeyForCredential(credential) {
+        if (!credential || typeof credential !== 'object') return null;
+        const embedded = credential.issuerInfo?.publicKey || credential.issuerInfo?.public_key || null;
+        if (embedded) return String(embedded).trim() || null;
+        try {
+            const stored = await this.getIssuer(credential.issuer);
+            if (stored?.publicKey) return String(stored.publicKey).trim() || null;
+        } catch (_) { /* ignore */ }
+        const did = String(credential.issuer || '');
+        const parts = did.split(':');
+        if (parts.length === 3 && parts[0] === 'did' && parts[1] === 'lemma'
+            && /^[0-9a-fA-F]{64}$/.test(parts[2])) {
+            return parts[2];
+        }
+        return null;
+    }
+
+    async _enrichCredentialForTransfer(credential) {
+        const clone = JSON.parse(JSON.stringify(credential));
+        const publicKey = await this._resolveIssuerPublicKeyForCredential(clone);
+        if (publicKey) {
+            clone.issuerInfo = {
+                ...(clone.issuerInfo || {}),
+                publicKey,
+                name: clone.issuerInfo?.name || clone.issuer || 'lemma.id',
+            };
+        }
+        return clone;
+    }
+
+    /**
+     * Keep one newest master plus one newest site credential per site|assurance.
+     */
+    _dedupeCredentialsForTransfer(credentials) {
+        const masters = [];
+        const bySiteAssurance = new Map();
+        for (const cred of this._sortCredentialsNewestFirst(credentials || [])) {
+            if (this._isIsHumanMasterRecord(cred)) {
+                if (!masters.length) masters.push(cred);
+                continue;
+            }
+            const cl = cred.claims || cred.credentialSubject || {};
+            const site = this._canonicalizeCredentialSiteValue(this._getCredentialSiteBinding(cl)) || '_unknown';
+            const assurance = this._credentialRecordAssurance(cred) || 'ishuman';
+            const key = `${site}|${assurance}`;
+            if (!bySiteAssurance.has(key)) {
+                bySiteAssurance.set(key, cred);
+            }
+        }
+        return [...masters, ...bySiteAssurance.values()];
+    }
+
+    /**
+     * Valid-only filter for device transfer: shape + locally verifiable signature,
+     * not expired, not revoked. Drops legacy/malformed/stale duplicates.
+     */
+    async _selectValidCredentialsForTransfer(credentials, { forImport = false } = {}) {
+        const selected = [];
+        for (const raw of credentials || []) {
+            if (!raw || !this._isIsHumanCredentialRecord(raw)) continue;
+            if (!this._siteCredentialLocallyVerifiable(raw)) {
+                console.warn('[Lemma] Skipping legacy/non-verifiable credential for transfer:', raw.id);
+                continue;
+            }
+            let cred = raw;
+            try {
+                cred = await this._enrichCredentialForTransfer(raw);
+                if (!cred.issuerInfo?.publicKey) {
+                    console.warn('[Lemma] Skipping credential without issuer public key:', raw.id);
+                    continue;
+                }
+                const result = await this._verifyIsHumanCredentialBrowser(cred);
+                if (!result?.valid) {
+                    console.warn(
+                        '[Lemma] Skipping invalid credential for transfer:',
+                        raw.id,
+                        result?.reason || 'invalid',
+                    );
+                    continue;
+                }
+                selected.push(cred);
+            } catch (e) {
+                console.warn(
+                    `[Lemma] Credential ${forImport ? 'import' : 'export'} verify failed:`,
+                    raw?.id,
+                    e?.message || e,
+                );
+            }
+        }
+        return this._dedupeCredentialsForTransfer(selected);
+    }
+
+    /**
      * Restore isHuman credentials transferred inside an encrypted device-link payload.
      * Stores in lemmas + ishuman_cache so the new device can prove humanity without re-IDV.
+     * Re-validates on import so a compromised/older sender dump cannot land junk.
      */
     async _importLinkedIsHumanCredentials(credentials) {
         if (!Array.isArray(credentials) || !credentials.length) {
             return { applied: 0, masterRestored: false };
         }
+        const valid = await this._selectValidCredentialsForTransfer(credentials, { forImport: true });
         let applied = 0;
         let masterRestored = false;
-        for (const cred of credentials) {
-            if (!cred || !this._isIsHumanCredentialRecord(cred)) continue;
+        for (const cred of valid) {
             try {
+                if (cred.issuer && cred.issuerInfo?.publicKey) {
+                    try {
+                        await this.addIssuer({
+                            did: cred.issuer,
+                            publicKey: cred.issuerInfo.publicKey,
+                            name: cred.issuerInfo.name || cred.issuer,
+                            verified: true,
+                        });
+                    } catch (_) { /* issuer already present */ }
+                }
                 await this.storeCredential(cred);
                 applied += 1;
                 if (this._isIsHumanMasterRecord(cred)) masterRestored = true;
@@ -4125,12 +4231,22 @@ class LemmaWallet {
         if (!masterRestored && applied > 0) {
             masterRestored = await this.hasIsHumanMasterInCache();
         }
-        return { applied, masterRestored };
+        return { applied, masterRestored, skipped: Math.max(0, credentials.length - valid.length) };
     }
 
     async exportIsHumanCredentialsForBridge() {
         await this.syncIsHumanCacheFromWallet();
         return this.getIsHumanCredentialsFromCache();
+    }
+
+    /**
+     * Device-link export: only currently valid, locally verifiable credentials.
+     * Unlike the bridge export, this drops legacy/expired/revoked/duplicate copies.
+     */
+    async exportIsHumanCredentialsForTransfer() {
+        await this.syncIsHumanCacheFromWallet();
+        const all = await this.getIsHumanCredentialsFromCache();
+        return this._selectValidCredentialsForTransfer(all);
     }
 
     _getCredentialSiteBinding(claims) {
@@ -5023,14 +5139,10 @@ class LemmaWallet {
         }
 
         const prfBound = await this._bindAtRestKeyFromCredential(credential, walletId);
-        if (prfBound) {
-            await this._migratePlaintextStores();
-        } else {
-            const meta = await this._getWalletMeta();
-            if (meta.migrationComplete) {
-                throw new Error('prf_required_for_encrypted_storage');
-            }
+        if (!prfBound) {
+            throw new Error('prf_required_for_encrypted_storage');
         }
+        await this._migratePlaintextStores();
 
         // Get wallet secret for PPID derivation
         let walletSecretRecord = await this._get('secrets', 'master');
@@ -6975,11 +7087,12 @@ class LemmaWallet {
         this._atRestKey = await mod.importStorageKey(prfBytes);
         this._atRestKeyReady = true;
         // Stash the raw 32-byte PRF key material so the daily-unlock bundle can
-        // carry it for 24h. The bundle already persists walletSecret in plaintext
-        // localStorage for the same window, so this does not weaken the at-rest
-        // posture, it just lets ONE passkey/day cover every encrypted read/write
-        // (master storage + per-site proof derivation) instead of re-prompting on
-        // each fresh popup page load that lacks the in-memory CryptoKey.
+        // carry it for the session window (≤10h). Sensitive fields are wrapped
+        // under a non-extractable device key (wrap_v1) — see
+        // docs/security/LEMMA_ID_BROWSER_STORAGE_CONTRACT.md. This lets ONE
+        // passkey/day cover every encrypted read/write (master storage +
+        // per-site proof derivation) instead of re-prompting on each fresh
+        // popup page load that lacks the in-memory CryptoKey.
         try {
             this._atRestKeyRaw = mod.bufferToBase64url(prfBytes.slice(0, 32));
         } catch (e) {
@@ -7001,16 +7114,6 @@ class LemmaWallet {
         }
         const mod = this._walletAtRest();
         if (!this._atRestKey || !mod) {
-            if (storeName === 'ishuman_cache') {
-                throw new Error('storage_key_unavailable');
-            }
-            const meta = await this._getWalletMeta();
-            if (meta.migrationComplete) {
-                throw new Error('storage_key_unavailable');
-            }
-            if (this._canPersistWalletSecret()) {
-                return value;
-            }
             throw new Error('storage_key_unavailable');
         }
         const recordId = value?.id || value?.did || 'record';

@@ -28,6 +28,12 @@ Unlocked `/app` → **Generate QR Code** / **Send Transfer Link** → `beginLink
 **Why confirm code stays:** passkey proves the *sender*; the code binds the *receiver*
 so a stolen transfer link cannot race-register and receive the deposit.
 
+**Credential filter (push + pull):** `exportIsHumanCredentialsForTransfer` only
+includes credentials that are locally verifiable (`proof.signatureValueWeb`),
+not expired, not revoked, and have a resolvable issuer public key. It keeps the
+newest master plus newest site credential per `site|assurance`. Import
+re-validates with `_selectValidCredentialsForTransfer` before store.
+
 ### 3. Seed transfer tab on `/link`
 
 `beginDeviceTransfer` / `depositDeviceTransfer` / `claimDeviceTransfer` via

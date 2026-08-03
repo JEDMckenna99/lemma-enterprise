@@ -61,6 +61,30 @@ def test_link_completion_defers_signing_key_when_enrollment_grant_pending():
 
 
 @pytest.mark.unit
+def test_device_link_exports_only_valid_ishuman_credentials():
+    source = WALLET_JS.read_text(encoding="utf-8")
+    assert "async exportIsHumanCredentialsForTransfer" in source
+    assert "async _selectValidCredentialsForTransfer" in source
+    assert "_dedupeCredentialsForTransfer" in source
+    assert "_verifyIsHumanCredentialBrowser" in source
+
+    pull_idx = source.index("async sendLinkDepositFromScan")
+    pull_chunk = source[pull_idx:pull_idx + 4500]
+    assert "exportIsHumanCredentialsForTransfer" in pull_chunk
+    assert "exportIsHumanCredentialsForBridge" not in pull_chunk
+
+    push_idx = source.index("async confirmLinkPushDeposit")
+    push_chunk = source[push_idx:push_idx + 5500]
+    assert "exportIsHumanCredentialsForTransfer" in push_chunk
+    assert "exportIsHumanCredentialsForBridge" not in push_chunk
+
+    import_idx = source.index("async _importLinkedIsHumanCredentials")
+    import_chunk = source[import_idx:import_idx + 2500]
+    assert "_selectValidCredentialsForTransfer" in import_chunk
+    assert "forImport: true" in import_chunk
+
+
+@pytest.mark.unit
 def test_server_has_no_legacy_link_store_route():
     api_root = ROOT / "api"
     routes_text = "\n".join(p.read_text(encoding="utf-8") for p in api_root.rglob("*.py"))
