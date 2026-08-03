@@ -3070,6 +3070,12 @@ def wallet_link_receive():
         transfer_id = (body.get("transfer_id") or "").strip()
         if not transfer_id:
             return jsonify({"success": False, "error": "transfer_id required"}), 400
+        # Peek first. Receiver polls claim while waiting for deposit; consuming
+        # a waiting/registered offer would delete the slot and make the sender
+        # think the transfer expired (status 404) before confirm/send.
+        pending = redis_get(_link_receive_key(transfer_id))
+        if not pending or not pending.get("bundle"):
+            return jsonify({"success": False, "error": "transfer_not_found"}), 404
         entry = redis_consume(_link_receive_key(transfer_id))
         if not entry or not entry.get("bundle"):
             return jsonify({"success": False, "error": "transfer_not_found"}), 404

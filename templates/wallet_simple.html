@@ -1488,11 +1488,13 @@ async function pollPushRegistration(result) {
     activePushOffer = result;
     const waitEl = document.getElementById('push-wait-status');
     let consecutiveErrors = 0;
+    let consecutiveMissing = 0;
     while (!pushPollAbort) {
         try {
             const status = await wallet.getLinkPushStatus(result.transferId);
             consecutiveErrors = 0;
             if (status.ready) {
+                consecutiveMissing = 0;
                 const code = status.confirmCode || result.confirmCode;
                 showPushConfirmCode(code);
                 waitEl.innerHTML =
@@ -1513,15 +1515,21 @@ async function pollPushRegistration(result) {
                 return;
             }
             if (status.status === 'missing') {
-                waitEl.textContent = 'Transfer expired. Generate a new QR or link.';
-                waitEl.style.color = '';
-                setPushConfirmReady(false);
-                const confirmBtn = document.getElementById('confirm-push-btn');
-                if (confirmBtn) {
-                    confirmBtn.disabled = true;
-                    confirmBtn.textContent = 'Transfer expired';
+                consecutiveMissing += 1;
+                // Require a few misses — a single 404 must not kill an active transfer.
+                if (consecutiveMissing >= 3) {
+                    waitEl.textContent = 'Transfer expired. Generate a new QR or link.';
+                    waitEl.style.color = '';
+                    setPushConfirmReady(false);
+                    const confirmBtn = document.getElementById('confirm-push-btn');
+                    if (confirmBtn) {
+                        confirmBtn.disabled = true;
+                        confirmBtn.textContent = 'Transfer expired';
+                    }
+                    return;
                 }
-                return;
+            } else {
+                consecutiveMissing = 0;
             }
             if (status.hasBundle) {
                 waitEl.textContent = 'Already sent. Finish setup on the other device.';

@@ -81,6 +81,56 @@ def test_link_receive_claim_before_deposit_404(ishuman_client):
     assert resp.status_code == 404
 
 
+@pytest.mark.integration
+def test_link_push_early_claim_does_not_expire_offer(
+    ishuman_client,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+    attach_wallet_assertion,
+):
+    """Regression: receiver claim polling must not delete a push offer."""
+    db = fake_ishuman_db_session_factory
+    monkeypatch.setattr("api.database.SessionLocal", db.session_local)
+
+    offer_id = "linkpush_" + "e" * 24
+    offer_body = attach_wallet_assertion(
+        {
+            "action": "offer",
+            "wallet_id": "wallet_push_early",
+            "transfer_id": offer_id,
+            "confirm_code": "135790",
+        },
+        ["transfer_id", "confirm_code"],
+    )
+    assert ishuman_client.post("/api/wallet/link-receive", json=offer_body).status_code == 200
+    assert ishuman_client.post(
+        "/api/wallet/link-receive",
+        json={
+            "action": "register",
+            "transfer_id": offer_id,
+            "recv_pubkey": RECV_PUB,
+        },
+    ).status_code == 200
+
+    for _ in range(3):
+        early = ishuman_client.post(
+            "/api/wallet/link-receive",
+            json={"action": "claim", "transfer_id": offer_id},
+        )
+        assert early.status_code == 404
+
+    status = ishuman_client.post(
+        "/api/wallet/link-receive",
+        json={"action": "status", "transfer_id": offer_id},
+    )
+    body = status.get_json()
+    assert status.status_code == 200, body
+    assert body["status"] == "registered"
+    assert body["recv_pubkey"] == RECV_PUB
+    assert body["confirm_code"] == "135790"
+    assert body["has_bundle"] is False
+
+
 PUSH_ID = "linkpush_" + "c" * 24
 CONFIRM = "482913"
 
@@ -141,6 +191,17 @@ def test_link_push_offer_register_deposit_claim(
         json={"action": "claim", "transfer_id": PUSH_ID},
     )
     assert early_claim.status_code == 404
+
+    # Early claim polls must not destroy the registered offer (sender status
+    # would otherwise 404 and the UI would report "expired" mid-transfer).
+    status_after_early = ishuman_client.post(
+        "/api/wallet/link-receive",
+        json={"action": "status", "transfer_id": PUSH_ID},
+    )
+    assert status_after_early.status_code == 200, status_after_early.get_json()
+    assert status_after_early.get_json()["status"] == "registered"
+    assert status_after_early.get_json()["recv_pubkey"] == RECV_PUB
+    assert status_after_early.get_json()["confirm_code"] == CONFIRM
 
     deposit_body = attach_wallet_assertion(
         {
