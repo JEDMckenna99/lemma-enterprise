@@ -780,6 +780,15 @@ def create_app():
         response.headers['Expires'] = '0'
         return response
 
+    @app.route('/favicon.ico')
+    def favicon_ico():
+        """Root favicon fallback — jewel violet mark (browsers request this by default)."""
+        from flask import send_from_directory
+        response = send_from_directory('static', 'favicon.ico', mimetype='image/x-icon')
+        # Short cache + versioned <link> tags; avoid sticky old blurple icons.
+        response.headers['Cache-Control'] = 'public, max-age=86400'
+        return response
+
     @app.route('/wallet')
     def wallet():
         """Legacy redirect: /wallet -> /app"""

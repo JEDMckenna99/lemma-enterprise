@@ -6,8 +6,10 @@
     <title>{% block title %}lemma.id | Passwordless sign-in with no user data to store{% endblock %}</title>
     <meta name="description" content="{% block description %}Sign in with lemma.id: passkey login with a stable, site-private account ID. No emails, no passwords, no API key, verification on your own backend. Step up to human proofs when bans have to stick.{% endblock %}">
     
-    <!-- Favicon -->
-    <link rel="icon" href="{{ url_for('static', filename='img/lemma_logo.svg') }}" type="image/svg+xml">
+    <!-- Favicon — jewel violet mark; cache-bust so old blurple tab icons drop -->
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}?v=20260803" sizes="any">
+    <link rel="icon" href="{{ url_for('static', filename='img/lemma_logo.svg') }}?v=20260803" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}?v=20260803">
 
     <!-- Fonts, IBM Plex (not Inter) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">

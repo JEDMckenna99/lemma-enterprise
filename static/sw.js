@@ -5,7 +5,9 @@ const CACHE_NAME = 'lemma-v19';  // v19 - local noble vendor bundles; bypass /np
 const STATIC_ASSETS = [
   '/static/css/lemma.css',
   '/static/js/lemma-bot-shield-simple.js',
-  '/static/img/lemma_logo.svg'
+  '/static/img/lemma_logo.svg',
+  '/static/favicon.ico',
+  '/static/img/apple-touch-icon.png'
 ];
 
 // JS files that change frequently, use network-first, cache as fallback
