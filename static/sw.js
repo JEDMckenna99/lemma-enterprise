@@ -6,6 +6,7 @@ const STATIC_ASSETS = [
   '/static/css/lemma.css',
   '/static/js/lemma-bot-shield-simple.js',
   '/static/img/lemma_logo.svg',
+  '/static/img/favicon.svg',
   '/static/favicon.ico',
   '/static/img/apple-touch-icon.png'
 ];
