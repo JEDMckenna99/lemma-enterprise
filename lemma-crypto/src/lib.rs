@@ -1,39 +1,24 @@
-//! Lemma Crypto Library - Clean Working Implementation
-//! 
-//! Provides real cryptographic verification with Ed25519 signatures,
-//! OPRF privacy-preserving revocation, and ZKP claims.
+//! Lemma Crypto Library
+//!
+//! Ed25519 credential issuance and verification with cascaded-Bloom
+//! revocation checks. OPRF is used internally by the optimized verifier's
+//! revocation path; it is not a standalone product feature.
 
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-// WORKING CORE MODULES
+// CORE MODULES
 pub mod minimal_core;
 pub mod complete_verification;
-pub mod zkp_claims;
-pub mod device_delegation;
-pub mod qr_authentication;
-pub mod advanced_wallet;
-pub mod optimized_wallet;
-pub mod envelope_encryption;
-pub mod hpke_rewrapping;
-
-// PERFORMANCE OPTIMIZATIONS
 pub mod optimized_verification;
-pub mod ultra_optimized_verification;
-pub mod encrypted_browser_wallet;
 
-// WORKING CRYPTO PRIMITIVES
+// CRYPTO PRIMITIVES
 pub mod constants;
 pub mod oprf;
 pub mod oprf_key_manager;
 pub mod bloom;
-pub mod bloom_envelope;
-pub mod network_partition;
-pub mod credential_lifecycle;
 pub mod utils;
-
-// WORKING INTEGRATIONS
 
 // Minimal Python bindings (only if Python feature enabled)
 #[cfg(feature = "python")]
@@ -42,25 +27,13 @@ pub mod minimal_python;
 #[cfg(feature = "wasm")]
 pub mod wasm_oprf_minimal;
 
-// Re-export WORKING types
+// Re-export core types
 pub use crate::minimal_core::{MinimalIssuer, MinimalCore, MinimalCredential, MinimalVerificationResult, MinimalError};
 pub use crate::complete_verification::{CompleteVerifier, CompleteVerificationResult};
-pub use crate::zkp_claims::{ZKPCredential, ZKPClaimType, ZKPClaimProof, ZKPVerifier};
-pub use crate::device_delegation::{DeviceDelegationManager, DeviceDelegationLemma, EncryptedSyncPackage, DeviceSyncStats};
-pub use crate::qr_authentication::{QRAuthenticationLemma, QRSyncManager, QRVerificationResult, LemmaSyncStats};
-pub use crate::advanced_wallet::{AdvancedWalletCrypto, KYCTuple, WalletEnvelope, EnvelopeEncryption};
-pub use crate::optimized_wallet::{OptimizedWalletCrypto};
-pub use crate::hpke_rewrapping::{HPKERewrapper, DevicePublicKey, RewrappedEnvelope};
-pub use crate::envelope_encryption::{WalletEnvelopeV2, EnvelopeEncryptionV2};
 pub use crate::optimized_verification::{OptimizedVerifier, OptimizedVerificationResult, OptimizationStats};
-pub use crate::ultra_optimized_verification::{UltraOptimizedVerifier, UltraVerificationResult, UltraOptimizationStats};
-pub use crate::encrypted_browser_wallet::{EncryptedBrowserWallet, EncryptedCredentialEntry, EncryptionConfig, WalletStats, CredentialMetadata};
 pub use crate::oprf::{OPRFClient, OPRFServer, OPRFResult};
 pub use crate::oprf_key_manager::{OPRFKeyManager, OPRFKeyVersion, KeyStatus, KeyType, RotationPlan};
 pub use crate::bloom::{CascadedBloomFilter};
-pub use crate::bloom_envelope::{BloomFilterEnvelope, BloomFilterParams};
-pub use crate::network_partition::{NetworkPartitionHandler, GraceConfig, RiskLevel, FilterFreshness, VerificationDecision, SyncStrategy};
-pub use crate::credential_lifecycle::{CredentialLifecycleManager, CredentialState, RenewalPolicy};
 pub use crate::utils::{bytes_to_hex, hex_to_bytes, current_timestamp};
 pub use crate::constants::*;
 
@@ -77,8 +50,6 @@ pub enum LemmaError {
     Serialization(String),
     #[error("Crypto error: {0}")]
     Crypto(String),
-    #[error("ZKP error: {0}")]
-    ZKP(String),
 }
 
 // Error conversions
@@ -124,7 +95,7 @@ pub fn library_info() -> HashMap<String, String> {
     let mut info = HashMap::new();
     info.insert("name".to_string(), NAME.to_string());
     info.insert("version".to_string(), VERSION.to_string());
-    info.insert("features".to_string(), "ed25519,oprf,bloom,zkp".to_string());
+    info.insert("features".to_string(), "ed25519,bloom".to_string());
     info.insert("status".to_string(), "working".to_string());
     info
-} 
+}

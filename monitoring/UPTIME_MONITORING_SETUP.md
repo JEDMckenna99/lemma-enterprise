@@ -69,11 +69,18 @@ Know immediately when your site goes down:
 
 ## Health Check Endpoint
 
-You need to create a `/health` endpoint for monitoring:
+These endpoints already exist in `app.py`:
+
+- `GET /health` — process liveness probe, no dependency checks (`api/operational_readiness.liveness_payload`)
+- `GET /ready` — dependency-aware readiness probe (`api/operational_readiness.readiness_report`)
+- `GET /api/health` — detailed system health (`api/health_check.get_health_status`; 503 critical, 206 degraded)
+
+Point uptime monitors at `/health` for liveness and `/ready` for dependency checks.
+
+<details>
+<summary>Historical example (superseded by the real endpoints above)</summary>
 
 ```python
-# In app.py, add this endpoint:
-
 @app.route('/health')
 def health_check():
     """
@@ -82,8 +89,8 @@ def health_check():
     """
     try:
         # Check database connection
-        from api.database_models import db
-        db.engine.execute('SELECT 1')
+        from api.database import SessionLocal
+        SessionLocal().execute('SELECT 1')
         
         # Check Redis connection
         import redis
@@ -118,8 +125,8 @@ def readiness_check():
     
     try:
         # Check database
-        from api.database_models import db
-        db.engine.execute('SELECT 1')
+        from api.database import SessionLocal
+        SessionLocal().execute('SELECT 1')
         checks['database'] = True
     except:
         pass
@@ -150,6 +157,8 @@ def readiness_check():
         'timestamp': datetime.now().isoformat()
     }), status_code
 ```
+
+</details>
 
 ---
 

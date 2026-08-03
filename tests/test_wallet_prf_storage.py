@@ -10,7 +10,6 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 CRYPTO_JS = ROOT / "static" / "js" / "wallet-at-rest-crypto.js"
 WALLET_JS = ROOT / "static" / "js" / "lemma-wallet.js"
-PASSKEY_JS = ROOT / "static" / "js" / "lemma-passkey.js"
 PASSKEY_API = ROOT / "api" / "passkey_auth.py"
 
 
@@ -76,13 +75,6 @@ def test_passkey_api_requests_prf_extensions():
     assert "_merge_prf_extensions" in source
     assert "prf_requested" in source
     assert "_credential_reports_prf" in source
-
-
-@pytest.mark.unit
-def test_lemma_passkey_forwards_prf_extensions():
-    source = PASSKEY_JS.read_text(encoding="utf-8")
-    assert "_preparePrfExtensions" in source
-    assert "clientExtensionResults" in source
 
 
 @pytest.mark.unit

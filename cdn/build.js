@@ -28,12 +28,6 @@ const BUILD_CONFIG = {
       minified: true,
       gzip: true,
       brotli: true
-    },
-    'lemma-verifier': {
-      input: 'static/js/lemma-verifier.js',
-      minified: true,
-      gzip: true,
-      brotli: true
     }
   },
   css: {

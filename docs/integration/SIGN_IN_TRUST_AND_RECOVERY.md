@@ -1,0 +1,147 @@
+# Sign in with lemma.id: trust, recovery, and failure modes
+
+This page answers the three questions developers ask before putting an
+auth dependency on their critical path: **What happens if a user loses their
+device? What happens if lemma.id goes down? And is this a crypto/blockchain
+thing?** Short answers first, detail below.
+
+- **Recovery:** passkeys sync across a user's devices (iCloud/Google), users
+  can add a second device at [lemma.id/link](https://lemma.id/link), and your
+  site always owns the account row keyed by `ppid` so you can add your own
+  recovery. Guaranteed account recovery for a **single-device, passkey-only**
+  lemma.id is not promised — see the honest matrix below.
+- **Availability:** the verifier runs **on your backend, offline** — there is no
+  per-request call to lemma.id, so verification and your own sessions do not
+  depend on lemma being up. A lemma.id outage blocks **new** sign-ins (the popup
+  mints the presentation), not your active sessions.
+- **No blockchain:** there is no token, no coin, and no chain. See
+  ["What this is not"](#what-this-is-not).
+
+---
+
+## Where lemma.id sits in your login path (and where it doesn't)
+
+```
+Browser                         Your backend                    lemma.id
+-------                         ------------                    --------
+<lemma-signin> popup  --------> POST /api/login
+  (mints signed                   verify(presentation)  ← runs LOCALLY, offline
+   presentation) ← talks           find/create user by ppid
+   to lemma to derive             set your OWN session cookie
+   the site proof
+```
+
+Two independent facts follow from this shape:
+
+1. **You verify locally.** `@lemma.id/proof-verifier` (Node) and
+   `lemma_proof_verifier.py` (Python) verify the signed presentation on your
+   server with **no network call to lemma.id per login**. They validate the
+   Ed25519 signature against a cached, signed **issuer trust list** that
+   refreshes on a slow interval (default ~15 minutes), not per request.
+2. **You own the session.** After verification you issue your **own** HttpOnly
+   cookie. lemma.id is not in your session-validation path, cannot see your
+   logged-in users, and cannot revoke your sessions.
+
+The one thing that does require lemma.id online is **minting a fresh
+presentation** in the popup (`derive-site-proof`). That matters only at the
+moment a user signs in, and its failure mode is spelled out below.
+
+---
+
+## Availability and failure modes (honest table)
+
+| Scenario | Active sessions (already logged in) | New sign-in / re-auth | Your data |
+|----------|-------------------------------------|-----------------------|-----------|
+| lemma.id API/popup **down** | ✅ Unaffected — validated by your own cookie | ❌ Blocked while down (popup can't mint a presentation) | ✅ Your `ppid`→account rows are in **your** DB |
+| lemma.id **verifier/SDK CDN down** | ✅ Unaffected | ✅ Pin/self-host the verifier (npm/PyPI/vendored) and it keeps working | ✅ Unaffected |
+| Issuer key rotation | ✅ Unaffected | ✅ Trust list carries `previous_keys`; verifiers refresh automatically, no site action | ✅ Unaffected |
+| lemma.id **shuts down permanently** | ✅ Sessions persist until expiry | ⚠️ New logins stop; migrate via a dual-run window to another method | ✅ You keep every `ppid` and all site-scoped state |
+
+Practical hardening you control:
+
+- **Pin and vendor the verifier.** It's Apache-2.0. Install
+  `@lemma.id/proof-verifier` from npm (or copy `lemma_proof_verifier.py`) and
+  commit it, rather than hot-loading from the CDN, so a CDN blip can't affect
+  logins.
+- **Keep your own account table.** Match returning users on `ppid` from your
+  database; never depend on lemma.id to "look up" a user.
+- **Have a migration story.** Because you hold the `ppid`→account mapping and
+  issue your own sessions, you can add or swap to any other auth method during a
+  dual-run window without lemma's involvement. See the account-linking recipe in
+  [SIMPLE_INTEGRATION_GUIDE.md](SIMPLE_INTEGRATION_GUIDE.md).
+
+---
+
+## Recovery: the honest matrix
+
+lemma.id does **not** collect email, phone, or any recovery contact for the
+passkey tier — which is a privacy feature and a recovery constraint. Be honest
+with your users about which row they're in.
+
+| Situation | Recovery path | Guarantee |
+|-----------|---------------|-----------|
+| Passkey **synced** (iCloud Keychain / Google Password Manager / synced manager) | New device inherits the passkey automatically | Strong — this is the common case |
+| **Second device added** via [lemma.id/link](https://lemma.id/link) | Sign in / re-link from the other device | Strong — recommended for everyone |
+| **Single device, non-synced** passkey, device lost | Site-side recovery (below) or start over | **Not guaranteed** — state this to users |
+| Needs guaranteed, identity-backed recovery | Step up to **isHuman** (IDV-backed, same `ppid`) | Strong — paid tier |
+
+### What the SDK/flow already does
+
+- **Second-device nudge on first sign-in.** After a lemma.id is created, the popup
+  shows a one-tap "add a second device" screen linking to `/link`. Encourage
+  users to take it; a two-device user is a recoverable user.
+- **Passkey sync is the happy path.** Most users on Apple/Google ecosystems get
+  cross-device continuity for free.
+
+### What you (the site) can add
+
+Because the account row is yours, you can offer recovery **without**
+reintroducing PII to lemma:
+
+- **Require a second device** before treating an account as durable for
+  high-value use.
+- **Site-side recovery** on your own terms — e.g. a support-verified re-link, a
+  user-held recovery code you issue, or linking a second login method — all keyed
+  to the `ppid` you already store.
+- **Offer isHuman** for users who want identity-backed recovery; it's the same
+  `ppid`, so nothing about their account changes.
+
+> Rule of thumb: treat a **single-device, non-synced passkey** the way you'd
+> treat a user who set a password and refused to give a recovery email — usable,
+> but tell them plainly to add a second device.
+
+---
+
+## What this is not
+
+Sign in with lemma.id is deliberately boring infrastructure. To clear the most
+common misreads:
+
+- **No blockchain, no token, no coin, no ICO.** Nothing is written to a chain.
+- **No cryptocurrency and nothing to buy for basic login.** Passkey login is
+  free: no site registration and no API key.
+- **No biometric database.** The passkey tier uses standard WebAuthn passkeys;
+  the biometric (if any) never leaves the user's device and lemma.id never
+  receives it. (isHuman IDV is a separate, opt-in, paid step-up.)
+- **No profile data from lemma.** Sign-in returns `ppid` + `assurance` only —
+  no email, name, or avatar. You own the profile; lemma owns the proof.
+- **No cross-site tracking.** PPIDs are **pairwise**: the id a user gets on your
+  site is derived from your hostname and is unlinkable to the id they get
+  anywhere else. lemma.id cannot correlate a user across sites, by design.
+- **No device attestation gate on your users.** Your site only ever sees a
+  signed presentation and a `ppid`; you never allow/deny users by which passkey
+  provider or authenticator they chose.
+
+---
+
+## Verify these claims yourself
+
+- **Verifier source (Apache-2.0):**
+  [`packages/proof-verifier-js`](https://github.com/JEDMckenna99/lemma-enterprise/tree/main/packages/proof-verifier-js)
+  and
+  [`packages/proof-verifier-py`](https://github.com/JEDMckenna99/lemma-enterprise/tree/main/packages/proof-verifier-py).
+- **Offline test helpers** (mint and verify presentations with no lemma.id and
+  no WebAuthn): see "Testing your integration" in
+  [QUICK_START_SIMPLE_LOGIN.md](QUICK_START_SIMPLE_LOGIN.md).
+- **Error and outcome reference:** [ERROR_CODES.md](../ERROR_CODES.md),
+  [BROWSER_SUPPORT.md](BROWSER_SUPPORT.md).

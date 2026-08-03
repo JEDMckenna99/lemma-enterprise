@@ -222,9 +222,9 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
   - Binds PRF output on `registerPasskey`, `unlock`, and `_requireFreshPasskeyAuth`
   - Lazy migration from plaintext sensitive stores (`secrets`, `profiles`, `session`, `lemmas`)
   - `wallet_meta` tracks `prfEnabled` / `migrationComplete`
-- [api/passkey_auth.py](api/passkey_auth.py) + [static/js/lemma-passkey.js](static/js/lemma-passkey.js):
+- [api/passkey_auth.py](api/passkey_auth.py):
   - Server passkey begin endpoints merge PRF `extensions`
-  - Client forwards PRF salts and `clientExtensionResults`
+  - Client (`lemma-wallet.js`) forwards PRF salts and `clientExtensionResults`
 
 ### 5.2 Acceptance criteria
 

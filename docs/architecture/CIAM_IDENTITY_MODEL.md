@@ -1,7 +1,7 @@
 # CIAM Identity Model (Proof-Native)
 
 lemma.id is building toward full CIAM while keeping **Sign in with lemma.id** as the
-primary contract: wallet + passkey proofs, **site-private PPIDs**, local presentation
+primary contract: lemma.id + passkey proofs, **site-private PPIDs**, local presentation
 verification, and **site-owned sessions**.
 
 This document freezes the Phase 1 identity vocabulary. OIDC/OAuth are deferred;
@@ -56,7 +56,6 @@ If added later, OIDC should:
 
 ## Code entry points
 
-- Identity helpers: [`api/ciam_identity.py`](../../api/ciam_identity.py)
 - Site directory API: [`api/site_management_api.py`](../../api/site_management_api.py)
 - Presentation model: [`docs/product/LEMMA_ID_PRESENTATION_MODEL.md`](../product/LEMMA_ID_PRESENTATION_MODEL.md)
 - Integration guide: [`docs/integration/ISHUMAN_AGENT_INTEGRATION.md`](../integration/ISHUMAN_AGENT_INTEGRATION.md)
