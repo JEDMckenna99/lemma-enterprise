@@ -11,7 +11,7 @@
 {% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=12">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=13">
 <link rel="stylesheet" href="/static/css/demo/signin-flow.css?v=4">
 <style nonce="{{ csp_nonce }}">
 /* Manager logos stay jewel violet; never green when unlocked */
@@ -121,7 +121,8 @@
 
             <p class="card-intro" style="margin-top: 0;">
                 Generate a QR or transfer link on <strong>this</strong> device. Open it on the empty browser,
-                match the confirmation code on both screens, then passkey to send.
+                check that both screens show the same confirmation code, then tap
+                <strong>Codes match. Send with passkey</strong> on <strong>this</strong> screen.
             </p>
             <button id="show-qr-btn" type="button" class="btn btn-secondary btn-full">Generate QR Code</button>
             <button id="show-link-btn" type="button" class="btn btn-secondary btn-full" style="margin-top: 10px;">
@@ -135,13 +136,16 @@
                 <div id="push-confirm-banner" class="push-confirm-banner hidden">
                     <div class="push-confirm-label">Confirmation code</div>
                     <div id="push-confirm-code-display" class="push-confirm-code"></div>
-                    <p class="push-confirm-help">The other device must show this same code before you send.</p>
+                    <p class="push-confirm-help">
+                        Confirm on <strong>this</strong> device. When the other screen shows the same code,
+                        tap the button below to send with your passkey.
+                    </p>
                 </div>
                 <div id="qr-timer" class="qr-timer">Expires in 5:00</div>
                 <div id="link-options" class="hidden"></div>
-                <div id="push-wait-status" class="card-help" style="margin-top: 12px;"></div>
-                <button id="confirm-push-btn" type="button" class="btn btn-primary btn-full hidden" style="margin-top: 12px;">
-                    Codes match. Send with passkey
+                <div id="push-wait-status" class="card-help" style="margin-top: 12px;" role="status" aria-live="polite"></div>
+                <button id="confirm-push-btn" type="button" class="btn btn-primary btn-full" style="margin-top: 12px;" disabled>
+                    Waiting for other device…
                 </button>
                 <button id="hide-qr-btn" type="button" class="btn btn-secondary" style="margin-top: 12px;">Cancel</button>
             </div>
@@ -1440,16 +1444,42 @@ function renderTransferLink(result, { showQr }) {
     });
 }
 
+function setPushConfirmReady(ready, { code } = {}) {
+    const confirmBtn = document.getElementById('confirm-push-btn');
+    if (!confirmBtn) return;
+    confirmBtn.classList.remove('hidden');
+    if (ready) {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Codes match. Send with passkey';
+        if (code) {
+            confirmBtn.setAttribute(
+                'aria-label',
+                'Codes match on both screens. Send lemma.id with passkey. Confirmation code ' + code,
+            );
+        }
+    } else {
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Waiting for other device…';
+        confirmBtn.removeAttribute('aria-label');
+    }
+}
+
 function showTransferDisplay(result, { showQr }) {
     document.getElementById('qr-display').classList.remove('hidden');
     document.getElementById('show-qr-btn').classList.add('hidden');
     document.getElementById('show-link-btn').classList.add('hidden');
-    document.getElementById('confirm-push-btn').classList.add('hidden');
+    setPushConfirmReady(false);
     showPushConfirmCode(result.confirmCode);
     renderTransferLink(result, { showQr });
     startTransferTimer(result);
     const waitEl = document.getElementById('push-wait-status');
-    waitEl.textContent = 'Waiting for the other device to open the link or scan the QR...';
+    waitEl.textContent =
+        'Keep this page open. When the other device shows code ' +
+        (result.confirmCode || '------') +
+        ', tap Codes match below on this device.';
+    waitEl.style.color = '';
+    // Keep the confirm control in view — link UI can push it below the fold.
+    document.getElementById('confirm-push-btn')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     pollPushRegistration(result);
 }
 
@@ -1457,35 +1487,63 @@ async function pollPushRegistration(result) {
     pushPollAbort = false;
     activePushOffer = result;
     const waitEl = document.getElementById('push-wait-status');
-    const confirmBtn = document.getElementById('confirm-push-btn');
-    try {
-        while (!pushPollAbort) {
+    let consecutiveErrors = 0;
+    while (!pushPollAbort) {
+        try {
             const status = await wallet.getLinkPushStatus(result.transferId);
+            consecutiveErrors = 0;
             if (status.ready) {
                 const code = status.confirmCode || result.confirmCode;
                 showPushConfirmCode(code);
                 waitEl.innerHTML =
-                    'Other device joined. If it shows <strong>' +
+                    'Other device joined and shows code <strong>' +
                     escapeHtml(code) +
-                    '</strong>, tap below to send with your passkey. If not, cancel and start over.';
-                confirmBtn.classList.remove('hidden');
+                    '</strong>. If it matches, tap <strong>Codes match. Send with passkey</strong> below. If not, cancel and start over.';
+                waitEl.style.color = '#065f46';
+                setPushConfirmReady(true, { code });
                 activePushOffer = {
                     ...result,
                     recvPubkey: status.recvPubkey,
                     confirmCode: code,
                 };
+                document.getElementById('confirm-push-btn')?.scrollIntoView({
+                    block: 'nearest',
+                    behavior: 'smooth',
+                });
                 return;
             }
             if (status.status === 'missing') {
                 waitEl.textContent = 'Transfer expired. Generate a new QR or link.';
+                waitEl.style.color = '';
+                setPushConfirmReady(false);
+                const confirmBtn = document.getElementById('confirm-push-btn');
+                if (confirmBtn) {
+                    confirmBtn.disabled = true;
+                    confirmBtn.textContent = 'Transfer expired';
+                }
                 return;
             }
-            await new Promise((r) => setTimeout(r, 2000));
+            if (status.hasBundle) {
+                waitEl.textContent = 'Already sent. Finish setup on the other device.';
+                waitEl.style.color = '#065f46';
+                setPushConfirmReady(false);
+                const confirmBtn = document.getElementById('confirm-push-btn');
+                if (confirmBtn) {
+                    confirmBtn.disabled = true;
+                    confirmBtn.textContent = 'Already sent';
+                }
+                return;
+            }
+        } catch (e) {
+            consecutiveErrors += 1;
+            if (!pushPollAbort && consecutiveErrors >= 3) {
+                waitEl.textContent =
+                    (e.message || 'Transfer status failed') +
+                    ' — retrying. Keep this page open.';
+            }
+            // Keep polling; a single blip must not hide the confirm step.
         }
-    } catch (e) {
-        if (!pushPollAbort) {
-            waitEl.textContent = e.message || 'Transfer status failed';
-        }
+        await new Promise((r) => setTimeout(r, 2000));
     }
 }
 
@@ -1536,8 +1594,8 @@ async function showTransferLink() {
 async function confirmPushSend() {
     const btn = document.getElementById('confirm-push-btn');
     const waitEl = document.getElementById('push-wait-status');
-    if (!activePushOffer?.transferId || !activePushOffer?.recvPubkey) {
-        alert('Other device has not joined yet');
+    if (!activePushOffer?.transferId || !activePushOffer?.recvPubkey || btn?.disabled) {
+        alert('Wait until the other device opens the link and shows the same confirmation code.');
         return;
     }
     const orig = btn.textContent;
@@ -1550,13 +1608,13 @@ async function confirmPushSend() {
         });
         waitEl.textContent = 'Sent. Finish setup on the other device.';
         waitEl.style.color = '#065f46';
-        btn.classList.add('hidden');
+        btn.disabled = true;
+        btn.textContent = 'Sent';
         pushPollAbort = true;
     } catch (e) {
         console.error('Push send failed:', e);
         waitEl.textContent = e.message || 'Send failed';
         alert('Failed to send: ' + (e.message || e));
-    } finally {
         btn.disabled = false;
         btn.textContent = orig;
     }
@@ -1568,7 +1626,12 @@ function hideQR() {
     document.getElementById('qr-display').classList.add('hidden');
     document.getElementById('show-qr-btn').classList.remove('hidden');
     document.getElementById('show-link-btn').classList.remove('hidden');
-    document.getElementById('confirm-push-btn').classList.add('hidden');
+    const confirmBtn = document.getElementById('confirm-push-btn');
+    if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Waiting for other device…';
+        confirmBtn.removeAttribute('aria-label');
+    }
     document.getElementById('push-confirm-banner')?.classList.add('hidden');
     const codeEl = document.getElementById('push-confirm-code-display');
     if (codeEl) codeEl.textContent = '';

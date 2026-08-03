@@ -1,43 +1,49 @@
-{% extends "modern/layout.html" %}
+﻿{% extends "modern/layout.html" %}
 
-{% block title %}Send lemma.id - Lemma ID{% endblock %}
+{% block title %}Send lemma.id{% endblock %}
 {% block description %}Send your lemma.id to another device after scanning its QR code.{% endblock %}
 
 {% block head %}
 <meta name="referrer" content="no-referrer">
-<style nonce="{{ csp_nonce }}">
-.send-container { max-width: 440px; margin: 0 auto; padding: 40px 24px; text-align: center; }
-.send-header h1 { font-size: 1.6rem; font-weight: 600; color: #111827; margin: 0 0 8px; }
-.send-header p { color: #6b7280; margin: 0; }
-.status-box {
-    padding: 16px; border-radius: 12px; margin-top: 24px; font-size: 0.95rem;
-}
-.status-box.info { background: #e0f2fe; border: 1px solid #0ea5e9; color: #0c4a6e; }
-.status-box.success { background: #d1fae5; border: 1px solid #10b981; color: #065f46; }
-.status-box.error { background: #fee2e2; border: 1px solid #ef4444; color: #991b1b; }
-.btn {
-    display: inline-block; margin-top: 16px; padding: 12px 20px; border-radius: 10px;
-    font-weight: 600; text-decoration: none; background: #667eea; color: #fff;
-}
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=13">
 {% endblock %}
 
 {% block content %}
-<div class="send-container">
-    <header class="send-header">
-        <h1>Send lemma.id</h1>
-        <p>Confirm with your passkey to transfer to your other device</p>
+<div class="wallet-container">
+    <header class="wallet-header">
+        <div class="wallet-logo" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 120 120" focusable="false">
+                <g stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <ellipse cx="60" cy="60" rx="38" ry="14"/>
+                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(90 60 60)"/>
+                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(45 60 60)"/>
+                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(-45 60 60)"/>
+                </g>
+            </svg>
+        </div>
+        <h1 class="wallet-brand-name">lemma.id</h1>
+        <p class="wallet-tagline">Send to another device</p>
     </header>
-    <div id="status" class="status-box info">Preparing transfer...</div>
+
+    <div class="card card-elevated" style="text-align: center;">
+        <div id="status" class="status-box info" role="status" aria-live="polite" style="margin-bottom: 0;">
+            Preparing transfer...
+        </div>
+        <div id="send-actions" class="link-complete-actions hidden">
+            <a class="btn btn-primary btn-full" href="/app">Back to lemma.id</a>
+        </div>
+    </div>
 </div>
 
 <script nonce="{{ csp_nonce }}">
 async function runSendFlow() {
     const statusEl = document.getElementById('status');
+    const actionsEl = document.getElementById('send-actions');
 
     function show(msg, kind) {
         statusEl.textContent = msg;
         statusEl.className = 'status-box ' + (kind || 'info');
+        statusEl.style.marginBottom = '0';
     }
 
     try {
@@ -53,7 +59,7 @@ async function runSendFlow() {
 
         const info = await wallet.getWalletInfo();
         if (!info.hasWalletSecret || !info.hasPasskey) {
-            show('This device does not have a lemma.id yet. Scan the QR on the device you want to add, not the one that already has your wallet.', 'error');
+            show('This device does not have a lemma.id yet. Scan the QR on the device you want to add, not the one that already has your lemma.id.', 'error');
             return;
         }
 
@@ -68,8 +74,7 @@ async function runSendFlow() {
         await wallet.sendLinkDepositFromScan(scanInput);
 
         show('Sent! Your other device should finish setup automatically.', 'success');
-        statusEl.innerHTML = 'Sent! Your other device should finish setup automatically.<br><br>' +
-            '<a class="btn" href="/app">Back to lemma.id</a>';
+        actionsEl?.classList.remove('hidden');
     } catch (e) {
         console.error('Send link failed:', e);
         const msg = e && e.message ? e.message : 'Send failed';

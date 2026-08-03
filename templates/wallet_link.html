@@ -1,112 +1,55 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Add Device - Lemma ID{% endblock %}
-{% block description %}Add this device to your existing Lemma ID.{% endblock %}
+{% block title %}Add Device - lemma.id{% endblock %}
+{% block description %}Add this device to your existing lemma.id.{% endblock %}
 
 {% block head %}
 <meta name="referrer" content="no-referrer">
-<style nonce="{{ csp_nonce }}">
-.link-container { max-width: 500px; margin: 0 auto; padding: 40px 24px; }
-.link-header { text-align: center; margin-bottom: 32px; }
-.link-header h1 { font-size: 1.8rem; font-weight: 600; color: #111827; margin: 0 0 8px; }
-.link-header p { color: #6b7280; font-size: 1rem; }
-
-.card {
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 16px;
-    padding: 24px;
-    margin-bottom: 24px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-}
-
-.status-box {
-    padding: 16px;
-    border-radius: 12px;
-    margin-bottom: 16px;
-    text-align: center;
-}
-.status-box.info { background: #e0f2fe; border: 1px solid #0ea5e9; color: #0c4a6e; }
-.status-box.success { background: #d1fae5; border: 1px solid #10b981; color: #065f46; }
-.status-box.error { background: #e0f2fe; border: 1px solid #ef4444; color: #991b1b; }
-.status-box.warning { background: #fef3cd; border: 1px solid #f59e0b; color: #92400e; }
-
-.btn {
-    display: block;
-    width: 100%;
-    padding: 14px 24px;
-    border-radius: 10px;
-    font-weight: 600;
-    cursor: pointer;
-    border: none;
-    font-size: 1rem;
-    transition: all 0.2s;
-    margin-bottom: 12px;
-}
-.btn:hover { transform: translateY(-1px); }
-.btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-.btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
-.btn-secondary { background: #6b7280; color: white; }
-
-.hidden { display: none !important; }
-
-.security-note {
-    background: #fef3cd;
-    border: 1px solid #f59e0b;
-    border-radius: 8px;
-    padding: 12px;
-    font-size: 0.85rem;
-    color: #92400e;
-    margin-top: 16px;
-}
-.security-note strong { display: block; margin-bottom: 4px; }
-
-.mode-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
-.mode-tab {
-    flex: 1; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 10px;
-    background: #f9fafb; font-weight: 600; cursor: pointer; font-size: 0.9rem;
-}
-.mode-tab.active { background: #667eea; color: #fff; border-color: #667eea; }
-
-.qr-box {
-    display: flex; justify-content: center; margin: 16px 0;
-    padding: 16px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
-}
-.qr-timer { text-align: center; color: #6b7280; font-size: 0.9rem; margin-top: 8px; }
-.qr-timer.expiring { color: #dc2626; font-weight: 600; }
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=13">
 {% endblock %}
 
 {% block content %}
-<div class="link-container">
-    <header class="link-header">
-        <h1>Add Device</h1>
-        <p>Receive lemma.id on this empty device</p>
+<div class="wallet-container">
+    <header class="wallet-header">
+        <div class="wallet-logo" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 120 120" focusable="false">
+                <g stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <ellipse cx="60" cy="60" rx="38" ry="14"/>
+                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(90 60 60)"/>
+                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(45 60 60)"/>
+                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(-45 60 60)"/>
+                </g>
+            </svg>
+        </div>
+        <h1 class="wallet-brand-name">lemma.id</h1>
+        <p class="wallet-tagline">Add this device</p>
+        <p class="wallet-about-link"><a href="/app">Back to manager</a></p>
     </header>
 
     <div id="status" class="status-box info hidden"></div>
 
     <!-- PUSH: opened transfer link / scanned manager QR -->
     <div id="push-content" class="hidden">
-        <div class="card">
-            <h2 style="margin: 0 0 12px; font-size: 1.1rem;">Receive from transfer link</h2>
-            <p style="color: #6b7280; margin: 0 0 16px; font-size: 0.95rem;">
+        <div class="card card-elevated">
+            <h2>Receive from transfer link</h2>
+            <p class="card-intro">
                 You opened a transfer from a device that already has lemma.id.
-                Match the confirmation code on both screens before they send.
+                Check that this confirmation code matches the other device — then confirm
+                on <strong>that</strong> device with <strong>Codes match. Send with passkey</strong>.
+                There is nothing to tap here until it sends.
             </p>
-            <div id="push-confirm-display" class="status-box info hidden" style="font-size: 1.4rem; font-weight: 700; letter-spacing: 0.12em;"></div>
-            <div id="push-wait-status" class="status-box info" style="margin-top: 16px;">
+            <div id="push-confirm-display" class="confirm-code-display hidden"></div>
+            <div id="push-wait-status" class="status-box info" role="status" aria-live="polite">
                 Joining transfer...
             </div>
-            <div id="push-complete-actions" class="hidden" style="margin-top: 16px;">
-                <button type="button" class="btn btn-primary" onclick="window.location.href='/app'">
-                    Go to lemma.id
-                </button>
+            <div id="push-complete-actions" class="link-complete-actions hidden">
+                <a class="btn btn-primary btn-full" href="/app">Go to lemma.id</a>
             </div>
         </div>
         <div class="security-note">
-            <strong>Confirm before they send</strong>
-            If the code on this screen does not match the other device, close this page and start again.
+            <strong>Confirm on the other device</strong>
+            If this code does not match the lemma.id device, close this page and start again.
+            When it matches, tap <strong>Codes match. Send with passkey</strong> on that device.
         </div>
     </div>
 
@@ -117,53 +60,49 @@
 
     <!-- PULL: receiver shows QR, phone camera sends -->
     <div id="pull-content">
-        <div class="card">
-            <h2 style="margin: 0 0 12px; font-size: 1.1rem;">Recommended: receive on this device</h2>
-            <p style="color: #6b7280; margin: 0 0 16px; font-size: 0.95rem;">
+        <div class="card card-elevated">
+            <h2>Receive on this device</h2>
+            <p class="card-intro">
                 Show this QR on your computer or tablet. On the phone that already has lemma.id,
                 open the Camera app and scan it. That phone will ask for a passkey before sending.
                 After it arrives here, this device creates its own passkey.
             </p>
-            <button type="button" class="btn btn-primary" id="show-receive-qr-btn">Show QR Code</button>
+            <button type="button" class="btn btn-primary btn-full" id="show-receive-qr-btn">Show QR Code</button>
             <div id="receive-qr-display" class="hidden">
                 <div class="qr-box"><div id="receive-qr-container"></div></div>
                 <div id="receive-qr-timer" class="qr-timer">Expires in 5:00</div>
-                <div id="receive-wait-status" class="status-box info" style="margin-top: 16px;">
+                <div id="receive-wait-status" class="status-box info" style="margin-top: 16px;" role="status" aria-live="polite">
                     Waiting for your phone to send lemma.id...
                 </div>
-                <div id="pull-complete-actions" class="hidden" style="margin-top: 16px;">
-                    <button type="button" class="btn btn-primary" onclick="window.location.href='/app'">
-                        Go to lemma.id
-                    </button>
+                <div id="pull-complete-actions" class="link-complete-actions hidden">
+                    <a class="btn btn-primary btn-full" href="/app">Go to lemma.id</a>
                 </div>
             </div>
         </div>
         <div class="security-note">
             <strong>How it works</strong>
             Your phone opens a confirm page after scanning and prompts for your passkey.
-            Wallet data is encrypted to this device only, lemma.id never sees your secret.
+            Data is encrypted to this device only — lemma.id never sees your secret.
         </div>
     </div>
 
     <!-- SYNC: person-root seed relay (post-IDV wallets) -->
     <div id="sync-content" class="hidden">
         <div class="card">
-            <h2 style="margin: 0 0 12px; font-size: 1.1rem;">Person-root seed transfer</h2>
-            <p style="color: #6b7280; margin: 0 0 16px; font-size: 0.95rem;">
+            <h2>Person-root seed transfer</h2>
+            <p class="card-intro">
                 For verified wallets: show this QR on the new device, then scan it from your
                 existing device to transfer person-root seeds only (no raw wallet secret).
             </p>
-            <button type="button" class="btn btn-primary" id="show-sync-qr-btn">Show transfer QR</button>
+            <button type="button" class="btn btn-primary btn-full" id="show-sync-qr-btn">Show transfer QR</button>
             <div id="sync-qr-display" class="hidden">
                 <div class="qr-box"><div id="sync-qr-container"></div></div>
                 <div id="sync-qr-timer" class="qr-timer">Expires in 1:00</div>
-                <div id="sync-wait-status" class="status-box info" style="margin-top: 16px;">
+                <div id="sync-wait-status" class="status-box info" style="margin-top: 16px;" role="status" aria-live="polite">
                     Waiting for your existing device to deposit seeds...
                 </div>
-                <div id="sync-complete-actions" class="hidden" style="margin-top: 16px;">
-                    <button type="button" class="btn btn-primary" onclick="window.location.href='/app'">
-                        Go to lemma.id
-                    </button>
+                <div id="sync-complete-actions" class="link-complete-actions hidden">
+                    <a class="btn btn-primary btn-full" href="/app">Go to lemma.id</a>
                 </div>
             </div>
         </div>
@@ -235,7 +174,7 @@ async function showReceiveQr() {
                 correctLevel: QRCode.CorrectLevel ? QRCode.CorrectLevel.M : 0,
             });
         } else {
-            container.innerHTML = '<p style="color:#dc2626">QR library not loaded</p>';
+            container.innerHTML = '<p style="color:#b91c1c">QR library not loaded</p>';
         }
 
         document.getElementById('receive-qr-display').classList.remove('hidden');
@@ -283,7 +222,7 @@ async function showSyncQr() {
                 correctLevel: QRCode.CorrectLevel ? QRCode.CorrectLevel.M : 0,
             });
         } else {
-            container.innerHTML = '<p style="color:#dc2626">QR library not loaded</p>';
+            container.innerHTML = '<p style="color:#b91c1c">QR library not loaded</p>';
         }
 
         document.getElementById('sync-qr-display').classList.remove('hidden');
@@ -357,8 +296,8 @@ async function finishLinkSuccess(result, statusEl, mode) {
     const waitEl = statusEl || document.getElementById('receive-wait-status');
     waitEl.innerHTML = '<strong>Device Added!</strong><br><br>' +
         (result.humanProofRestored
-            ? 'Your Lemma ID and human proof are ready on this device.'
-            : 'Your Lemma ID is now on this device.') +
+            ? 'Your lemma.id and human proof are ready on this device.'
+            : 'Your lemma.id is now on this device.') +
         '<br><br><span id="passkey-status">Creating passkey...</span>';
     waitEl.className = 'status-box success';
     try {
@@ -414,7 +353,9 @@ async function startPushFromHash() {
         const joined = await wallet.acceptLinkPushOffer(hash);
         codeEl.textContent = joined.confirmCode || '------';
         codeEl.classList.remove('hidden');
-        waitEl.textContent = 'Waiting for the other device to confirm and send...';
+        waitEl.textContent =
+            'Codes ready. On the other device (the one that already has lemma.id), ' +
+            'tap “Codes match. Send with passkey”. This page waits for that send.';
         waitEl.className = 'status-box info';
         history.replaceState({}, document.title, window.location.pathname + window.location.search);
 
@@ -450,13 +391,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         const statusEl = document.getElementById('status');
         if (info.hasWalletSecret && info.hasPasskey) {
             statusEl.innerHTML =
-                'This device already has a Lemma ID.<br>' +
-                'You can add a different one below, or <a href="/" style="color: #0ea5e9;">go to your Lemma ID</a>.';
+                'This device already has a lemma.id.<br>' +
+                'You can add a different one below, or <a href="/app">go to your lemma.id</a>.';
             statusEl.className = 'status-box warning';
             statusEl.classList.remove('hidden');
         } else if (info.hasWalletSecret && !info.hasPasskey) {
             statusEl.innerHTML =
-                'Incomplete setup detected. Add your Lemma ID below to complete setup.';
+                'Incomplete setup detected. Add your lemma.id below to complete setup.';
             statusEl.className = 'status-box info';
             statusEl.classList.remove('hidden');
         }
