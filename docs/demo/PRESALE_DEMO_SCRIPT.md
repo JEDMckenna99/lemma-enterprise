@@ -8,19 +8,24 @@
 
 ## One-liner
 
-Passkey is who you are; Face ID again to get the code; delivery contact is optional after you claim.
+Passkey sign-in first; verified human proof unlocks the code; delivery contact is optional after you claim.
 
 ## Talk track
+
+### 0. Sign in (passkey)
+
+- Click **Sign in with lemma.id**.
+- Say: passkey proves who you are — no signup form, nothing sent to lemma.id for login.
 
 ### 1. Join presale (Step 1)
 
 - Click **Step 1, Passkey register for drop** (no email or phone first).
-- Say: passkey proves identity — no signup form, nothing sent to lemma.id.
+- Say: passkey register binds your site-private ID for this drop.
 
 ### 2. Unlock code (Step 2)
 
-- Click **Step 2, Fresh passkey unlocks unique code**.
-- Say: fresh passkey at claim time — bots cannot replay a cached session.
+- Click **Step 2, Verified human unlocks unique code**.
+- Say: claim requires verified human proof — one account per person; bots cannot replay a cached passkey session.
 - Optional delivery: after success, email/phone are **where to send the code** — site-local only.
 
 ### 3. Retry same lemma.id
@@ -43,8 +48,8 @@ Passkey is who you are; Face ID again to get the code; delivery contact is optio
 
 | Objection | Response |
 |-----------|----------|
-| "We already use SMS OTP" | OTP proves possession of a phone number, not present control of a lemma.id. Fresh passkey at unlock binds the code to a site-private PPID with replay protection. |
-| "Passkeys add friction" | Step 1 is low-friction passkey register; Step 2 is intentional friction at the high-value moment (code unlock). |
+| "We already use SMS OTP" | OTP proves possession of a phone number, not verified human presence. Human proof at unlock binds the code to a site-private PPID with replay protection. |
+| "Passkeys add friction" | Step 1 is low-friction passkey sign-in and register; Step 2 is intentional human proof at the high-value moment (code unlock). |
 | "What does lemma.id see?" | Action names, bodies, and contact fields stay on your site. lemma.id attests fresh passkey to an opaque action commitment only. |
 | "Can one person get multiple codes?" | No, ledger keys `(drop_id, ppid)`; same lemma.id retry is denied. |
 

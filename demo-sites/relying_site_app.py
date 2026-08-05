@@ -49,12 +49,16 @@ function plainAssurance(tier) {
 DEMO_REQUIRED_ASSURANCE = os.getenv("LEMMA_DEMO_REQUIRED_ASSURANCE", "passkey").strip().lower()
 PRESALE_DROP_ID = os.getenv("LEMMA_PRESALE_DROP_ID", "artist-presale-2026").strip()
 PRESALE_CODE_CLAIM_ASSURANCE = os.getenv(
-    "LEMMA_PRESALE_CODE_CLAIM_ASSURANCE", "passkey"
+    "LEMMA_PRESALE_CODE_CLAIM_ASSURANCE", "ishuman"
 ).strip().lower()
 PRESALE_ESCALATED_ASSURANCE = os.getenv(
     "LEMMA_PRESALE_ESCALATED_ASSURANCE", "ishuman"
 ).strip().lower()
-ISHUMAN_VERIFIER_SDK_VERSION = os.getenv("ISHUMAN_VERIFIER_SDK_VERSION", "1.9.2").strip()
+TRIAL_ACTION = "start_trial"
+TRIAL_REQUIRED_ASSURANCE = os.getenv(
+    "LEMMA_TRIAL_REQUIRED_ASSURANCE", "ishuman"
+).strip().lower()
+ISHUMAN_VERIFIER_SDK_VERSION = os.getenv("ISHUMAN_VERIFIER_SDK_VERSION", "1.9.3").strip()
 SESSION_SECRET = os.getenv("SESSION_SECRET", "lemma-demo-site-session-dev-secret")
 SESSION_COOKIE = "lemma_demo_session"
 SESSION_MAX_AGE = int(os.getenv("LEMMA_DEMO_SESSION_MAX_AGE", "86400"))
@@ -75,6 +79,104 @@ TICKETING_FAVICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 
   </g>
 </svg>"""
 
+TRIALS_ICON_SVG = """<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+  <path d="M7 17.5h10a3 3 0 0 0 .2-6 4.5 4.5 0 0 0-8.7-1.5A3.5 3.5 0 0 0 7 17.5Z" stroke="#16a34a" stroke-width="1.8"/>
+</svg>"""
+
+TRIALS_FAVICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <rect x=".5" y=".5" width="31" height="31" rx="7.5" fill="#f0fdf4" stroke="#bbf7d0"/>
+  <g transform="translate(4 4)">
+    <path d="M7 17.5h10a3 3 0 0 0 .2-6 4.5 4.5 0 0 0-8.7-1.5A3.5 3.5 0 0 0 7 17.5Z" stroke="#16a34a" stroke-width="1.8"/>
+  </g>
+</svg>"""
+
+LEMMA_SIGNIN_CSS = """
+    lemma-signin { display: block; width: 100%; margin-top: 16px; }
+    lemma-signin::part(button) {
+      width: 100%;
+      background: #1A1A24;
+      box-shadow: none;
+    }
+    lemma-signin::part(button):hover:not(:disabled) { background: #32313F; }
+"""
+
+SITE_CTA_CSS = """
+    button.site-cta, .site-cta {
+      background: var(--accent);
+      color: #fff;
+    }
+    button.site-cta:hover:not(:disabled) {
+      filter: brightness(0.95);
+    }
+    .gated-section {
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+    }
+    .gated-section[hidden] { display: none; }
+    .site-brand { display: flex; align-items: center; gap: 10px; }
+    .site-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      flex: 0 0 42px;
+      border: 1px solid var(--icon-border);
+      border-radius: 10px;
+      background: var(--icon-bg);
+    }
+    .site-icon svg { width: 28px; height: 28px; }
+"""
+
+
+def _site_theme() -> dict[str, str]:
+    if "trial" in SITE_KIND.lower():
+        return {
+            "accent": "#16a34a",
+            "bg": "#f0fdf4",
+            "icon_border": "#bbf7d0",
+            "icon_bg": "#f0fdf4",
+            "icon_svg": TRIALS_ICON_SVG,
+            "favicon_svg": TRIALS_FAVICON_SVG,
+        }
+    return {
+        "accent": "#d97706",
+        "bg": "#fffbeb",
+        "icon_border": "#fde68a",
+        "icon_bg": "#fffbeb",
+        "icon_svg": TICKETING_ICON_SVG,
+        "favicon_svg": TICKETING_FAVICON_SVG,
+    }
+
+
+def _theme_css_root() -> str:
+    theme = _site_theme()
+    return f"""
+    :root {{
+      --bg: {theme["bg"]};
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --brand: {theme["accent"]};
+      --accent: {theme["accent"]};
+      --ok: #166534;
+      --deny: #991b1b;
+      --icon-border: {theme["icon_border"]};
+      --icon-bg: {theme["icon_bg"]};
+    }}"""
+
+
+def _site_header(links_html: str) -> str:
+    theme = _site_theme()
+    return f"""  <header>
+    <div class="site-brand">
+      <span class="site-icon">{theme["icon_svg"]}</span>
+      <strong>{SITE_NAME}</strong>
+    </div>
+    {links_html}
+  </header>"""
+
 PRESALE_REGISTER_ACTION = "register_presale"
 PRESALE_REGISTER_PATH = "/api/presale/register"
 PRESALE_CLAIM_ACTION = "claim_presale_code"
@@ -83,6 +185,7 @@ PRESALE_CLAIM_PATH = "/api/presale/claim-code"
 ACTION_LOG: deque = deque(maxlen=20)
 _VERIFY_CTX: Optional[VerificationContext] = None
 _CLAIM_VERIFY_CTX: Optional[VerificationContext] = None
+_TRIAL_VERIFY_CTX: Optional[VerificationContext] = None
 _POLICY_STORE = InMemorySitePolicyStore()
 _PRESALE_REGISTRATIONS, _PRESALE_LEDGER = create_presale_stores()
 _NONCE_STORE = InMemoryNonceStore()
@@ -278,6 +381,18 @@ def _claim_verify_ctx() -> VerificationContext:
     return _CLAIM_VERIFY_CTX
 
 
+def _trial_verify_ctx() -> VerificationContext:
+    global _TRIAL_VERIFY_CTX
+    if _TRIAL_VERIFY_CTX is None:
+        _TRIAL_VERIFY_CTX = VerificationContext(
+            site_id=SITE_ID,
+            lemma_origin=LEMMA_ORIGIN,
+            required_assurance=TRIAL_REQUIRED_ASSURANCE,
+            nonce_store_mode="required",
+        )
+    return _TRIAL_VERIFY_CTX
+
+
 def _is_presale_site() -> bool:
     return "ticket" in SITE_KIND.lower()
 
@@ -373,10 +488,12 @@ def _signin_content():
             "headline": "Passwordless login for your app",
             "subhead": "Sign in with a passkey-backed lemma.id. Your backend verifies a signed presentation and stores a site-private account ID — no passwords or emails required for login.",
             "primary": "Start free trial",
+            "trial_eyebrow": "Trial access",
+            "trial_subhead": "Starting a trial requires verified human proof — one account per person. Sign in with a passkey first, then step up when you claim access.",
             "success": "Trial workspace created",
             "form": "Work email (optional profile field)",
             "placeholder": "founder@example.com",
-            "action": "start_trial",
+            "action": TRIAL_ACTION,
         }
     return {
         "eyebrow": "Sign in with lemma.id",
@@ -395,9 +512,9 @@ def _presale_content():
     return {
         "eyebrow": "Unique presale code distributor",
         "headline": "Passkey proves who you are",
-        "subhead": "Join the drop with a passkey register — no email or password. Unlock your one-time code with a fresh passkey ceremony at claim time. Contact info is optional delivery after you claim. No SMS OTP. IDV runs only when the site flags you for review.",
+        "subhead": "Join the drop with a passkey register — no email or password. Unlock your one-time code with verified human proof at claim time. Contact info is optional delivery after you claim. No SMS OTP.",
         "register": "Step 1, Passkey register for drop",
-        "claim": "Step 2, Fresh passkey unlocks unique code",
+        "claim": "Step 2, Verified human unlocks unique code",
         "retry": "Try again with same lemma.id",
         "flag": "Simulate site risk flag",
         "clear_flag": "Clear risk flag",
@@ -579,11 +696,38 @@ def demo_policy_clear():
 @app.post("/api/demo/action")
 def demo_action():
     body = request.get_json(silent=True) or {}
-    ctx = _verify_ctx()
     presentation = _extract_presentation(body)
     action_name = body.get("action") or "unknown"
     clear_session = None
-    if presentation:
+
+    if action_name == TRIAL_ACTION:
+        if not presentation:
+            entry = {
+                "ok": False,
+                "ppid": None,
+                "assurance": None,
+                "reason": "human_proof_required",
+                "action": action_name,
+            }
+            ACTION_LOG.appendleft(entry)
+            return jsonify({
+                "success": False,
+                "reason": "human_proof_required",
+                "action_log": list(ACTION_LOG),
+            }), 403
+        ctx = _trial_verify_ctx()
+        try:
+            result = ctx.verify(presentation)
+            result, clear_session = _apply_policy_to_result(ctx, result)
+        except Exception:
+            logger.exception("demo_action trial verification failed")
+            return jsonify({
+                "success": False,
+                "reason": "verify_error",
+                "error": "Presentation verification failed on the server",
+            }), 500
+    elif presentation:
+        ctx = _verify_ctx()
         try:
             result = ctx.verify(presentation)
             result, clear_session = _apply_policy_to_result(ctx, result)
@@ -595,6 +739,7 @@ def demo_action():
                 "error": "Presentation verification failed on the server",
             }), 500
     else:
+        ctx = _verify_ctx()
         session = getattr(g, "demo_session", None) or _session_from_request()
         if not session:
             result = ctx.Result(False, "auth_required")
@@ -1092,29 +1237,37 @@ def index():
 
 @app.get("/favicon.svg")
 def favicon():
-    if not _is_presale_site():
-        return Response(status=404)
-    return Response(TICKETING_FAVICON_SVG, mimetype="image/svg+xml")
+    return Response(_site_theme()["favicon_svg"], mimetype="image/svg+xml")
 
 
 def _generic_index():
     copy = _content()
+    theme = _site_theme()
+    is_trial = "trial" in SITE_KIND.lower()
+    trial_gated_block = ""
+    if is_trial:
+        trial_gated_block = f"""
+        <div class="gated-section" id="trial-gated" hidden>
+          <p class="eyebrow">{copy["trial_eyebrow"]}</p>
+          <p class="muted" style="font-size:14px;margin-bottom:8px;">{copy["trial_subhead"]}</p>
+          <label for="email">{copy["form"]}</label>
+          <input id="email" value="{copy["placeholder"]}" aria-label="{copy["form"]}">
+          <button id="verify-btn" class="site-cta" disabled>{copy["primary"]}</button>
+        </div>"""
+    else:
+        trial_gated_block = f"""
+        <label for="email">{copy["form"]}</label>
+        <input id="email" value="{copy["placeholder"]}" aria-label="{copy["form"]}">
+        <button id="verify-btn" disabled>{copy["primary"]}</button>"""
     html = f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{SITE_NAME}</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <style>
-    :root {{
-      --bg: #f8fafc;
-      --ink: #0f172a;
-      --muted: #64748b;
-      --line: #e2e8f0;
-      --brand: #4E3D8F;
-      --ok: #166534;
-      --deny: #991b1b;
-    }}
+    {_theme_css_root()}
     * {{ box-sizing: border-box; }}
     body {{
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -1172,6 +1325,8 @@ def _generic_index():
       margin-top: 16px;
     }}
     button:disabled {{ opacity: 0.65; cursor: not-allowed; }}
+    {SITE_CTA_CSS}
+    {LEMMA_SIGNIN_CSS}
     .pill {{
       display: inline-block;
       border: 1px solid var(--line);
@@ -1227,29 +1382,22 @@ def _generic_index():
       font-size: 12px;
     }}
     @media (max-width: 820px) {{ .layout {{ grid-template-columns: 1fr; }} }}
-    lemma-signin {{ display: block; width: 100%; margin-top: 16px; }}
-    lemma-signin::part(button) {{ width: 100%; }}
   </style>
 </head>
 <body>
-  <header>
-    <strong>{SITE_NAME}</strong>
-    <a href="{DEMO_HUB_URL}?from=demo" target="_blank" rel="noopener">Return to demo hub</a>
-  </header>
+  {_site_header(f'<a href="{DEMO_HUB_URL}?from=demo" target="_blank" rel="noopener">Return to demo hub</a>')}
   <main>
     <div class="layout">
       <section class="card">
         <p class="eyebrow">{copy["eyebrow"]}</p>
         <h1>{copy["headline"]}</h1>
         <p class="muted">{copy["subhead"]}</p>
-        <label for="email">{copy["form"]}</label>
-        <input id="email" value="{copy["placeholder"]}" aria-label="{copy["form"]}">
         {_lemma_signin_element()}
-        <button id="verify-btn" disabled>{copy["primary"]}</button>
-        <p class="muted" id="session-copy" style="margin-top:12px;font-size:13px;">Sign in once. This site keeps a session until a fresh passkey is required.</p>
+        <p class="muted" id="session-copy" style="margin-top:12px;font-size:13px;">Sign in once with a passkey. This site keeps a session until a fresh passkey is required.</p>
+        {trial_gated_block}
         <div class="verdict" id="decision-card">
           <strong>What happens when you click</strong>
-          <p class="tiny">Passkey unlock + continuity proof only. This site accepts <code>assurance: passkey</code>, no IDV unless you later step up to human proofs.</p>
+          <p class="tiny">Passkey unlock + continuity proof for sign-in (<code>assurance: passkey</code>). {"Trial access requires a separate verified human step-up (<code>assurance: ishuman</code>)." if is_trial else "Protected actions reuse the site session until policy requires fresh passkey."}</p>
         </div>
       </section>
       <aside class="card">
@@ -1263,8 +1411,8 @@ def _generic_index():
           <dl id="server-receipt-fields"></dl>
         </div>
         <ol class="how">
-          <li>Sign in with lemma.id once, server verifies presentation and sets a session cookie.</li>
-          <li>Protected actions reuse the site session until policy requires fresh passkey.</li>
+          <li>Sign in with lemma.id once — passkey assurance, server sets a session cookie.</li>
+          <li>{"Start trial requires verified human proof — same PPID, higher assurance tier." if is_trial else "Protected actions reuse the site session until policy requires fresh passkey."}</li>
           <li>Site policy may require human proof assurance → IDV step-up, same PPID.</li>
           <li>Server verifies locally with offline revocation checks.</li>
           <li>Business never sees passport, selfie, or cross-site ID.</li>
@@ -1301,7 +1449,10 @@ def _generic_index():
     const sessionCopy = document.getElementById('session-copy');
     const signInEl = document.getElementById('lemma-signin-btn');
     const actionBtn = document.getElementById('verify-btn');
+    const trialGated = document.getElementById('trial-gated');
     const SITE_POLICY = '{DEMO_REQUIRED_ASSURANCE}';
+    const TRIAL_ASSURANCE = '{TRIAL_REQUIRED_ASSURANCE}';
+    const IS_TRIAL_SITE = {'true' if is_trial else 'false'};
     let sharedVerifier = null;
     let siteSessionPpid = null;
 
@@ -1311,8 +1462,9 @@ def _generic_index():
       else signInEl.removeAttribute('disabled');
     }}
 
-    function makeVerifier(autoProvision) {{
-      if (sharedVerifier && sharedVerifier.autoProvision === autoProvision) {{
+    function makeVerifier(autoProvision, requiredAssurance) {{
+      const assurance = requiredAssurance || SITE_POLICY;
+      if (sharedVerifier && sharedVerifier.autoProvision === autoProvision && sharedVerifier.requiredAssurance === assurance) {{
         return sharedVerifier;
       }}
       if (sharedVerifier) sharedVerifier.destroy();
@@ -1320,7 +1472,7 @@ def _generic_index():
         siteId: '{SITE_ID}',
         lemmaOrigin: '{LEMMA_ORIGIN}',
         autoProvision,
-        requiredAssurance: SITE_POLICY,
+        requiredAssurance: assurance,
         debug: true,
         isBlockedLocally: async (ppid) => {{
           const res = await fetch('/api/demo/policy/check?ppid=' + encodeURIComponent(ppid));
@@ -1329,7 +1481,13 @@ def _generic_index():
         }},
       }});
       sharedVerifier.autoProvision = autoProvision;
+      sharedVerifier.requiredAssurance = assurance;
       return sharedVerifier;
+    }}
+
+    function updateGatedVisibility(signedIn) {{
+      if (!IS_TRIAL_SITE || !trialGated) return;
+      trialGated.hidden = !signedIn;
     }}
 
     function setAssurancePill(assurance) {{
@@ -1453,10 +1611,11 @@ def _generic_index():
           const data = await me.json();
           siteSessionPpid = data.ppid || null;
           if (sessionCopy) {{
-            sessionCopy.textContent = 'Signed in · PPID ' + (siteSessionPpid || '').slice(0, 24) + '…';
+            sessionCopy.textContent = 'Signed in with passkey · PPID ' + (siteSessionPpid || '').slice(0, 24) + '…';
           }}
           if (actionBtn) actionBtn.disabled = false;
           setSignInDisabled(true);
+          updateGatedVisibility(true);
           pill.textContent = 'SIGNED IN';
           pill.className = 'pill ok';
           setAssurancePill(data.assurance || SITE_POLICY);
@@ -1464,9 +1623,10 @@ def _generic_index():
         }}
       }} catch (err) {{}}
       siteSessionPpid = null;
-      if (sessionCopy) sessionCopy.textContent = 'Sign in once. This site keeps a session until a fresh passkey is required.';
+      if (sessionCopy) sessionCopy.textContent = 'Sign in once with a passkey. This site keeps a session until a fresh passkey is required.';
       if (actionBtn) actionBtn.disabled = true;
       setSignInDisabled(false);
+      updateGatedVisibility(false);
       return false;
     }}
 
@@ -1512,24 +1672,47 @@ def _generic_index():
       actionBtn.disabled = true;
       pill.textContent = 'CHECKING';
       pill.className = 'pill checking';
-      decisionCard.innerHTML = '<strong>Running protected action</strong><p class="tiny">Using your site session cookie, no new lemma.id popup unless policy requires fresh passkey.</p>';
+      decisionCard.innerHTML = '<strong>Starting trial access</strong><p class="tiny">Verified human proof required — one account per person.</p>';
       try {{
         const email = document.getElementById('email')?.value || '';
-        const requestPayload = {{
+        let requestPayload = {{
           action: '{copy["action"]}',
           email,
           at: Date.now(),
         }};
+        let serverEntry = null;
+        if (IS_TRIAL_SITE) {{
+          const verifier = makeVerifier(true, TRIAL_ASSURANCE);
+          const fresh = await verifier.verifyFreshForBackend({{
+            requiredAssurance: TRIAL_ASSURANCE,
+            autoProvision: true,
+          }});
+          if (!fresh.ok) {{
+            const response = {{
+              human: false,
+              assurance: fresh.assurance || null,
+              reason: fresh.reason || 'not_verified',
+              timeMs: fresh.timeMs || 0,
+              ppid: fresh.ppid || siteSessionPpid,
+            }};
+            applyVerdict(response, {{ requestPayload }});
+            return;
+          }}
+          requestPayload = {{
+            ...requestPayload,
+            presentation: fresh.presentation,
+          }};
+        }}
         const serverRes = await fetch('/api/demo/action', {{
           method: 'POST',
           credentials: 'include',
           headers: {{ 'Content-Type': 'application/json' }},
           body: JSON.stringify(requestPayload),
         }});
-        const serverEntry = await serverRes.json();
+        serverEntry = await serverRes.json();
         const response = {{
           human: !!serverEntry.success,
-          assurance: serverEntry.assurance || SITE_POLICY,
+          assurance: serverEntry.assurance || (IS_TRIAL_SITE ? TRIAL_ASSURANCE : SITE_POLICY),
           reason: serverEntry.reason,
           timeMs: 0,
           ppid: serverEntry.ppid || siteSessionPpid,
@@ -1581,15 +1764,10 @@ def _ticketing_signin_index():
   <title>{SITE_NAME}</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <style>
-    :root {{
-      --bg: #f8fafc; --ink: #0f172a; --muted: #64748b; --line: #e2e8f0; --brand: #4E3D8F; --ok: #166534; --deny: #991b1b;
-    }}
+    {_theme_css_root()}
     * {{ box-sizing: border-box; }}
     body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; background: var(--bg); color: var(--ink); }}
     header {{ background: #fff; border-bottom: 1px solid var(--line); padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; }}
-    .site-brand {{ display: flex; align-items: center; gap: 10px; }}
-    .site-icon {{ display: inline-flex; width: 42px; height: 42px; align-items: center; justify-content: center; border: 1px solid #fde68a; border-radius: 10px; background: #fffbeb; }}
-    .site-icon svg {{ width: 28px; height: 28px; }}
     header a {{ color: var(--muted); font-size: 13px; text-decoration: none; }}
     main {{ max-width: 920px; margin: 0 auto; padding: 28px 18px 48px; }}
     .layout {{ display: grid; grid-template-columns: 1.1fr .9fr; gap: 18px; }}
@@ -1610,19 +1788,13 @@ def _ticketing_signin_index():
     .how li {{ margin-bottom: 8px; }}
     code {{ font-size: 12px; background: #f1f5f9; padding: 2px 6px; border-radius: 6px; }}
     .presale-link {{ display: inline-block; margin-top: 14px; color: var(--brand); font-weight: 700; text-decoration: none; }}
+    {SITE_CTA_CSS}
+    {LEMMA_SIGNIN_CSS}
     @media (max-width: 820px) {{ .layout {{ grid-template-columns: 1fr; }} }}
-    lemma-signin {{ display: block; width: 100%; margin-top: 16px; }}
-    lemma-signin::part(button) {{ width: 100%; }}
   </style>
 </head>
 <body>
-  <header>
-    <div class="site-brand">
-      <span class="site-icon">{TICKETING_ICON_SVG}</span>
-      <strong>{SITE_NAME}</strong>
-    </div>
-    <a href="{DEMO_HUB_URL}?from=demo" target="_blank" rel="noopener">Return to demo hub</a>
-  </header>
+  {_site_header(f'<a href="{DEMO_HUB_URL}?from=demo" target="_blank" rel="noopener">Return to demo hub</a>')}
   <main>
     <div class="layout">
       <section class="card">
@@ -1805,7 +1977,7 @@ def _presale_index(welcome_mode=False):
           <summary>Fan-visible flow</summary>
           <ol class="how">
             <li>Passkey register binds a site-private ID (Step 1).</li>
-            <li>Fresh passkey at claim (Step 2).</li>
+            <li>Verified human proof at claim (Step 2).</li>
             <li>One code per person per drop.</li>
           </ol>
         </details>
@@ -1829,7 +2001,7 @@ def _presale_index(welcome_mode=False):
           </thead>
           <tbody>
             <tr><td>Identity</td><td>Phone or email uniqueness</td><td>Site-scoped ID from passkey</td></tr>
-            <tr><td>Claim presence</td><td>SMS OTP or none</td><td>Fresh passkey at unlock</td></tr>
+            <tr><td>Claim presence</td><td>SMS OTP or none</td><td>Verified human proof at unlock</td></tr>
             <tr><td>Contact data</td><td>Auth + CRM</td><td>Site-local delivery only</td></tr>
           </tbody>
         </table>
@@ -1892,15 +2064,7 @@ def _presale_index(welcome_mode=False):
   <title>{SITE_NAME}</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <style>
-    :root {{
-      --bg: #f8fafc;
-      --ink: #0f172a;
-      --muted: #64748b;
-      --line: #e2e8f0;
-      --brand: #4E3D8F;
-      --ok: #166534;
-      --deny: #991b1b;
-    }}
+    {_theme_css_root()}
     * {{ box-sizing: border-box; }}
     body {{
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -1924,9 +2088,9 @@ def _presale_index(welcome_mode=False):
       width: 42px;
       height: 42px;
       flex: 0 0 42px;
-      border: 1px solid #fde68a;
+      border: 1px solid var(--icon-border);
       border-radius: 10px;
-      background: #fffbeb;
+      background: var(--icon-bg);
     }}
     .site-icon svg {{ width: 28px; height: 28px; }}
     header strong {{ font-size: 17px; }}
@@ -2219,7 +2383,7 @@ def _presale_index(welcome_mode=False):
     .welcome-step.is-active {{
       border-color: var(--brand);
       color: var(--brand);
-      background: #f5f3ff;
+      background: var(--icon-bg);
     }}
     .welcome-step.is-done {{
       border-color: #86efac;
@@ -2238,22 +2402,16 @@ def _presale_index(welcome_mode=False):
       gap: 8px;
       margin-top: 10px;
     }}
+    {SITE_CTA_CSS}
+    {LEMMA_SIGNIN_CSS}
     @media (max-width: 820px) {{
       .layout {{ grid-template-columns: 1fr; }}
       .defense-strip {{ grid-template-columns: 1fr 1fr; }}
     }}
-    lemma-signin {{ display: block; width: 100%; margin-top: 16px; }}
-    lemma-signin::part(button) {{ width: 100%; }}
   </style>
 </head>
 <body class="{body_class}">
-  <header>
-    <div class="site-brand">
-      <span class="site-icon">{TICKETING_ICON_SVG}</span>
-      <strong>{SITE_NAME}</strong>
-    </div>
-    {header_links}
-  </header>
+  {_site_header(header_links)}
   <main>
     {welcome_progress}
     {welcome_contrast}
@@ -2261,34 +2419,35 @@ def _presale_index(welcome_mode=False):
       <strong>Guided presale demo</strong>
       <ol class="tour-checklist" id="tour-checklist">
         <li data-tour-step="register" id="tour-step-register">Register with passkey, phone is delivery only</li>
-        <li data-tour-step="claim" id="tour-step-claim">Unlock code, fresh passkey + server-attested action</li>
+        <li data-tour-step="claim" id="tour-step-claim">Unlock code — verified human proof at claim time</li>
         <li data-tour-step="retry" id="tour-step-retry">Retry with the same lemma.id, denied, one code per fan</li>
         <li data-tour-step="flag" id="tour-step-flag">Simulate risk flag, IDV penalty, then code at isHuman</li>
         <li data-tour-step="attack" id="tour-step-attack">Attack lab, replay stamp or skip Step 1</li>
       </ol>
-      <p class="tour-impact" id="tour-impact">Start with Step 1. Passkey is who you are — contact info comes after you claim.</p>
+      <p class="tour-impact" id="tour-impact">Sign in with a passkey first. Register for the drop, then unlock your code with verified human proof.</p>
     </div>
     <div class="{layout_class}">
       <section class="card">
         <p class="eyebrow">{copy["eyebrow"]}</p>
         <h1>{copy["headline"]}</h1>
         <p class="muted">{copy["subhead"]}</p>
+        {_lemma_signin_element()}
+        <p class="contact-note" id="session-copy">Sign in once with a passkey. Presale steps unlock after you have a site session.</p>
+        <div class="gated-section" id="presale-gated" hidden>
         <div class="defense-strip" id="defense-strip">
           <div class="defense-item">Site PPID<small>passkey proof</small></div>
           <div class="defense-item">Action stamp<small>bound mutation</small></div>
           <div class="defense-item">Server nonce<small>replay block</small></div>
-          <div class="defense-item">Fresh passkey<small>claim ceremony</small></div>
+          <div class="defense-item">Human proof<small>claim ceremony</small></div>
           <div class="defense-item">1 code / fan<small>PPID ledger</small></div>
         </div>
         <div class="steps">
           <div class="step active" id="step-register">1 · Passkey register</div>
-          <div class="step" id="step-claim">2 · Fresh passkey claim</div>
+          <div class="step" id="step-claim">2 · Verified human claim</div>
         </div>
         <p class="muted" style="margin-top:12px;font-size:13px;">Drop: <code id="drop-id">{PRESALE_DROP_ID}</code></p>
-        {_lemma_signin_element()}
-        <p class="contact-note" id="session-copy">Sign in once. Presale register uses your site session; claim still requires a fresh passkey ceremony.</p>
         <button id="register-btn" disabled>{copy["register"]}</button>
-        <button type="button" class="btn-secondary" id="claim-btn" disabled>{copy["claim"]}</button>
+        <button type="button" class="btn-secondary site-cta" id="claim-btn" disabled>{copy["claim"]}</button>
         <button type="button" class="btn-secondary" id="retry-btn" disabled>{copy["retry"]}</button>
         <button type="button" class="btn-secondary btn-ghost" id="flag-btn">{copy["flag"]}</button>
         <button type="button" class="btn-secondary btn-ghost" id="clear-flag-btn">{copy["clear_flag"]}</button>
@@ -2312,9 +2471,10 @@ def _presale_index(welcome_mode=False):
           <button type="button" class="btn-secondary" id="save-delivery-btn">Save delivery info</button>
           <button type="button" class="btn-secondary btn-ghost" id="skip-delivery-btn">Skip for now</button>
         </div>
+        </div>
         <div class="verdict" id="decision-card">
           <strong>Protected presale flow</strong>
-          <p class="tiny">Step 1: action-bound passkey register, email/phone are delivery fields on this site. Step 2: fresh passkey ceremony (Face ID / Touch ID / Windows Hello) unlocks your unique code. If the site flags suspicious activity, fresh IDV (<code>verifyFreshForBackend</code>) is required before issuance.</p>
+          <p class="tiny">Step 1: passkey register binds your site-private ID. Step 2: verified human proof unlocks your unique code — one account per person. Contact info is optional delivery after you claim.</p>
         </div>
       </section>
       {aside_block}
@@ -2337,7 +2497,7 @@ def _presale_index(welcome_mode=False):
     const WELCOME_SEQUENCE = ['contrast', 'signin', 'claim', 'deny', 'return'];
     const TOUR_IMPACTS = {{
       register: 'Passkey binds a site-private ID — no email or password required.',
-      claim: 'Fresh passkey ceremony proves present control, bots cannot replay cached sessions for codes.',
+      claim: 'Verified human proof at unlock — one account per person, bots cannot replay cached sessions for codes.',
       retry: 'Ledger enforces one code per verified person. Same lemma.id cannot farm multiple codes.',
       flag: 'Site doubt escalates to fresh IDV, policy-driven penalty before code issuance.',
       attack: 'Attack lab shows replay and skip-step denies that bots hit in production.',
@@ -2360,6 +2520,7 @@ def _presale_index(welcome_mode=False):
     const tourBanner = document.getElementById('tour-banner');
     const tourImpact = document.getElementById('tour-impact');
     const signInEl = document.getElementById('lemma-signin-btn');
+    const presaleGated = document.getElementById('presale-gated');
     let sharedVerifier = null;
     let lastPpid = null;
     let siteSessionPpid = null;
@@ -2556,6 +2717,10 @@ def _presale_index(welcome_mode=False):
       else signInEl.removeAttribute('disabled');
     }}
 
+    function updatePresaleGatedVisibility(signedIn) {{
+      if (presaleGated) presaleGated.hidden = !signedIn;
+    }}
+
     async function refreshSessionState() {{
       const sessionCopy = document.getElementById('session-copy');
       const registerBtn = document.getElementById('register-btn');
@@ -2566,9 +2731,10 @@ def _presale_index(welcome_mode=False):
           siteSessionPpid = data.ppid || null;
           lastPpid = siteSessionPpid || lastPpid;
           if (sessionCopy) {{
-            sessionCopy.textContent = 'Signed in · PPID ' + (siteSessionPpid || '').slice(0, 24) + '…';
+            sessionCopy.textContent = 'Signed in with passkey · PPID ' + (siteSessionPpid || '').slice(0, 24) + '…';
           }}
           setSignInDisabled(true);
+          updatePresaleGatedVisibility(true);
           if (registerBtn && !presaleRegistered) registerBtn.disabled = false;
           pill.textContent = 'SIGNED IN';
           pill.className = 'pill ok';
@@ -2577,9 +2743,10 @@ def _presale_index(welcome_mode=False):
       }} catch (err) {{}}
       siteSessionPpid = null;
       if (sessionCopy) {{
-        sessionCopy.textContent = 'Sign in once. Presale register uses your site session; claim still requires a fresh passkey ceremony.';
+        sessionCopy.textContent = 'Sign in once with a passkey. Presale steps unlock after you have a site session.';
       }}
       setSignInDisabled(false);
+      updatePresaleGatedVisibility(false);
       if (registerBtn) registerBtn.disabled = true;
       return false;
     }}
@@ -2887,9 +3054,9 @@ def _presale_index(welcome_mode=False):
           pill.textContent = 'REGISTERED';
           pill.className = 'pill ok';
           assurancePill.textContent = 'register: passkey';
-          decisionCopy.textContent = 'Joined drop ' + (serverEntry.drop_id || DROP_ID) + '. Use Step 2 for fresh passkey code unlock.';
+          decisionCopy.textContent = 'Joined drop ' + (serverEntry.drop_id || DROP_ID) + '. Use Step 2 for verified human code unlock.';
           decisionCard.innerHTML = '<strong>{copy["success_register"]}</strong><p class="tiny">PPID '
-            + (serverEntry.ppid || '').slice(0, 24) + '… registered. Step 2 requires a fresh passkey ceremony to issue your unique code.</p>';
+            + (serverEntry.ppid || '').slice(0, 24) + '… registered. Step 2 requires verified human proof to issue your unique code.</p>';
           advanceTour('register');
         }} else {{
           pill.textContent = 'DENY';
@@ -2930,8 +3097,8 @@ def _presale_index(welcome_mode=False):
         setTourHighlight(isRetry ? 'retry' : 'claim');
         const idvNote = claimAssurance === ESCALATED_ASSURANCE
           ? 'Fresh IDV-backed proof required after site risk flag.'
-          : 'Fresh passkey ceremony required, Face ID / Touch ID / Windows Hello at unlock. Server verifies fresh_passkey_attestation bound to this action.';
-        decisionCard.innerHTML = '<strong>Step 2, Fresh passkey unlock</strong><p class="tiny">' + idvNote + '</p>';
+          : 'Verified human proof required at unlock — one account per person. Server verifies fresh_passkey_attestation bound to this action.';
+        decisionCard.innerHTML = '<strong>Step 2, Verified human unlock</strong><p class="tiny">' + idvNote + '</p>';
       try {{
         const verifier = makeVerifier(claimAssurance);
         const payload = stampBody(contactPayload());

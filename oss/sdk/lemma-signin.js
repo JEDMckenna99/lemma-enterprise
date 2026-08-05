@@ -20,11 +20,11 @@
     button {
       display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
       min-height: 44px; padding: 0.625rem 1.25rem; border: none; border-radius: 8px;
-      background: linear-gradient(180deg, #5a4899 0%, #4e3d8f 100%);
+      background: #1A1A24;
       color: #fff; font-size: 0.9375rem; font-weight: 600; cursor: pointer;
       box-shadow: 0 1px 2px rgba(0,0,0,.12);
     }
-    button:hover:not(:disabled) { filter: brightness(1.05); }
+    button:hover:not(:disabled) { background: #32313F; }
     button:disabled { opacity: 0.65; cursor: wait; }
     .lemma-mark { font-weight: 700; letter-spacing: -0.02em; }
   `;

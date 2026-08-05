@@ -39,6 +39,80 @@ def fixture_relying_site_client(monkeypatch):
         yield client, mod
 
 
+@pytest.fixture(name="trials_site_client")
+def fixture_trials_site_client(monkeypatch):
+    monkeypatch.setenv("LEMMA_DEMO_SITE_ID", "trials-demo.lemma.id")
+    monkeypatch.setenv("LEMMA_DEMO_SITE_NAME", "Lemma Trials Demo")
+    monkeypatch.setenv("LEMMA_DEMO_SITE_KIND", "free trial")
+    monkeypatch.setenv("LEMMA_DEMO_REQUIRED_ASSURANCE", "passkey")
+    monkeypatch.setenv("LEMMA_ORIGIN", "https://lemma.id")
+
+    for path in (str(PY_PKG), str(DEMO_SITES)):
+        if path not in sys.path:
+            sys.path.insert(0, path)
+
+    module_name = "relying_site_app_trials_test"
+    if module_name in sys.modules:
+        mod = sys.modules[module_name]
+    else:
+        spec = importlib.util.spec_from_file_location(module_name, DEMO_SITES / "relying_site_app.py")
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = mod
+        spec.loader.exec_module(mod)
+
+    mod.app.config["TESTING"] = True
+    with mod.app.test_client() as client:
+        yield client, mod
+
+
+def test_trials_start_trial_requires_human_presentation(trials_site_client):
+    client, mod = trials_site_client
+    mod.ACTION_LOG.clear()
+    cookie = mod._sign_session("ppid_trial_demo", "passkey")
+    client.set_cookie(mod.SESSION_COOKIE, cookie)
+    resp = client.post(
+        "/api/demo/action",
+        json={"action": mod.TRIAL_ACTION, "email": "founder@example.com"},
+    )
+    payload = resp.get_json()
+
+    assert resp.status_code == 403
+    assert payload["success"] is False
+    assert payload["reason"] == "human_proof_required"
+
+
+def test_trials_start_trial_accepts_ishuman_presentation(trials_site_client, monkeypatch):
+    client, mod = trials_site_client
+    mod.ACTION_LOG.clear()
+    mod._TRIAL_VERIFY_CTX = None
+
+    class _FakeResult:
+        ok = True
+        ppid = "ppid_trial_human"
+        assurance = "ishuman"
+        reason = "valid"
+        credential_id = "cred-1"
+        issuer_did = "did:lemma:test"
+        bound_site_id = "trials-demo.lemma.id"
+
+    monkeypatch.setattr(mod.VerificationContext, "verify", lambda self, _p: _FakeResult())
+
+    resp = client.post(
+        "/api/demo/action",
+        json={
+            "action": mod.TRIAL_ACTION,
+            "email": "founder@example.com",
+            "presentation": {"credential": {"id": "cred-1"}},
+        },
+    )
+    payload = resp.get_json()
+
+    assert resp.status_code == 200
+    assert payload["success"] is True
+    assert payload["ppid"] == "ppid_trial_human"
+    assert payload["assurance"] == "ishuman"
+
+
 def test_relying_site_health(relying_site_client):
     client, mod = relying_site_client
     resp = client.get("/health")
@@ -50,7 +124,7 @@ def test_relying_site_health(relying_site_client):
     assert payload["required_assurance"] == "passkey"
     assert payload["presale_mode"] is True
     assert payload["presale_drop_id"]
-    assert payload["presale_claim_assurance"] == "passkey"
+    assert payload["presale_claim_assurance"] == "ishuman"
     assert payload["presale_escalated_assurance"] == "ishuman"
 
 
@@ -483,7 +557,7 @@ def test_presale_claim_issues_code_once(relying_site_client, monkeypatch):
         ok = True
         ppid = "did:lemma:ppid_demo_123"
         legacy_ppid = None
-        assurance = "passkey"
+        assurance = "ishuman"
         reason = "valid"
         credential_id = "cred-1"
         issuer_did = "did:lemma:test"
@@ -498,6 +572,7 @@ def test_presale_claim_issues_code_once(relying_site_client, monkeypatch):
         "drop_id": mod.PRESALE_DROP_ID,
         "email": "fan@example.com",
         "phone": "+15550101234",
+        "required_assurance": "ishuman",
         "lemma": {"verified": True},
     }
     first = client.post("/api/presale/claim-code", json=body)
@@ -541,9 +616,10 @@ def test_presale_claim_doubt_requires_escalated_assurance(relying_site_client, m
 
     monkeypatch.setattr(mod.VerificationContext, "verify_action_stamp", _fake_verify_action_stamp)
 
+    # Passkey-tier claim on a doubted PPID should fail closed until human step-up.
     resp = client.post(
         "/api/presale/claim-code",
-        json={"drop_id": mod.PRESALE_DROP_ID, "lemma": {"verified": True}},
+        json={"drop_id": mod.PRESALE_DROP_ID, "required_assurance": "passkey", "lemma": {"verified": True}},
     )
     payload = resp.get_json()
 
@@ -609,7 +685,7 @@ def test_presale_claim_denies_missing_fresh_passkey(relying_site_client, monkeyp
         ok = False
         ppid = "did:lemma:ppid_demo_123"
         legacy_ppid = None
-        assurance = "passkey"
+        assurance = "ishuman"
         reason = "fresh_passkey_missing"
 
     def _fake_verify_action_stamp(self, *_args, **kwargs):
@@ -622,6 +698,7 @@ def test_presale_claim_denies_missing_fresh_passkey(relying_site_client, monkeyp
         "/api/presale/claim-code",
         json={
             "drop_id": mod.PRESALE_DROP_ID,
+            "required_assurance": "ishuman",
             "server_nonce": "nonce-claim-missing-fp",
             "lemma": {"verified": True},
         },
