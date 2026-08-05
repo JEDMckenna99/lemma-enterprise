@@ -1489,6 +1489,57 @@
             });
         }
 
+        function isWalletNotVerifiedError(err) {
+            const msg = String(err?.message || err?.code || err || '').trim().toLowerCase();
+            return msg === 'wallet_not_verified';
+        }
+
+        /**
+         * Master human proofs live in lemma.id browser storage. The server only
+         * knows that this wallet completed IDV (person binding). If the local
+         * master VC is missing but that binding exists, reissue-master restores
+         * a signed master into IndexedDB without a new IDV.
+         */
+        async function restoreMasterProofFromServer() {
+            wallet = wallet || new LemmaWallet();
+            await wallet.init();
+            if (typeof wallet.reissueMasterCredential !== 'function') {
+                return { restored: false, needsIdv: true };
+            }
+            try {
+                await wallet.reissueMasterCredential();
+                return { restored: true };
+            } catch (err) {
+                if (isWalletNotVerifiedError(err)) {
+                    return { restored: false, needsIdv: true };
+                }
+                throw err;
+            }
+        }
+
+        async function issueSiteProofPackageWithMasterFallback() {
+            const pkgParams = {
+                siteId: requestingSite,
+                sessionNonce: clientSessionNonce,
+                bloomSequence,
+                sessionTtlSec,
+                issueMode: issueMode || 'site_proof',
+                requiredAssurance,
+            };
+            try {
+                return await wallet.issueSiteProofPackage(pkgParams);
+            } catch (err) {
+                if (!isWalletNotVerifiedError(err)) {
+                    throw err;
+                }
+                const masterReady = await ensureMasterProofForIssuance();
+                if (!masterReady) {
+                    return null;
+                }
+                return await wallet.issueSiteProofPackage(pkgParams);
+            }
+        }
+
         async function storeMasterFromStatus(payload) {
             if (!payload || payload.status !== 'verified' || !payload.credential) {
                 // Clear the dead session so retries don't keep polling it.
@@ -2091,9 +2142,11 @@
         }
 
         /**
-         * Ensure a master human proof exists before deriving a per-site credential.
-         * Returns true when the master is present (or was just issued). Returns false
-         * when IDV was started and the popup should wait for a redirect return.
+         * Ensure a master human proof is available locally before IDV.
+         * Order: local IndexedDB → verification-return claim → reissue-master
+         * (person binding still valid) → hosted IDV only if never verified.
+         * Returns true when a master is present (or was restored/issued).
+         * Returns false when IDV was started and the popup should wait for return.
          */
         async function ensureMasterProofForIssuance() {
             if (await hasMasterProof()) return true;
@@ -2119,6 +2172,14 @@
 
             if (await hasMasterProof()) return true;
 
+            const restored = await restoreMasterProofFromServer();
+            if (restored.restored || await hasMasterProof()) {
+                return true;
+            }
+            if (!restored.needsIdv) {
+                return false;
+            }
+
             if (testVerifyEnabled && serverTestToken) {
                 setStatus('Completing demo verification…', 'loading');
                 await verifyOnceTestMode();
@@ -2138,11 +2199,6 @@
             }
             await ensureWalletReadyForSiteProof();
 
-            if (!siteProofUsesContinuityOnly()) {
-                const masterReady = await ensureMasterProofForIssuance();
-                if (!masterReady) return false;
-            }
-
             // v2 (Phase 1.1): pull + open person-root seed envelopes so site
             // signing keys derive from wallet_local_seed. No-op when the flag is
             // off or this wallet predates the feature (falls back to wallet_secret).
@@ -2152,14 +2208,23 @@
                 console.warn('[isHuman IDV] seed envelope fetch failed:', err?.message || err);
             }
 
-            const pkg = await wallet.issueSiteProofPackage({
-                siteId: requestingSite,
-                sessionNonce: clientSessionNonce,
-                bloomSequence,
-                sessionTtlSec,
-                issueMode: issueMode || 'site_proof',
-                requiredAssurance,
-            });
+            // Prefer deriving the site-scoped VC from the local master (or from
+            // server reissue if the local copy was lost). One human proof per
+            // person — full IDV only when the wallet was never verified
+            // (wallet_not_verified via ensureMasterProofForIssuance fallback).
+            const pkg = siteProofUsesContinuityOnly()
+                ? await wallet.issueSiteProofPackage({
+                    siteId: requestingSite,
+                    sessionNonce: clientSessionNonce,
+                    bloomSequence,
+                    sessionTtlSec,
+                    issueMode: issueMode || 'site_proof',
+                    requiredAssurance,
+                })
+                : await issueSiteProofPackageWithMasterFallback();
+            if (!pkg) {
+                return false;
+            }
 
             const proofSuccess = siteProofUsesContinuityOnly()
                 ? (consumerCopy().status?.siteProofSuccess || 'You\u2019re verified for this site.')
@@ -2191,14 +2256,26 @@
                 let siteProofPackage = null;
                 if (!credential || !wallet._siteCredentialLocallyVerifiable(credential)) {
                     const sessionNonce = clientSessionNonce || requestNonce;
-                    siteProofPackage = await wallet.issueSiteProofPackage({
+                    const issueParams = {
                         siteId: requestingSite,
                         sessionNonce,
                         bloomSequence,
                         sessionTtlSec,
                         issueMode: 'site_proof',
                         requiredAssurance,
-                    });
+                    };
+                    try {
+                        siteProofPackage = await wallet.issueSiteProofPackage(issueParams);
+                    } catch (err) {
+                        if (!isWalletNotVerifiedError(err)) {
+                            throw err;
+                        }
+                        const masterReady = await ensureMasterProofForIssuance();
+                        if (!masterReady) {
+                            return false;
+                        }
+                        siteProofPackage = await wallet.issueSiteProofPackage(issueParams);
+                    }
                     credential = siteProofPackage.credential;
                 }
                 const signed = await wallet.signSiteActionPresentation({
@@ -2379,6 +2456,13 @@
             await ensureWalletUnlocked();
 
             if (await hasMasterProof()) {
+                setStatus(consumerCopy().status?.alreadyVerified || 'You\u2019re already verified.', 'success');
+                setTimeout(() => closeWith('ISHUMAN_IDV_COMPLETE', { reason: 'already_provisioned' }), 600);
+                return;
+            }
+
+            const restored = await restoreMasterProofFromServer();
+            if (restored.restored || await hasMasterProof()) {
                 setStatus(consumerCopy().status?.alreadyVerified || 'You\u2019re already verified.', 'success');
                 setTimeout(() => closeWith('ISHUMAN_IDV_COMPLETE', { reason: 'already_provisioned' }), 600);
                 return;

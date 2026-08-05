@@ -57,6 +57,17 @@ def test_wallet_daily_unlock_helpers(wallet_source):
 
 
 @pytest.mark.browser
+def test_wallet_derive_omits_local_master_id_when_missing(wallet_source):
+    """Phase 1.2 wallet half: local master VC is optional for derive-site-proof."""
+    derive_block = wallet_source.split("async deriveAndStoreSiteProof(", 1)[1]
+    derive_block = derive_block.split("async reissueMasterCredential(", 1)[0]
+    assert "omit master_credential_id rather than failing closed" in derive_block
+    assert "if (masterId)" in derive_block
+    assert "deriveBody.master_credential_id = masterId" in derive_block
+    assert "reissueMasterCredential" in wallet_source
+
+
+@pytest.mark.browser
 def test_wallet_ishuman_storage_fails_when_all_persistence_locked(wallet_source):
     assert "return false;" in wallet_source.split("async _putIsHumanCacheRecord(credential)", 1)[1].split("async syncIsHumanCacheFromWallet", 1)[0]
     assert "let storedInLemmas = false;" in wallet_source
@@ -228,11 +239,63 @@ def test_idv_popup_issues_site_proof_via_wallet():
 
 @pytest.mark.browser
 def test_idv_site_proof_starts_hosted_verification_without_master():
+    """IDV is last resort: only after local miss AND reissue reports wallet_not_verified."""
     idv_html = IDV_HTML.read_text(encoding="utf-8")
     ensure_block = idv_html.split("async function ensureMasterProofForIssuance()", 1)[1]
     ensure_block = ensure_block.split("async function issueSiteProofAndClose()", 1)[0]
+    assert "restoreMasterProofFromServer" in ensure_block
     assert "startHostedVerification();" in ensure_block
+    # Ordering lock: recovery must precede hosted IDV (the bug was skipping this).
+    assert ensure_block.index("restoreMasterProofFromServer") < ensure_block.index(
+        "startHostedVerification();"
+    )
     assert "siteProofPending" not in ensure_block
+
+
+@pytest.mark.browser
+def test_idv_site_proof_does_not_gate_issuance_on_local_master_only():
+    """Regression: popup used to call ensureMasterProofForIssuance (local IDB only)
+    BEFORE issueSiteProofPackage, so Phase 1.2 derive-without-local-master never ran
+    and users were pushed into a second IDV per site.
+
+    Master proofs live in lemma.id browser storage; the server holds person binding
+    and can re-sign. Site-proof issuance must attempt derive first.
+    """
+    idv_html = IDV_HTML.read_text(encoding="utf-8")
+    issue_block = idv_html.split("async function issueSiteProofAndClose()", 1)[1]
+    issue_block = issue_block.split("async function runActionSignAndClose()", 1)[0]
+
+    # Must derive via fallback helper (not pre-check local master then IDV).
+    assert "issueSiteProofPackageWithMasterFallback" in issue_block
+    # Old bug pattern: await ensureMasterProofForIssuance() before package issue.
+    pre_package = issue_block.split("issueSiteProofPackageWithMasterFallback", 1)[0]
+    assert "ensureMasterProofForIssuance()" not in pre_package
+
+    fallback_block = idv_html.split("async function issueSiteProofPackageWithMasterFallback()", 1)[1]
+    fallback_block = fallback_block.split("async function storeMasterFromStatus", 1)[0]
+    assert "issueSiteProofPackage(pkgParams)" in fallback_block
+    assert "isWalletNotVerifiedError(err)" in fallback_block
+    assert "ensureMasterProofForIssuance()" in fallback_block
+    assert fallback_block.index("issueSiteProofPackage(pkgParams)") < fallback_block.index(
+        "ensureMasterProofForIssuance()"
+    )
+
+    restore_block = idv_html.split("async function restoreMasterProofFromServer()", 1)[1]
+    restore_block = restore_block.split("async function issueSiteProofPackageWithMasterFallback()", 1)[0]
+    assert "reissueMasterCredential" in restore_block
+
+
+@pytest.mark.browser
+def test_idv_action_sign_recovers_via_master_reissue_before_idv():
+    """Action stamps that need an ishuman site VC must not jump to IDV on first miss."""
+    idv_html = IDV_HTML.read_text(encoding="utf-8")
+    action_block = idv_html.split("async function runActionSignAndClose()", 1)[1]
+    action_block = action_block.split("async function prepareActionSignUi()", 1)[0]
+    assert "isWalletNotVerifiedError(err)" in action_block
+    assert "ensureMasterProofForIssuance()" in action_block
+    assert action_block.index("issueSiteProofPackage(issueParams)") < action_block.index(
+        "ensureMasterProofForIssuance()"
+    )
 
 
 @pytest.mark.browser
