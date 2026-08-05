@@ -144,6 +144,34 @@ def test_encrypt_stored_value_never_plaintext_fallback(wallet_js):
 
 
 @pytest.mark.unit
+def test_device_link_bootstraps_storage_before_passkey(wallet_js):
+    """Empty receive browsers must persist link material before PRF exists."""
+    assert "async _putBootstrap(" in wallet_js
+    assert "async _finalizePendingLinkAfterPasskey(" in wallet_js
+    persist = _method_body(
+        wallet_js,
+        "async persistLinkedWallet(",
+        "\n    prepareIdvMobileHandoff(",
+    )
+    assert "_putBootstrap('profiles'" in persist or '_putBootstrap("profiles"' in persist
+    assert "_putBootstrap('secrets'" in persist or '_putBootstrap("secrets"' in persist
+    assert "_putBootstrap('session'" in persist or '_putBootstrap("session"' in persist
+    complete = _method_body(
+        wallet_js,
+        "async _completeLinkFromPayload(",
+        "\n    async _backupWalletData(",
+    )
+    assert "_pendingLinkCredentials" in complete
+    assert "_putBootstrap('session'" in complete or '_putBootstrap("session"' in complete
+    register = _method_body(
+        wallet_js,
+        "async registerPasskey(",
+        "\n    async unlock(",
+    )
+    assert "_finalizePendingLinkAfterPasskey" in register
+
+
+@pytest.mark.unit
 def test_local_unlock_requires_prf_before_sensitive_puts(wallet_js):
     """Local passkey unlock must fail when PRF output is unavailable."""
     body = _method_body(

@@ -426,7 +426,10 @@ async function startPushFromHash() {
             await new Promise((r) => setTimeout(r, 2000));
         }
     } catch (e) {
-        waitEl.textContent = e.message || 'Transfer failed';
+        const msg = e?.message || 'Transfer failed';
+        waitEl.textContent = msg === 'storage_key_unavailable'
+            ? 'This browser could not finish setup before creating a passkey. Generate a new transfer link and try again.'
+            : msg;
         waitEl.className = 'status-box error';
     }
     return true;

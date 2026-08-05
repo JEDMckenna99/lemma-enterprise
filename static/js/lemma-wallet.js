@@ -2164,6 +2164,11 @@ class LemmaWallet {
         }
         await this._migratePlaintextStores();
 
+        // Preserve person-root seeds from an in-progress device link.
+        const priorLocalSeed = this.session?.walletLocalSeed || null;
+        const priorProxy = this.session?.personRootProxy || null;
+        const priorSessionSecret = this.session?.walletSecret || null;
+
         // Get wallet secret for PPID derivation
         // CRITICAL: Check multiple sources for the secret (profiles, secrets, session)
         // This handles the case where secret was stored via device linking
@@ -2180,6 +2185,15 @@ class LemmaWallet {
                 // Sync to secrets/master for consistency
                 await this._put('secrets', { ...walletSecret, linkedFrom: profile.linkedFrom });
             }
+        }
+
+        if (!walletSecret?.secret && priorSessionSecret) {
+            walletSecret = { id: 'master', secret: priorSessionSecret, source: 'pending_link_session' };
+            await this._put('secrets', {
+                ...walletSecret,
+                createdAt: Date.now(),
+                linkedFrom: walletId.value || 'link',
+            });
         }
         
         // Only generate new secret if NONE found anywhere
@@ -2212,10 +2226,13 @@ class LemmaWallet {
             unlockedAt: now,
             expiresAt: now + getSessionDurationMs(),
             walletId: walletId.value,
-            walletSecret: walletSecret.secret
+            walletSecret: walletSecret.secret,
+            walletLocalSeed: priorLocalSeed || undefined,
+            personRootProxy: priorProxy || undefined,
         };
         await this._put('session', { id: 'current', ...this.session });
         console.log(' Wallet created and auto-unlocked after passkey registration');
+        await this._finalizePendingLinkAfterPasskey();
 
         const keys = this._getLemmaKeys();
         const keypair = await this._deriveWalletSigningKey();
@@ -7119,8 +7136,14 @@ class LemmaWallet {
         if (storeName === 'secrets' && value?.id === 'device_signing') {
             return value;
         }
+        // ishuman_cache is in SENSITIVE_STORES and must fail closed without PRF.
+        if (storeName === 'ishuman_cache' && !this._atRestKey) {
+            throw new Error('storage_key_unavailable');
+        }
         const mod = this._walletAtRest();
         if (!this._atRestKey || !mod) {
+            // Fail closed for normal _put paths. Device-link bootstrap must use
+            // _putBootstrap()/_putRaw() before the first passkey/PRF bind.
             throw new Error('storage_key_unavailable');
         }
         const recordId = value?.id || value?.did || 'record';
@@ -7134,6 +7157,42 @@ class LemmaWallet {
             throw new Error('envelope_invalid');
         }
         return mod.decryptEnvelope(this._atRestKey, raw);
+    }
+
+    /**
+     * Pre-PRF bootstrap write for device link on an empty browser.
+     * Uses plaintext IndexedDB until registerPasskey binds PRF and migrates.
+     * Still fail-closed if this DB already contains encrypted envelopes.
+     */
+    async _putBootstrap(storeName, value) {
+        if (this._atRestKey) {
+            return this._put(storeName, value);
+        }
+        if (await this._encryptedStorageNeedsAtRestKey()) {
+            throw new Error('storage_key_unavailable');
+        }
+        return this._putRaw(storeName, value);
+    }
+
+    async _finalizePendingLinkAfterPasskey() {
+        if (this.session?.walletLocalSeed && this.session?.personRootProxy) {
+            try {
+                await this._persistPersonRootSeedsAtRest();
+            } catch (e) {
+                console.warn('[Lemma] person-root seed persist after link passkey skipped:', e?.message || e);
+            }
+        }
+        const pendingCreds = this._pendingLinkCredentials;
+        this._pendingLinkCredentials = null;
+        if (!Array.isArray(pendingCreds) || !pendingCreds.length) {
+            return { applied: 0, masterRestored: false };
+        }
+        try {
+            return await this._importLinkedIsHumanCredentials(pendingCreds);
+        } catch (e) {
+            console.warn('[Lemma] Pending link credential import failed:', e?.message || e);
+            return { applied: 0, masterRestored: false, error: e?.message || String(e) };
+        }
     }
 
     _isEncryptedStorageLockedError(error) {
@@ -8282,8 +8341,10 @@ class LemmaWallet {
             isDefault: profileId === DEFAULT_PROFILE_ID,
         };
 
-        await this._put('profiles', linkedProfile);
-        await this._put('secrets', {
+        // Empty receive browsers have no PRF key yet. Bootstrap plaintext here;
+        // registerPasskey() migrates to encrypted envelopes after passkey create.
+        await this._putBootstrap('profiles', linkedProfile);
+        await this._putBootstrap('secrets', {
             id: 'master',
             secret: walletSecret,
             createdAt: Date.now(),
@@ -8309,7 +8370,7 @@ class LemmaWallet {
             walletSecret: walletSecret,
             source: source,
         };
-        await this._put('session', { id: 'current', ...this.session });
+        await this._putBootstrap('session', { id: 'current', ...this.session });
 
         return {
             walletId,
@@ -8629,7 +8690,7 @@ class LemmaWallet {
         if (hasPersonRoot) {
             this.session.walletLocalSeed = payload.walletLocalSeed;
             this.session.personRootProxy = payload.personRootProxy;
-            await this._put('session', { id: 'current', ...this.session });
+            await this._putBootstrap('session', { id: 'current', ...this.session });
             await this._persistPersonRootSeedsAtRest();
         }
 
@@ -8645,10 +8706,21 @@ class LemmaWallet {
         let humanProofRestored = false;
         let credentialsImported = 0;
         if (Array.isArray(payload.ishumanCredentials) && payload.ishumanCredentials.length) {
-            const imported = await this._importLinkedIsHumanCredentials(payload.ishumanCredentials);
-            credentialsImported = imported.applied;
-            humanProofRestored = imported.masterRestored;
-            console.log(`[Lemma] Imported ${credentialsImported} isHuman credential(s) from link`);
+            if (this._atRestKey) {
+                const imported = await this._importLinkedIsHumanCredentials(payload.ishumanCredentials);
+                credentialsImported = imported.applied;
+                humanProofRestored = imported.masterRestored;
+                console.log(`[Lemma] Imported ${credentialsImported} isHuman credential(s) from link`);
+            } else {
+                // Import after passkey/PRF so encrypted lemma/cache writes succeed.
+                this._pendingLinkCredentials = payload.ishumanCredentials;
+                humanProofRestored = payload.ishumanCredentials.some(
+                    (cred) => this._isIsHumanMasterRecord(cred),
+                );
+                console.log(
+                    `[Lemma] Deferred ${payload.ishumanCredentials.length} isHuman credential(s) until passkey`,
+                );
+            }
         }
 
         let sessionError = null;

@@ -346,12 +346,12 @@ def test_idv_popup_handles_encrypted_master_without_raw_error():
 @pytest.mark.browser
 def test_wallet_pages_use_current_wallet_bundle():
     wallet_pages = {
-        IDV_HTML: "2698",
-        POPUP_HTML: "2698",
-        WALLET_UNLOCK_HTML: "2698",
-        RECOVER_COMPLETE_HTML: "2698",
-        MODERN_LAYOUT_HTML: "2698",
-        WALLET_SIMPLE_HTML: "2698",
+        IDV_HTML: "2699",
+        POPUP_HTML: "2699",
+        WALLET_UNLOCK_HTML: "2699",
+        RECOVER_COMPLETE_HTML: "2699",
+        MODERN_LAYOUT_HTML: "2699",
+        WALLET_SIMPLE_HTML: "2699",
     }
     for path, version in wallet_pages.items():
         source = path.read_text(encoding="utf-8")
