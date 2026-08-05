@@ -47,11 +47,16 @@ jobs:
       - name: Sync verifier mirrors
         run: python scripts/sync_proof_verifier_packages.py --check
 
-      - name: Section 10 unit tests
+      - name: Section 10 + package verify tests
         run: |
           pip install -r requirements.txt
           pip install pytest cryptography
-          python -m pytest tests/test_sdk_integration_section10.py tests/test_ishuman_verify_packages.py -q
+          python -m pytest \
+            tests/test_sdk_integration_section10.py \
+            tests/test_ishuman_verify_packages.py \
+            tests/test_proof_verifier_testing.py \
+            tests/test_ishuman_verify_contract.py \
+            -q
 
       - name: Build Python package
         working-directory: packages/proof-verifier-py
@@ -71,6 +76,13 @@ jobs:
           echo "wheel=$wheel" >> "$GITHUB_OUTPUT"
           echo "tgz=$tgz" >> "$GITHUB_OUTPUT"
           echo "Resolved wheel=$wheel tgz=$tgz"
+
+      # Clean-install the exact artifacts that would be published, then mint→verify.
+      - name: Artifact install + offline verify smoke
+        run: |
+          python scripts/proof_verifier_artifact_smoke.py \
+            --wheel "${{ steps.artifacts.outputs.wheel }}" \
+            --tgz "${{ steps.artifacts.outputs.tgz }}"
 
       - name: Generate SBOM (Python wheel)
         uses: anchore/sbom-action@v0
@@ -111,6 +123,21 @@ jobs:
           # --skip-existing: npm-only bumps keep the same PyPI version.
           twine upload --skip-existing packages/proof-verifier-py/dist/*.whl packages/proof-verifier-py/dist/*.tar.gz
 
+      # Confirm registries match the SDK manifest after publish (tag runs only).
+      - name: Post-publish registry smoke
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          # npm/PyPI can lag a few seconds after upload.
+          for i in 1 2 3 4 5; do
+            if python scripts/section10_registry_smoke.py --require-registry; then
+              exit 0
+            fi
+            echo "registry smoke attempt $i failed; retrying in 15s"
+            sleep 15
+          done
+          echo "::error::registry smoke failed after publish"
+          exit 1
+
       - name: Release summary
         run: |
           echo "Ref: ${{ github.ref }}"
@@ -118,5 +145,5 @@ jobs:
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             echo "Publish attempted via npm OIDC Trusted Publishing + PyPI_API_TOKEN."
           else
-            echo "workflow_dispatch dry run: build/test only (no registry publish)."
+            echo "workflow_dispatch dry run: build/test/artifact-smoke only (no registry publish)."
           fi

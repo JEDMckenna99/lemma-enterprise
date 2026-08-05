@@ -13,7 +13,22 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 ORIGIN = "https://lemma.id"
 NPM_PACKAGE = "@lemma.id/proof-verifier"
 PYPI_PACKAGE = "lemma-proof-verifier"
-EXPECTED_VERSION = "1.4.0"
+
+
+def _expected_versions() -> tuple[str, str, str]:
+    """Return (backend_cdn, npm, pypi) from the SDK manifest."""
+    manifest = json.loads(
+        (REPO_ROOT / "docs" / "sdk" / "ISHUMAN_SDK_VERSIONS.json").read_text(encoding="utf-8")
+    )
+    backend = str(manifest.get("backend_verifier") or "")
+    npm = str(manifest.get("npm_package") or backend)
+    pypi = str(manifest.get("pypi_package") or backend)
+    if not backend or not npm or not pypi:
+        raise SystemExit("ISHUMAN_SDK_VERSIONS.json missing backend/npm/pypi versions")
+    return backend, npm, pypi
+
+
+EXPECTED_BACKEND_VERSION, EXPECTED_NPM_VERSION, EXPECTED_PYPI_VERSION = _expected_versions()
 
 
 def _get(url: str) -> tuple[int, str]:
@@ -33,7 +48,7 @@ def _npm_registry_version() -> tuple[bool, str]:
     try:
         data = json.loads(body)
         version = (data.get("dist-tags") or {}).get("latest") or ""
-        return version == EXPECTED_VERSION, version or "missing"
+        return version == EXPECTED_NPM_VERSION, version or "missing"
     except json.JSONDecodeError:
         return False, "invalid_json"
 
@@ -46,7 +61,7 @@ def _pypi_registry_version() -> tuple[bool, str]:
     try:
         data = json.loads(body)
         version = str((data.get("info") or {}).get("version") or "")
-        return version == EXPECTED_VERSION, version or "missing"
+        return version == EXPECTED_PYPI_VERSION, version or "missing"
     except json.JSONDecodeError:
         return False, "invalid_json"
 
@@ -127,8 +142,8 @@ def main() -> int:
     require_registry = "--require-registry" in sys.argv
 
     for name, url, needle in (
-        ("zero-install-mjs", f"{ORIGIN}/sdk/v{EXPECTED_VERSION}/proof-verifier.mjs", "createVerifier"),
-        ("zero-install-py", f"{ORIGIN}/sdk/v{EXPECTED_VERSION}/proof-verifier.py", "VerificationContext"),
+        ("zero-install-mjs", f"{ORIGIN}/sdk/v{EXPECTED_BACKEND_VERSION}/proof-verifier.mjs", "createVerifier"),
+        ("zero-install-py", f"{ORIGIN}/sdk/v{EXPECTED_PYPI_VERSION}/proof-verifier.py", "VerificationContext"),
         ("legacy-mjs-alias", f"{ORIGIN}/sdk/lemma-ishuman-verify.mjs", "createVerifier"),
         ("legacy-py-alias", f"{ORIGIN}/sdk/lemma_ishuman_verify.py", "VerificationContext"),
     ):

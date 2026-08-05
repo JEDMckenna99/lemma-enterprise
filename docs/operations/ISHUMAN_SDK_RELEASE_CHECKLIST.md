@@ -12,10 +12,20 @@
    ```
 5. Run tests:
    ```powershell
-   python -m pytest tests/test_sdk_integration_section10.py tests/test_ishuman_verify_packages.py tests/test_protocol_fixtures_section4.py -q
+   python -m pytest tests/test_sdk_integration_section10.py tests/test_ishuman_verify_packages.py tests/test_proof_verifier_testing.py tests/test_protocol_fixtures_section4.py -q
    python scripts/generate_sri_hashes.py
    ```
-6. Update [`ISHUMAN_SDK_COMPATIBILITY_MATRIX.md`](../sdk/ISHUMAN_SDK_COMPATIBILITY_MATRIX.md) and integration guide if URLs changed.
+6. Build artifacts and clean-install smoke (mint→verify in fresh envs):
+   ```powershell
+   python -m build
+   # from packages/proof-verifier-py
+   Set-Location packages/proof-verifier-js
+   npm pack --pack-destination ../proof-verifier-py/dist/
+   Set-Location ../..
+   python scripts/proof_verifier_artifact_smoke.py --wheel "packages/proof-verifier-py/dist/*.whl" --tgz "packages/proof-verifier-py/dist/lemma.id-proof-verifier-*.tgz"
+   ```
+   (The release workflow runs this automatically before publish.)
+7. Update [`ISHUMAN_SDK_COMPATIBILITY_MATRIX.md`](../sdk/ISHUMAN_SDK_COMPATIBILITY_MATRIX.md) and integration guide if URLs changed.
 
 ## One-time npm Trusted Publisher setup
 

@@ -38,4 +38,9 @@ Documentation = "https://lemma.id/docs"
 Repository = "https://github.com/JEDMckenna99/lemma-enterprise"
 
 [tool.setuptools]
-py-modules = ["lemma_proof_verifier", "lemma_proof_verifier_site_policy", "lemma_proof_verifier_nonce_store"]
+py-modules = [
+  "lemma_proof_verifier",
+  "lemma_proof_verifier_site_policy",
+  "lemma_proof_verifier_nonce_store",
+  "lemma_proof_verifier_testing",
+]
