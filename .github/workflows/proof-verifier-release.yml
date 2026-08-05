@@ -89,13 +89,13 @@ jobs:
 
       - name: Attest Python wheel provenance
         if: startsWith(github.ref, 'refs/tags/')
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: ${{ steps.artifacts.outputs.wheel }}
 
       - name: Attest npm tarball provenance
         if: startsWith(github.ref, 'refs/tags/')
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: ${{ steps.artifacts.outputs.tgz }}
 
