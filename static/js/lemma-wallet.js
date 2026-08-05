@@ -3332,7 +3332,8 @@ class LemmaWallet {
     }
 
     /**
-     * RECEIVER: try to claim a deposited pull transfer (404 = not ready yet).
+     * RECEIVER: try to claim a deposited pull/push transfer.
+     * Returns { ready:false } while waiting; { expired:true } if the offer is gone.
      */
     async tryClaimLinkReceive(transferId) {
         const pending = this._pendingLinkReceive;
@@ -3346,14 +3347,17 @@ class LemmaWallet {
             credentials: 'include',
             body: JSON.stringify({ action: 'claim', transfer_id: id }),
         });
+        const data = await res.json().catch(() => ({}));
         if (res.status === 404) {
-            return { ready: false };
+            return { ready: false, expired: true };
         }
         if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || `link receive claim failed (${res.status})`);
+            throw new Error(data.error || `link receive claim failed (${res.status})`);
         }
-        const data = await res.json();
+        // Alive transfer, sender has not deposited yet.
+        if (data.ready === false || !data.bundle) {
+            return { ready: false, status: data.status || 'waiting' };
+        }
         this._pendingEnrollmentGrant = data.enrollment_grant || null;
         this._stashEnrollmentGrant(data.enrollment_grant, data.wallet_id || null);
         const bundle = data.bundle || {};
@@ -3404,6 +3408,9 @@ class LemmaWallet {
         while (Date.now() < deadline) {
             const result = await this.tryClaimLinkReceive(transferId);
             if (result.ready) return result;
+            if (result.expired) {
+                throw new Error('Transfer expired. Generate a new link or QR on your other device.');
+            }
             await new Promise((resolve) => setTimeout(resolve, intervalMs));
         }
         throw new Error('Timed out waiting for your phone. Scan the QR again with your camera app.');
