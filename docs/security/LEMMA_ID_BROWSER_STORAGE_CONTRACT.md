@@ -130,8 +130,8 @@ Schema version: **7** (`WALLET_DB_VERSION`).
 | `profiles` | `{profileId}` e.g. `default` | `{ id, name, secret, createdAt, isDefault, linkedFrom? }` | Default migrate, create/rename profile, link |
 | `session` | `current` | Unlock state including `walletSecret` while unlocked | Unlock / register / restore / link |
 | `session` | `verified_{lemmaId}` | Signature verification cache entries | Verify hydrate paths |
-| `lemmas` | `cred_*`, `ishuman_*`, … | VCs, permission lemmas, isHuman credentials | `storeLemma` / credential import |
-| `ishuman_cache` | cache keys | isHuman creds for lock-period reads | Sync/import during issuance readiness |
+| `lemmas` | `cred_*`, `ishuman_*`, … | VCs, permission lemmas, isHuman credentials | `storeLemma` / credential import; isHuman pruned to 1 master + ≤1 site identity VC per hostname |
+| `ishuman_cache` | cache keys | Mirror of durable isHuman identity slots for lock-period reads | Sync/import; pruned with `lemmas` |
 
 ### 5.2 Non-sensitive / special stores
 
@@ -234,6 +234,7 @@ Lock / purge / revoke device
 
 1. After `migrationComplete`, new writes to sensitive stores are `enc_v1` or fail closed.
 2. `ishuman_cache` never persists without an at-rest key.
+2b. Durable isHuman identity storage is bounded: **1** `ishuman_master_*` and **≤1** site identity VC per canonical hostname (highest assurance wins; superseded ids deleted from `lemmas` + `ishuman_cache` via `pruneIsHumanCredentialsLocally`).
 3. Daily unlock never newly persists plaintext `walletSecret` in localStorage.
 4. Third-party origins never keep `wallet_secret` / profile secrets at rest.
 5. Cache Storage never holds identity seeds or credentials.
@@ -306,3 +307,4 @@ Documented so they are not rediscovered as “undefined behavior”:
 |------|--------|
 | 2026-08-03 | Initial active contract; consolidates live `LemmaWallet` v7 + wrap + daily unlock behavior |
 | 2026-08-03 | Remove plaintext `_encryptStoredValue` fallback; require PRF on register/unlock |
+| 2026-08-05 | One site identity slot per hostname; prune superseded isHuman VCs on sync/derive/import |

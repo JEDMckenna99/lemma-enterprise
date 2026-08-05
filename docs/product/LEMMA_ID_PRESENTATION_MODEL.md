@@ -32,9 +32,19 @@ An **identity proof** establishes that a lemma.id holder is human on lemma.id.
 | Runtime site binding | Normalized hostname; platform binding is `lemma.id` |
 | Sparse site fields | Empty `siteId` / `siteDomain` on master records is valid; skip before canonicalization |
 | PPID derivation | Assigned **person_root** + normalized hostname (canonical). Legacy local-identity-seed derivation is provisional-only behind flags. |
-| Assurance | `passkey` = lemma.id-bound pre-IDV; `ishuman` = IDV-backed. Same PPID across tiers. |
+| Assurance | Ladder on one PPID: `passkey` = continuity; `ishuman` = IDV-backed human (higher tier, not a second identity). Same PPID across tiers. |
 
 **Complete lemma.id** means the user's lemma.id holds a valid isHuman identity proof for the platform (master credential and/or lemma.id site proof).
+
+### Site identity slots (durable) vs presentations (ephemeral)
+
+| Object | Rule |
+|--------|------|
+| Master human proof | At most one durable `ishuman_master_*` on lemma.id (never sent to relying sites) |
+| Site identity VC | At most one durable credential per hostname; assurance upgrades `passkey` → `ishuman` **in place** (same PPID); superseded ids pruned |
+| Presentation | Short-lived PoP over the current site identity slot for this verify — not a new durable VC every visit |
+
+Do not treat `ishuman_site_*` accumulation as normal. Re-verify on the same site should mint a session presentation only when a valid site slot already meets the required assurance.
 
 ## Permission proof
 

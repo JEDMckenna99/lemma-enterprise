@@ -282,7 +282,8 @@ def test_wallet_prefers_newest_credential_after_fresh_idv(wallet_source):
     """
     assert "_sortCredentialsNewestFirst" in wallet_source
     assert "_credentialIssuedAtSeconds" in wallet_source
-    assert "this._sortCredentialsNewestFirst(matches)[0]" in wallet_source
+    assert "this._sortCredentialsNewestFirst(tierMatches)[0]" in wallet_source
+    assert "this._assuranceRank(b) - this._assuranceRank(a)" in wallet_source
     assert "this._sortCredentialsNewestFirst(cachedMasters)[0]" in wallet_source
 
 
@@ -346,12 +347,12 @@ def test_idv_popup_handles_encrypted_master_without_raw_error():
 @pytest.mark.browser
 def test_wallet_pages_use_current_wallet_bundle():
     wallet_pages = {
-        IDV_HTML: "2699",
-        POPUP_HTML: "2699",
-        WALLET_UNLOCK_HTML: "2699",
-        RECOVER_COMPLETE_HTML: "2699",
-        MODERN_LAYOUT_HTML: "2699",
-        WALLET_SIMPLE_HTML: "2699",
+        IDV_HTML: "2700",
+        POPUP_HTML: "2700",
+        WALLET_UNLOCK_HTML: "2700",
+        RECOVER_COMPLETE_HTML: "2700",
+        MODERN_LAYOUT_HTML: "2700",
+        WALLET_SIMPLE_HTML: "2700",
     }
     for path, version in wallet_pages.items():
         source = path.read_text(encoding="utf-8")

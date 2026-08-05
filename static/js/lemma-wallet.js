@@ -91,7 +91,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.80.0';  // v2.80: fail-closed PRF at-rest storage (no plaintext IDB writes)
+    static VERSION = '2.81.0';  // v2.81: one site identity slot per hostname (prune + upgrade-in-place)
 
     static DEVICE_IDB_NAMES = ['LemmaWallet', 'LemmaWalletWrap'];
 
@@ -4069,12 +4069,14 @@ class LemmaWallet {
 
     async syncIsHumanCacheFromWallet() {
         if (!this.isUnlocked || !this.isUnlocked()) return { synced: 0 };
+        // Collapse superseded site identity VCs before mirroring into cache.
+        const pruneResult = await this.pruneIsHumanCredentialsLocally();
         let lemmas = [];
         try {
             lemmas = await this._getAll('lemmas');
         } catch (e) {
             if (!this._isEncryptedStorageLockedError(e)) throw e;
-            return { synced: 0, skipped: 'encrypted_locked' };
+            return { synced: 0, skipped: 'encrypted_locked', ...pruneResult };
         }
         let synced = 0;
         for (const cred of lemmas) {
@@ -4083,7 +4085,7 @@ class LemmaWallet {
                 synced += 1;
             }
         }
-        return { synced };
+        return { synced, pruned: pruneResult?.pruned || 0 };
     }
 
     async getIsHumanCredentialsFromCache() {
@@ -4159,12 +4161,20 @@ class LemmaWallet {
         return clone;
     }
 
+    _assuranceRank(credential) {
+        const assurance = this._credentialRecordAssurance(credential);
+        if (assurance === 'ishuman') return 2;
+        if (assurance === 'passkey') return 1;
+        return 0;
+    }
+
     /**
-     * Keep one newest master plus one newest site credential per site|assurance.
+     * Keep one newest master plus one site identity credential per hostname.
+     * Prefer higher assurance (ishuman > passkey), then newest.
      */
     _dedupeCredentialsForTransfer(credentials) {
         const masters = [];
-        const bySiteAssurance = new Map();
+        const bySite = new Map();
         for (const cred of this._sortCredentialsNewestFirst(credentials || [])) {
             if (this._isIsHumanMasterRecord(cred)) {
                 if (!masters.length) masters.push(cred);
@@ -4172,13 +4182,60 @@ class LemmaWallet {
             }
             const cl = cred.claims || cred.credentialSubject || {};
             const site = this._canonicalizeCredentialSiteValue(this._getCredentialSiteBinding(cl)) || '_unknown';
-            const assurance = this._credentialRecordAssurance(cred) || 'ishuman';
-            const key = `${site}|${assurance}`;
-            if (!bySiteAssurance.has(key)) {
-                bySiteAssurance.set(key, cred);
+            const existing = bySite.get(site);
+            if (!existing) {
+                bySite.set(site, cred);
+                continue;
+            }
+            if (this._assuranceRank(cred) > this._assuranceRank(existing)) {
+                bySite.set(site, cred);
             }
         }
-        return [...masters, ...bySiteAssurance.values()];
+        return [...masters, ...bySite.values()];
+    }
+
+    /**
+     * Collapse durable isHuman storage to 1 master + ≤1 site identity VC per hostname.
+     * Deletes superseded rows from lemmas and ishuman_cache.
+     */
+    async pruneIsHumanCredentialsLocally() {
+        if (!this.isUnlocked || !this.isUnlocked()) {
+            return { pruned: 0, kept: 0, skipped: 'locked' };
+        }
+        let lemmas = [];
+        try {
+            const all = await this._getAll('lemmas');
+            lemmas = (all || []).filter((cred) => this._isIsHumanCredentialRecord(cred));
+        } catch (e) {
+            if (this._isEncryptedStorageLockedError(e)) {
+                return { pruned: 0, kept: 0, skipped: 'encrypted_locked' };
+            }
+            throw e;
+        }
+        let cached = [];
+        try {
+            cached = await this.getIsHumanCredentialsFromCache();
+        } catch {
+            cached = [];
+        }
+
+        const byId = new Map();
+        for (const cred of [...lemmas, ...cached]) {
+            if (cred?.id) byId.set(String(cred.id), cred);
+        }
+        const keepers = this._dedupeCredentialsForTransfer([...byId.values()]);
+        const keepIds = new Set(keepers.map((cred) => String(cred.id)));
+        let pruned = 0;
+        for (const id of byId.keys()) {
+            if (keepIds.has(id)) continue;
+            try { await this._delete('lemmas', id); } catch (_) { /* ignore */ }
+            try { await this._delete('ishuman_cache', id); } catch (_) { /* ignore */ }
+            pruned += 1;
+        }
+        if (pruned > 0) {
+            console.log(`[Lemma] Pruned ${pruned} superseded isHuman credential(s); kept ${keepers.length}`);
+        }
+        return { pruned, kept: keepers.length };
     }
 
     /**
@@ -4254,6 +4311,9 @@ class LemmaWallet {
         }
         if (!masterRestored && applied > 0) {
             masterRestored = await this.hasIsHumanMasterInCache();
+        }
+        if (applied > 0) {
+            await this.pruneIsHumanCredentialsLocally();
         }
         return { applied, masterRestored, skipped: Math.max(0, credentials.length - valid.length) };
     }
@@ -4455,6 +4515,7 @@ class LemmaWallet {
         const matches = allCreds.filter((credential) => {
             const cl = credential.claims || credential.credentialSubject || {};
             if (!this._isIsHumanCredentialRecord(credential)) return false;
+            if (this._isIsHumanMasterRecord(credential)) return false;
             return this._canonicalizeCredentialSiteValue(this._getCredentialSiteBinding(cl)) === canonicalSite
                 && this._siteCredentialHasSigningKey(credential);
         });
@@ -4466,7 +4527,10 @@ class LemmaWallet {
             if (!tierMatches.length) return null;
             return this._sortCredentialsNewestFirst(tierMatches)[0];
         }
-        return this._sortCredentialsNewestFirst(matches)[0];
+        // No tier filter: prefer highest assurance, then newest.
+        return this._sortCredentialsNewestFirst(matches).sort(
+            (a, b) => this._assuranceRank(b) - this._assuranceRank(a),
+        )[0];
     }
 
     _credentialRecordAssurance(credential) {
@@ -4600,6 +4664,8 @@ class LemmaWallet {
         }
         await this.storeCredential(derived);
         await this._putIsHumanCacheRecord(derived);
+        // Upgrade-in-place: drop superseded passkey/older site VCs for this hostname.
+        await this.pruneIsHumanCredentialsLocally();
         await this._finalizeIsHumanIssuance({ isHumanIssuance: true });
         return derived;
     }
@@ -9474,6 +9540,7 @@ class LemmaWallet {
     async removeCredential(credentialId) {
         await this.init();
         await this._delete('lemmas', credentialId);
+        try { await this._delete('ishuman_cache', credentialId); } catch (_) { /* ignore */ }
         return { success: true };
     }
 
