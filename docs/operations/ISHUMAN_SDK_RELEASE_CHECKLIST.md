@@ -17,22 +17,46 @@
    ```
 6. Update [`ISHUMAN_SDK_COMPATIBILITY_MATRIX.md`](../sdk/ISHUMAN_SDK_COMPATIBILITY_MATRIX.md) and integration guide if URLs changed.
 
+## One-time npm Trusted Publisher setup
+
+On [npmjs.com](https://www.npmjs.com) → `@lemma.id/proof-verifier` → **Settings** → **Trusted Publisher**:
+
+| Field | Value |
+|---|---|
+| Publisher | GitHub Actions |
+| Organization or user | `JEDMckenna99` |
+| Repository | `lemma-enterprise` |
+| Workflow filename | `proof-verifier-release.yml` |
+| Environment name | *(leave blank)* |
+| Allowed actions | Allow npm publish |
+
+No `NPM_TOKEN` GitHub secret is required. Publishing uses OIDC from that workflow on tag pushes.
+
 ## Publish
 
-1. Tag: `proof-verifier-v{backend_verifier}` (e.g. `proof-verifier-v1.4.0`). Legacy tag `ishuman-verify-v*` still triggers the workflow.
-2. Push tag → GitHub Actions `proof-verifier-release.yml` builds npm + PyPI artifacts.
-3. Deploy lemma.id (versioned routes + `/api/sdk/versions`).
-4. Run prod smoke:
+1. Commit version bumps on `main` (or the release branch you will tag).
+2. Tag: `proof-verifier-v{backend_verifier}` (e.g. `proof-verifier-v1.4.1`). Legacy tag `ishuman-verify-v*` still triggers the workflow.
+   ```powershell
+   git tag proof-verifier-v1.4.1
+   git push github proof-verifier-v1.4.1
+   ```
+3. Watch GitHub Actions `proof-verifier-release`:
+   - Tag push → build, test, npm OIDC publish, PyPI upload
+   - Manual `workflow_dispatch` → build/test only (no registry publish)
+4. Deploy lemma.id if CDN/versioned `/sdk/v…` routes or `/api/sdk/versions` changed.
+5. Run prod + registry smoke:
    ```powershell
    python scripts/section10_prod_smoke.py
-   python scripts/section10_registry_smoke.py
    python scripts/section10_registry_smoke.py --require-registry
    ```
+   Update `EXPECTED_VERSION` in `scripts/section10_registry_smoke.py` when bumping.
 
-## Registry secrets (GitHub Actions)
+## Registry auth
 
-- `NPM_TOKEN` — publish `@lemma.id/proof-verifier`
-- `PYPI_API_TOKEN` — publish `lemma-proof-verifier`
+| Registry | Auth |
+|---|---|
+| npm `@lemma.id/proof-verifier` | Trusted Publisher OIDC (workflow above) |
+| PyPI `lemma-proof-verifier` | GitHub Actions secret `PYPI_API_TOKEN` |
 
 ## Post-release
 

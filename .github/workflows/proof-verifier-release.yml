@@ -1,98 +1,119 @@
-name: proof-verifier-release
-
-on:
-  push:
-    tags:
-      - "proof-verifier-v*"
-      - "ishuman-verify-v*"
-  workflow_dispatch:
-
-permissions:
-  contents: read
-  attestations: write
-  id-token: write
-
-jobs:
-  release:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          registry-url: "https://registry.npmjs.org"
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Sync verifier mirrors
-        run: python scripts/sync_proof_verifier_packages.py --check
-
-      - name: Section 10 unit tests
-        run: |
-          pip install -r requirements.txt
-          pip install pytest cryptography
-          python -m pytest tests/test_sdk_integration_section10.py tests/test_ishuman_verify_packages.py -q
-
-      - name: Build Python package
-        working-directory: packages/proof-verifier-py
-        run: pip install build && python -m build
-
-      - name: Pack npm tarball for SBOM
-        working-directory: packages/proof-verifier-js
-        run: npm pack --pack-destination ../proof-verifier-py/dist/
-
-      - name: Generate SBOM (Python wheel)
-        uses: anchore/sbom-action@v0
-        with:
-          path: packages/proof-verifier-py/dist/*.whl
-          artifact-name: proof-verifier-python-sbom
-          format: spdx-json
-
-      - name: Generate SBOM (npm tarball)
-        uses: anchore/sbom-action@v0
-        with:
-          path: packages/proof-verifier-py/dist/lemma.id-proof-verifier-*.tgz
-          artifact-name: proof-verifier-npm-sbom
-          format: spdx-json
-
-      - name: Attest Python wheel provenance
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-path: packages/proof-verifier-py/dist/*.whl
-
-      - name: Attest npm tarball provenance
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-path: packages/proof-verifier-py/dist/lemma.id-proof-verifier-*.tgz
-
-      - name: Publish npm package
-        working-directory: packages/proof-verifier-js
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
-            echo "NPM_TOKEN secret not configured; skipping npm publish"
-            exit 0
-          fi
-          npm publish --access public
-
-      - name: Publish PyPI package
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          if [ -z "${TWINE_PASSWORD:-}" ]; then
-            echo "PYPI_API_TOKEN secret not configured; skipping PyPI publish"
-            exit 0
-          fi
-          pip install twine
-          twine upload packages/proof-verifier-py/dist/*.whl packages/proof-verifier-py/dist/*.tar.gz
-
-      - name: Release summary
-        run: |
-          echo "Tag or dispatch: ${{ github.ref_name }}"
-          echo "SBOM artifacts: proof-verifier-python-sbom, proof-verifier-npm-sbom"
-          echo "Configure NPM_TOKEN and PYPI_API_TOKEN for live registry publish."
+name: proof-verifier-release
+
+# Publishes @lemma.id/proof-verifier via npm Trusted Publishing (OIDC).
+# Configure on npmjs.com → package Settings → Trusted Publisher:
+#   Organization/user: JEDMckenna99
+#   Repository: lemma-enterprise
+#   Workflow filename: proof-verifier-release.yml
+#   Environment: (leave blank)
+#   Allowed actions: Allow npm publish
+#
+# Requires npm CLI >= 11.5.1 and Node >= 22.14 (OIDC trusted publishing).
+# PyPI still uses PYPI_API_TOKEN until Trusted Publishing is configured there.
+
+on:
+  push:
+    tags:
+      - "proof-verifier-v*"
+      - "ishuman-verify-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  attestations: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Ensure npm supports trusted publishing
+        run: |
+          npm install -g npm@latest
+          node -v
+          npm -v
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Sync verifier mirrors
+        run: python scripts/sync_proof_verifier_packages.py --check
+
+      - name: Section 10 unit tests
+        run: |
+          pip install -r requirements.txt
+          pip install pytest cryptography
+          python -m pytest tests/test_sdk_integration_section10.py tests/test_ishuman_verify_packages.py -q
+
+      - name: Build Python package
+        working-directory: packages/proof-verifier-py
+        run: pip install build && python -m build
+
+      - name: Pack npm tarball for SBOM
+        working-directory: packages/proof-verifier-js
+        run: npm pack --pack-destination ../proof-verifier-py/dist/
+
+      - name: Generate SBOM (Python wheel)
+        uses: anchore/sbom-action@v0
+        with:
+          path: packages/proof-verifier-py/dist/*.whl
+          artifact-name: proof-verifier-python-sbom
+          format: spdx-json
+
+      - name: Generate SBOM (npm tarball)
+        uses: anchore/sbom-action@v0
+        with:
+          path: packages/proof-verifier-py/dist/lemma.id-proof-verifier-*.tgz
+          artifact-name: proof-verifier-npm-sbom
+          format: spdx-json
+
+      - name: Attest Python wheel provenance
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: packages/proof-verifier-py/dist/*.whl
+
+      - name: Attest npm tarball provenance
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: packages/proof-verifier-py/dist/lemma.id-proof-verifier-*.tgz
+
+      # OIDC trusted publish — no NPM_TOKEN. Only runs on release tags.
+      - name: Publish npm package
+        if: startsWith(github.ref, 'refs/tags/')
+        working-directory: packages/proof-verifier-js
+        run: npm publish --access public
+
+      - name: Publish PyPI package
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          if [ -z "${TWINE_PASSWORD:-}" ]; then
+            echo "::error::PYPI_API_TOKEN secret is not configured"
+            exit 1
+          fi
+          pip install twine
+          # --skip-existing: npm-only bumps keep the same PyPI version.
+          twine upload --skip-existing packages/proof-verifier-py/dist/*.whl packages/proof-verifier-py/dist/*.tar.gz
+
+      - name: Release summary
+        run: |
+          echo "Ref: ${{ github.ref }}"
+          echo "SBOM artifacts: proof-verifier-python-sbom, proof-verifier-npm-sbom"
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "Publish attempted via npm OIDC Trusted Publishing + PyPI_API_TOKEN."
+          else
+            echo "workflow_dispatch dry run: build/test only (no registry publish)."
+          fi
