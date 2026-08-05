@@ -76,16 +76,18 @@ jobs:
       - name: Generate SBOM (Python wheel)
         uses: anchore/sbom-action@v0
         with:
-          path: ${{ steps.artifacts.outputs.wheel }}
+          file: ${{ steps.artifacts.outputs.wheel }}
           artifact-name: proof-verifier-python-sbom
           format: spdx-json
+          upload-release-assets: false
 
       - name: Generate SBOM (npm tarball)
         uses: anchore/sbom-action@v0
         with:
-          path: ${{ steps.artifacts.outputs.tgz }}
+          file: ${{ steps.artifacts.outputs.tgz }}
           artifact-name: proof-verifier-npm-sbom
           format: spdx-json
+          upload-release-assets: false
 
       - name: Attest Python wheel provenance
         if: startsWith(github.ref, 'refs/tags/')
