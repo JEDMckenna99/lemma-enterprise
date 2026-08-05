@@ -1682,25 +1682,27 @@ def _generic_index():
         }};
         let serverEntry = null;
         if (IS_TRIAL_SITE) {{
+          // Step-up to ishuman: reuse master human proof + derive site VC.
+          // Site-doubt fresh IDV is a separate deliberate ceremony.
           const verifier = makeVerifier(true, TRIAL_ASSURANCE);
-          const fresh = await verifier.verifyFreshForBackend({{
+          const stepped = await verifier.verifyForBackend({{
             requiredAssurance: TRIAL_ASSURANCE,
             autoProvision: true,
           }});
-          if (!fresh.ok) {{
+          if (!stepped.ok) {{
             const response = {{
               human: false,
-              assurance: fresh.assurance || null,
-              reason: fresh.reason || 'not_verified',
-              timeMs: fresh.timeMs || 0,
-              ppid: fresh.ppid || siteSessionPpid,
+              assurance: stepped.assurance || null,
+              reason: stepped.reason || 'not_verified',
+              timeMs: stepped.timeMs || 0,
+              ppid: stepped.ppid || siteSessionPpid,
             }};
             applyVerdict(response, {{ requestPayload }});
             return;
           }}
           requestPayload = {{
             ...requestPayload,
-            presentation: fresh.presentation,
+            presentation: stepped.presentation,
           }};
         }}
         const serverRes = await fetch('/api/demo/action', {{

@@ -81,6 +81,20 @@ def test_trials_start_trial_requires_human_presentation(trials_site_client):
     assert payload["reason"] == "human_proof_required"
 
 
+def test_trials_start_trial_uses_verify_for_backend_not_fresh_idv(trials_site_client):
+    """Trial step-up must reuse the master human proof, not open site-doubt IDV."""
+    client, _mod = trials_site_client
+    resp = client.get("/")
+    body = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert "Start free trial" in body
+    assert "await verifier.verifyForBackend({" in body
+    assert "requiredAssurance: TRIAL_ASSURANCE" in body
+    # Site-doubt API must not be invoked from the trial start path.
+    assert "await verifier.verifyFreshForBackend" not in body
+
+
 def test_trials_start_trial_accepts_ishuman_presentation(trials_site_client, monkeypatch):
     client, mod = trials_site_client
     mod.ACTION_LOG.clear()
