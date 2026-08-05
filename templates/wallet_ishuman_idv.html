@@ -429,18 +429,33 @@
 
         function applyFreshIdvShell() {
             const copy = consumerCopy();
-            const intro = copy.intro?.freshDoubt
+            // Yellow "humanity doubted" framing is only for deliberate site doubt.
+            // fresh_idv without site_doubt (legacy/misc) uses neutral recovery copy.
+            const isSiteDoubt = refreshReason === 'site_doubt';
+            const intro = isSiteDoubt && copy.intro?.freshDoubt
                 ? copy.intro.freshDoubt(requestingSite)
-                : '';
+                : (copy.intro?.siteProof ? copy.intro.siteProof(requestingSite) : '');
             applyConsumerShell({
-                eyebrow: 'Fresh human proof required',
-                headline: copy.headlineFreshHuman || 'Verify your humanity again',
-                documentTitle: copy.documentTitleFreshHuman,
+                eyebrow: isSiteDoubt ? 'Fresh human proof required' : 'Human proof required',
+                headline: isSiteDoubt
+                    ? (copy.headlineFreshHuman || 'Verify your humanity again')
+                    : (copy.headline || 'Confirm you\u2019re human'),
+                documentTitle: isSiteDoubt
+                    ? copy.documentTitleFreshHuman
+                    : copy.documentTitle,
                 intro,
-                privacy: copy.privacyFreshDoubt || 'Your humanity has been doubted. Please prove you\u2019re human to continue.',
+                privacy: isSiteDoubt
+                    ? (copy.privacyFreshDoubt || 'Your humanity has been doubted. Please prove you\u2019re human to continue.')
+                    : (copy.privacy || ''),
                 hideSteps: false,
+                hidePrivacy: !isSiteDoubt,
             });
-            document.getElementById('brand-mark')?.classList.add('is-caution');
+            const mark = document.getElementById('brand-mark');
+            if (isSiteDoubt) {
+                mark?.classList.add('is-caution');
+            } else {
+                mark?.classList.remove('is-caution');
+            }
         }
 
         function applyActionSignShell() {

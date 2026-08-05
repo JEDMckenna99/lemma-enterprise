@@ -968,19 +968,18 @@ class ProofVerifier {
             // Monthly site VC expiry: renew via daily-unlock popup (passkey only
             // when the lock bundle is missing or stale).
             'expired',
-            // A revoked credential is not a permanent block, it triggers a
-            // fresh IDV (or fresh test verification in the demo) so the user
-            // can regain access. The popup runs in 'fresh_idv' mode below.
+            // Revoked site VC: re-issue via normal site_proof popup (local master
+            // or reissue/IDV). Never auto-open the site-doubt / fresh_idv shell —
+            // that ceremony is only for deliberate verifyFreshForBackend().
             'revoked',
         ]);
 
         if (popupReasons.has(result.reason)) {
-            const needsFreshIdv = result.reason === 'revoked';
             // Clear the locally cached site VC so the recovered credential
             // (with a fresh credential_id, signature, and session) replaces it.
             this._clearSessionCache();
             const issued = await this._issueSiteProofViaPopup({
-                freshIdv: needsFreshIdv,
+                freshIdv: false,
                 refreshReason: result.reason,
             });
             if (issued.ok) {

@@ -99,17 +99,27 @@ def test_verifier_site_vc_cache(verifier_source):
 
 @pytest.mark.browser
 def test_verifier_requires_explicit_fresh_idv_for_doubt(verifier_source):
-    """Site bans fail closed; revocation recovery and explicit doubt select fresh IDV."""
+    """Doubt / fresh_idv is deliberate only — never auto-selected on revoked."""
     popup_reasons = verifier_source.split("const popupReasons = new Set([", 1)[1].split("]);", 1)[0]
     assert "'revoked'," in popup_reasons
     assert "'invalid_signature'," not in popup_reasons
     assert "'site_blocked'," not in popup_reasons
     assert "'expired'," in verifier_source
-    assert "const needsFreshIdv = result.reason === 'revoked';" in verifier_source
+    # Auto-provision after revoked must use site_proof, not the doubt shell.
+    assert "const needsFreshIdv = result.reason === 'revoked';" not in verifier_source
+    assert "freshIdv: false" in verifier_source.split("if (popupReasons.has(result.reason))", 1)[1].split(
+        "if (issued.ok)", 1
+    )[0]
     assert "verifyFreshForBackend" in verifier_source
     assert "refreshReason: 'site_doubt'" in verifier_source
     assert "options.freshIdv ? 'fresh_idv' : 'site_proof'" in verifier_source
     assert "refresh_reason" in verifier_source
+    # Explicit doubt entry remains the only autoProvision=true freshIdv path.
+    explicit = verifier_source.split("if (options.freshIdv === true)", 1)[1].split(
+        "const autoProvision", 1
+    )[0]
+    assert "freshIdv: true" in explicit
+    assert "refreshReason: 'site_doubt'" in explicit
 
 
 @pytest.mark.browser

@@ -58,7 +58,7 @@ TRIAL_ACTION = "start_trial"
 TRIAL_REQUIRED_ASSURANCE = os.getenv(
     "LEMMA_TRIAL_REQUIRED_ASSURANCE", "ishuman"
 ).strip().lower()
-ISHUMAN_VERIFIER_SDK_VERSION = os.getenv("ISHUMAN_VERIFIER_SDK_VERSION", "1.9.3").strip()
+ISHUMAN_VERIFIER_SDK_VERSION = os.getenv("ISHUMAN_VERIFIER_SDK_VERSION", "1.9.4").strip()
 SESSION_SECRET = os.getenv("SESSION_SECRET", "lemma-demo-site-session-dev-secret")
 SESSION_COOKIE = "lemma_demo_session"
 SESSION_MAX_AGE = int(os.getenv("LEMMA_DEMO_SESSION_MAX_AGE", "86400"))

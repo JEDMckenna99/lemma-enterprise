@@ -120,6 +120,8 @@ def test_idv_fresh_passkey_confirms_holder_presence():
     assert ".brand-mark.is-caution" in idv
     assert "classList.add('is-caution')" in idv
     assert "Your humanity has been doubted." in copy
+    # Doubt framing is only for deliberate site_doubt, not every fresh_idv.
+    assert "const isSiteDoubt = refreshReason === 'site_doubt';" in idv
     assert "firstHumanSuccess: 'You\\u2019re a human'" in copy
     assert "freshSuccess: 'You\\u2019re a human'" in copy
 
