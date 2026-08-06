@@ -16,9 +16,11 @@ from api.fresh_passkey_attestation import (
     delete_fresh_passkey_challenge,
     get_fresh_passkey_challenge,
     issue_fresh_passkey_attestation,
+    lookup_wallet_passkey_identity,
     lookup_wallet_passkey_public_key,
     store_fresh_passkey_challenge,
     update_wallet_passkey_sign_count,
+    validate_fresh_passkey_identity_binding,
     verify_wallet_webauthn_assertion,
 )
 from api.passkey_auth import ORIGIN, RP_ID
@@ -47,6 +49,18 @@ def fresh_passkey_begin():
     if not passkey_credential_id:
         return jsonify({"success": False, "error": "passkey_credential_id required"}), 400
 
+    ok_bind, bind_reason = validate_fresh_passkey_identity_binding(
+        passkey_credential_id=passkey_credential_id,
+        wallet_id=wallet_id,
+        subject=subject,
+    )
+    if not ok_bind:
+        return jsonify({"success": False, "error": bind_reason}), 403
+
+    registered_wallet_id, _device_id = lookup_wallet_passkey_identity(passkey_credential_id)
+    if not registered_wallet_id:
+        return jsonify({"success": False, "error": "passkey_not_registered_on_server"}), 403
+
     challenge = secrets.token_bytes(32)
     challenge_key = f"fpa_{secrets.token_urlsafe(16)}"
     expires = (datetime.utcnow() + timedelta(seconds=120)).isoformat()
@@ -59,7 +73,7 @@ def fresh_passkey_begin():
             "credential_id": credential_id,
             "passkey_credential_id": passkey_credential_id,
             "subject": subject,
-            "wallet_id": wallet_id,
+            "wallet_id": registered_wallet_id,
             "expires": expires,
         },
     )
@@ -101,6 +115,14 @@ def fresh_passkey_complete():
     ).strip()
     if not credential_id_b64 or credential_id_b64 != expected_passkey_credential_id:
         return jsonify({"success": False, "error": "credential_id_mismatch"}), 403
+
+    ok_bind, bind_reason = validate_fresh_passkey_identity_binding(
+        passkey_credential_id=credential_id_b64,
+        wallet_id=str(stored.get("wallet_id") or ""),
+        subject=str(stored.get("subject") or ""),
+    )
+    if not ok_bind:
+        return jsonify({"success": False, "error": bind_reason}), 403
 
     public_key_b64, sign_count = lookup_wallet_passkey_public_key(credential_id_b64)
     if not public_key_b64:

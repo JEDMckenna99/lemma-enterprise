@@ -23,6 +23,7 @@ OUTPUT_PATH = REPO_ROOT / "docs" / "api" / "AUTH_SCOPE_MATRIX_V1.json"
 DEFAULT_SCOPE_BY_DECORATOR = {
     "require_site_admin": "admin",
     "require_admin": "admin",
+    "require_platform_admin": "admin",
     "require_customer_or_admin": "read",
     "require_wallet_ppid": "read",
     "require_wallet_auth": "read",

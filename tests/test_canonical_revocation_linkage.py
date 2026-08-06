@@ -71,7 +71,10 @@ def test_permission_verification_denies_when_canonically_revoked(monkeypatch):
         resp = client.post(
             "/api/sdk/verify-permission-lemma",
             json=payload,
-            headers={"Origin": "https://lemma.id", "Authorization": "Bearer test_key"},
+            headers={
+                "Origin": "https://lemma.id",
+                "X-Lemma-Credential": '{"id":"cred_caller"}',
+            },
         )
         assert resp.status_code == 403
         body = resp.get_json()

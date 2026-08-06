@@ -1811,7 +1811,11 @@ def issue_to_wallet():
                 return jsonify({'success': False, 'error': 'Invalid PPID format'}), 400
             ppid = client_ppid
         elif passkey_credential_id:
-            ppid = derive_user_ppid(site_id, passkey_credential_id=passkey_credential_id)
+            return jsonify({
+                'success': False,
+                'error': 'presentation_required',
+                'message': 'Bare passkey_credential_id issuance is disabled. Verify a signed presentation on your backend.',
+            }), 410
         else:
             return jsonify({
                 'success': False,

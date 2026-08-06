@@ -6,16 +6,48 @@ Provides real-time stats for the developer platform
 import os
 import logging
 from datetime import datetime
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, g
 from sqlalchemy import func, and_, or_
 
 from api.database import get_db_connection
 from api.usage_tracking import get_monthly_active_users, get_verification_count
-from auth.decorators import require_api_key, require_customer_or_admin
+from auth.decorators import require_platform_admin, require_customer_or_admin
 
 logger = logging.getLogger(__name__)
 
 platform_stats_bp = Blueprint('platform_stats', __name__)
+
+
+def _authorize_revocation_for_site(site_id: str) -> tuple[bool, str]:
+    """Authorize revocation from verified request principal only (never body claims)."""
+    from api.site_access import verify_site_ownership, is_platform_operator_ppid
+    from auth.decorators import _principal_is_platform_admin
+
+    ppid = getattr(g, "ppid", None)
+    site_binding = getattr(g, "site_binding", None)
+    scope = getattr(g, "scope", None) or []
+    is_admin = getattr(g, "is_admin", False) or "admin" in scope
+
+    if not ppid:
+        return False, "Credential required for revocation"
+
+    if _principal_is_platform_admin(ppid, site_binding):
+        return True, "platform_admin"
+
+    normalized_site = (site_id or "").strip()
+    if not normalized_site:
+        return False, "site_id is required"
+
+    if not is_admin:
+        return False, "Admin scope required for revocation"
+
+    if verify_site_ownership(normalized_site, ppid):
+        return True, "site_owner"
+
+    if is_platform_operator_ppid(ppid) and (site_binding or "").strip().lower() == normalized_site.lower():
+        return True, "platform_site_binding"
+
+    return False, "You can only revoke permissions for your own site"
 
 
 @platform_stats_bp.route('/api/platform/stats', methods=['GET', 'POST'])
@@ -497,81 +529,33 @@ def revoke_platform_permission():
         instance_id = data.get('instance_id')
         credential_id = data.get('credential_id')
         reason = data.get('reason', 'admin_action')
-        admin_credential = data.get('admin_credential')
         requested_site_id = data.get('site_id')
         
-        if not admin_credential:
-            logger.warning(f"🚫 Revocation attempt without credential")
+        if not requested_site_id:
             return jsonify({
                 'success': False,
-                'error': 'Credential required for revocation'
-            }), 403
-        
-        # Extract permission info from caller's credential
-        admin_claims = admin_credential.get('claims') or admin_credential.get('credentialSubject') or {}
-        admin_permission_id = admin_claims.get('permissionId') or admin_claims.get('permission_level') or admin_claims.get('permissions') or ''
-        admin_site_id = admin_claims.get('siteId') or admin_claims.get('site_id') or ''
-        
-        # Check if caller is lemma.id platform user
-        is_lemma_platform_user = admin_site_id == 'lemma.id' or admin_site_id == 'lemma_platform'
-        
-        # Determine the site_id for the revocation
-        site_id = requested_site_id or admin_site_id
-        
-        if not site_id or site_id == 'lemma.id':
+                'error': 'site_id is required'
+            }), 400
+
+        site_id = requested_site_id
+        if site_id == 'lemma.id':
             site_id = 'lemma_platform'
-        
-        # Authorization check:
-        # Option 1: Platform user revoking from their own customer site
-        # Option 2: Site admin revoking from their own site  
-        # Option 3: Lemma superadmin can revoke anything
-        can_revoke = False
-        
-        # If caller is a lemma.id platform user, check if they own the target site
-        if is_lemma_platform_user and site_id != 'lemma_platform':
-            # Look up the customer's sites from database
-            try:
-                from api.storage_helpers import get_sites_for_customer_from_postgres
-                # Get customer_id from the credential or lookup by email
-                admin_email = admin_claims.get('email') or admin_claims.get('userEmail') or ''
-                
-                # Get customer by email
-                conn_check = get_db_connection(site_id='lemma_platform')
-                cursor_check = conn_check.cursor()
-                cursor_check.execute("SELECT customer_id FROM customers WHERE email = %s", (admin_email,))
-                customer_row = cursor_check.fetchone()
-                
-                if customer_row:
-                    customer_id = customer_row[0]
-                    # Check if this customer owns the target site
-                    owned_sites = get_sites_for_customer_from_postgres(customer_id)
-                    owned_site_ids = [s.get('site_id') for s in owned_sites]
-                    
-                    if site_id in owned_site_ids:
-                        can_revoke = True
-                        logger.info(f"✅ Platform user {admin_email} owns site {site_id} - revocation authorized")
-                    else:
-                        logger.warning(f"🚫 Platform user {admin_email} does not own site {site_id}")
-                
-                cursor_check.close()
-                conn_check.close()
-            except Exception as e:
-                logger.error(f"Error checking site ownership: {e}")
-        
-        # Direct site admin
-        if admin_site_id == site_id:
-            can_revoke = True
-            
-        # Lemma superadmin can revoke anything
-        if is_lemma_platform_user and 'admin' in admin_permission_id.lower():
-            can_revoke = True
-        
+
+        can_revoke, auth_reason = _authorize_revocation_for_site(site_id)
         if not can_revoke:
-            logger.warning(f"🚫 Unauthorized revocation: caller site={admin_site_id}, target site={site_id}, role={admin_permission_id}")
+            logger.warning(
+                "Unauthorized revocation: caller ppid=%s site_binding=%s target site=%s reason=%s",
+                (getattr(g, "ppid", "") or "")[:30],
+                getattr(g, "site_binding", ""),
+                site_id,
+                auth_reason,
+            )
             return jsonify({
                 'success': False,
-                'error': 'You can only revoke permissions for your own site'
+                'error': auth_reason
             }), 403
+        
+        admin_permission_id = getattr(g, "permission_id", None) or "admin_access"
         
         # Need at least one identifier
         if not email and not credential_did and not instance_id:
@@ -714,13 +698,13 @@ def get_time_ago(timestamp):
 
 
 @platform_stats_bp.route('/api/platform/issue-site-permission', methods=['POST'])
-@require_api_key
+@require_platform_admin
 def issue_site_permission():
     """
     Issue a permission credential directly to a user for any registered site.
     This allows platform admins to grant access without the email confirmation flow.
     
-    Security: Requires valid API key (platform or customer).
+    Security: Requires lemma.id platform-operator admin credential.
     
     POST /api/platform/issue-site-permission
     {

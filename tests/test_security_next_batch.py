@@ -150,10 +150,10 @@ def test_exchange_proof_rejects_site_mismatch(monkeypatch):
         assert resp.get_json()["error"] == "site_mismatch"
 
 
-def test_complete_identity_verification_accepts_untracked_session_id(monkeypatch):
+def test_complete_identity_verification_rejects_untracked_session_id(monkeypatch):
     """
-    Risk check #1/#2: completion currently accepts attacker-chosen session IDs
-    if they match format, instead of binding to server-tracked issuance context.
+    Completion must reject client-supplied session IDs that were not started
+    and bound to the initiating API key.
     """
     app = _app_with_sdk_api(monkeypatch)
 
@@ -176,10 +176,10 @@ def test_complete_identity_verification_accepts_untracked_session_id(monkeypatch
                 "enable_rust_engine": False,
             },
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 403
         body = resp.get_json()
-        assert body["success"] is True
-        assert body["verified"] is True
+        assert body["success"] is False
+        assert body["error"] == "untracked_verification_session"
 
 
 def test_signal_unlock_origin_substring_bypass(monkeypatch):

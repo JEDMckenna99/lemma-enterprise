@@ -420,7 +420,7 @@ def exchange_proof_for_token():
 
 @sdk_auth_bp.route('/api/auth/introspect', methods=['POST', 'OPTIONS'])
 @cross_origin()
-@require_api_key
+@require_api_key(allow_credential_fallback=False)
 def introspect_access_token_endpoint():
     """Introspect a server-issued access token (requires API key auth)."""
     if request.method == 'OPTIONS':
@@ -439,7 +439,7 @@ def introspect_access_token_endpoint():
 
 @sdk_auth_bp.route('/api/auth/revoke', methods=['POST', 'OPTIONS'])
 @cross_origin()
-@require_api_key
+@require_api_key(allow_credential_fallback=False)
 def revoke_access_token_endpoint():
     """Revoke a server-issued access token (requires API key auth)."""
     if request.method == 'OPTIONS':

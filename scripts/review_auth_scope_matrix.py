@@ -20,10 +20,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 MATRIX_PATH = REPO_ROOT / "docs" / "api" / "AUTH_SCOPE_MATRIX_V1.json"
 
 STATE_CHANGING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
-ADMIN_AUTH_DECORATORS = {"require_admin", "require_site_admin"}
+ADMIN_AUTH_DECORATORS = {"require_admin", "require_site_admin", "require_platform_admin"}
 ANY_AUTH_DECORATORS = {
     "require_admin",
     "require_site_admin",
+    "require_platform_admin",
     "require_customer_or_admin",
     "require_wallet_ppid",
     "require_wallet_auth",

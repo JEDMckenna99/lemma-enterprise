@@ -500,4 +500,4 @@ def warn_client_ppid_issuance() -> bool:
 
 def reject_client_ppid_issuance() -> bool:
     """Hard-reject bare client-supplied PPID on wallet-auth issue (except platform allowlist)."""
-    return _env_truthy("LEMMA_REJECT_CLIENT_PPID_ISSUANCE", False)
+    return _env_truthy("LEMMA_REJECT_CLIENT_PPID_ISSUANCE", True)

@@ -14,7 +14,7 @@ from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from sqlalchemy import Column, String, Text, Boolean, DateTime, Integer
 from sqlalchemy.ext.declarative import declarative_base
-from auth.decorators import require_api_key
+from auth.decorators import require_platform_admin
 
 from .database import get_db, Base, engine
 
@@ -72,7 +72,7 @@ def init_issuer_registry_table():
 
 @issuer_registry_bp.route('/api/issuers/register', methods=['POST'])
 @cross_origin()
-@require_api_key
+@require_platform_admin
 def register_issuer():
     """
     Register a new issuer with the Lemma network
@@ -266,7 +266,7 @@ def list_issuers():
 
 @issuer_registry_bp.route('/api/issuers/verify', methods=['POST'])
 @cross_origin()
-@require_api_key
+@require_platform_admin
 def verify_issuer():
     """
     Verify domain ownership for an issuer
@@ -343,7 +343,7 @@ def verify_issuer():
 
 @issuer_registry_bp.route('/api/issuers/<path:issuer_did>/revoke', methods=['POST'])
 @cross_origin()
-@require_api_key
+@require_platform_admin
 def revoke_issuer(issuer_did):
     """
     Revoke an issuer (mark as inactive)

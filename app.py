@@ -880,81 +880,29 @@ def create_app():
     def verify_session_freshness():
         """
         Server-side verification of authentication freshness.
-        
-        High-security sites (banks, financial apps) can call this endpoint
-        to verify that a user's authentication is genuinely fresh - not just
-        trusting the client-side timestamp.
-        
-        Request body:
-        {
-            "walletId": "user's wallet ID",
-            "authTimestamp": 1234567890123,  // Claimed auth timestamp
-            "maxAgeMs": 30000  // Max acceptable age (default 30s)
-        }
-        
-        Response:
-        {
-            "valid": true/false,
-            "fresh": true/false,
-            "reason": "valid" | "timestamp_mismatch" | "too_old" | "unknown_wallet"
-        }
-        
-        SECURITY NOTES:
-        - This endpoint allows sites to verify client claims
-        - Without this, a compromised client could lie about auth freshness
-        - Rate limited to prevent enumeration attacks
+
+        Disabled pending a server-bound passkey auth-event store. Callers must
+        not treat client timestamps as proof of freshness.
         """
         from flask import request
-        
+
         data = request.get_json() or {}
         wallet_id = data.get('walletId')
         claimed_timestamp = data.get('authTimestamp')
-        max_age_ms = data.get('maxAgeMs', 30000)
-        
+
         if not wallet_id or not claimed_timestamp:
             return jsonify({
                 'valid': False,
                 'fresh': False,
                 'reason': 'missing_parameters'
             }), 400
-        
-        # In production, this would check against a server-side session store
-        # For now, we validate the timestamp is reasonable (not in future, not ancient)
-        import time
-        current_time = int(time.time() * 1000)
-        
-        # Validate timestamp is reasonable
-        if claimed_timestamp > current_time + 60000:  # Allow 1 min clock drift
-            return jsonify({
-                'valid': False,
-                'fresh': False,
-                'reason': 'timestamp_in_future'
-            })
-        
-        age_ms = current_time - claimed_timestamp
-        
-        if age_ms > max_age_ms:
-            return jsonify({
-                'valid': True,  # Timestamp is valid
-                'fresh': False,  # But not fresh enough
-                'reason': 'too_old',
-                'ageMs': age_ms,
-                'maxAgeMs': max_age_ms
-            })
-        
-        # For true production security, we would:
-        # 1. Store auth events server-side when they happen
-        # 2. Verify the claimed timestamp matches our record
-        # 3. Sign the response so sites can trust it
-        
+
         return jsonify({
-            'valid': True,
-            'fresh': True,
-            'reason': 'valid',
-            'ageMs': age_ms,
-            'maxAgeMs': max_age_ms,
-            'verifiedAt': current_time
-        })
+            'valid': False,
+            'fresh': False,
+            'reason': 'not_implemented',
+            'message': 'Server-side freshness verification is not available',
+        }), 410
 
     from api.sdk_serving import register_sdk_routes
 

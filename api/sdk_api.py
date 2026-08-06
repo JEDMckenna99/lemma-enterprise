@@ -45,6 +45,55 @@ logger = logging.getLogger(__name__)
 
 _velocity_redis = None
 _velocity_memory = {}
+_sdk_idv_sessions_memory = {}
+_SDK_IDV_SESSION_TTL_SECONDS = 3600
+
+
+def _sdk_idv_session_key(session_id: str) -> str:
+    return f"sdk:idv:session:{(session_id or '').strip()}"
+
+
+def _store_sdk_idv_session(session_id: str, *, api_key: str, user_id: str) -> None:
+    payload = {
+        "api_key": (api_key or "").strip(),
+        "user_id": (user_id or "").strip(),
+        "started_at": time.time(),
+    }
+    redis_client = get_velocity_redis()
+    if redis_client:
+        try:
+            redis_client.setex(
+                _sdk_idv_session_key(session_id),
+                _SDK_IDV_SESSION_TTL_SECONDS,
+                json.dumps(payload),
+            )
+            return
+        except Exception as exc:
+            logger.warning("SDK IDV session store failed (redis): %s", exc)
+    _sdk_idv_sessions_memory[_sdk_idv_session_key(session_id)] = payload
+
+
+def _consume_sdk_idv_session(session_id: str, *, api_key: str) -> dict | None:
+    key = _sdk_idv_session_key(session_id)
+    redis_client = get_velocity_redis()
+    if redis_client:
+        try:
+            raw = redis_client.getdel(key)
+            if raw:
+                data = json.loads(raw)
+            else:
+                return None
+        except Exception as exc:
+            logger.warning("SDK IDV session consume failed (redis): %s", exc)
+            return None
+    else:
+        data = _sdk_idv_sessions_memory.pop(key, None)
+        if not data:
+            return None
+
+    if (data.get("api_key") or "").strip() != (api_key or "").strip():
+        return None
+    return data
 
 def get_velocity_redis():
     """Get Redis client for velocity tracking"""
@@ -622,13 +671,18 @@ def start_identity_verification():
                 'message': session_result.get('message', 'Failed to create verification session')
             }), 500
         
-        # Store session info for completion
+        # Store session info for completion (server-bound to initiating API key)
         session['sdk_verification_session'] = {
             'session_id': session_result['session_id'],
             'user_id': user_id,
             'api_key': request.api_key,
             'started_at': time.time()
         }
+        _store_sdk_idv_session(
+            session_result['session_id'],
+            api_key=request.api_key,
+            user_id=user_id,
+        )
         
         return jsonify({
             'success': True,
@@ -705,9 +759,18 @@ def complete_identity_verification():
                 'error': 'invalid_session_format',
                 'message': 'Invalid session ID format'
             }), 400
-        
-        # Generate user_id from session_id for consistency
-        user_id = f"user_{session_id.split('_')[1] if '_' in session_id else session_id[-8:]}"
+
+        bound_session = _consume_sdk_idv_session(session_id, api_key=request.api_key)
+        if not bound_session:
+            return jsonify({
+                'success': False,
+                'error': 'untracked_verification_session',
+                'message': 'Verification session is not bound to this API key or was already completed',
+            }), 403
+
+        user_id = bound_session.get('user_id') or (
+            f"user_{session_id.split('_')[1] if '_' in session_id else session_id[-8:]}"
+        )
         
         logger.info(f"✅ Completing SDK identity verification for user: {user_id}")
         

@@ -151,6 +151,46 @@ def _validate_replacement_passkey_proof(data: dict) -> tuple[bool, str, str, str
     return True, "ok", ppid, passkey_credential_id
 
 
+def _verify_recovery_webauthn_assertion(
+    data: dict,
+    *,
+    token_hash: str,
+    passkey_credential_id: str,
+) -> tuple[bool, str]:
+    """Verify a WebAuthn assertion for the replacement passkey during recovery."""
+    credential = data.get("webauthn_credential") or data.get("credential")
+    if not isinstance(credential, dict):
+        return False, "replacement_webauthn_required"
+
+    from api.fresh_passkey_attestation import (
+        lookup_wallet_passkey_public_key,
+        verify_wallet_webauthn_assertion,
+    )
+    from api.fresh_passkey_attestation import allowed_fresh_passkey_origins
+    from api.passkey_auth import RP_ID
+
+    credential_id_b64 = str(credential.get("id") or "").strip()
+    if not credential_id_b64 or credential_id_b64 != passkey_credential_id:
+        return False, "replacement_passkey_mismatch"
+
+    public_key_b64, sign_count = lookup_wallet_passkey_public_key(credential_id_b64)
+    if not public_key_b64:
+        return False, "replacement_passkey_not_registered"
+
+    challenge = hashlib.sha256(f"recovery:{token_hash}".encode()).digest()
+    ok, reason, _new_sign_count = verify_wallet_webauthn_assertion(
+        credential=credential,
+        expected_challenge=challenge,
+        rp_id=RP_ID,
+        origin=allowed_fresh_passkey_origins(),
+        public_key_b64=public_key_b64,
+        sign_count=sign_count,
+    )
+    if not ok:
+        return False, reason or "replacement_webauthn_invalid"
+    return True, "ok"
+
+
 def clean_expired_tokens():
     """Remove expired tokens (only needed for memory fallback)"""
     if not redis_client:
@@ -458,6 +498,14 @@ def complete_recovery():
             return jsonify({'success': False, 'error': proof_err}), 400
 
         token_hash = hashlib.sha256(token.encode()).hexdigest()
+        ok_webauthn, webauthn_err = _verify_recovery_webauthn_assertion(
+            data,
+            token_hash=token_hash,
+            passkey_credential_id=passkey_credential_id,
+        )
+        if not ok_webauthn:
+            return jsonify({'success': False, 'error': webauthn_err}), 403
+
         token_data = consume_recovery_token(token_hash)
         if not token_data:
             return jsonify({'success': False, 'error': 'Invalid, expired, or already used token'}), 400

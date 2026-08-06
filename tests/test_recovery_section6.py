@@ -103,12 +103,14 @@ def test_recovery_token_consumed_atomically_before_issuance(recovery_client, mon
     monkeypatch.setattr(mod, "_issue_site_admin_proof", _issue)
     monkeypatch.setattr(mod, "_update_site_admin_ppid", lambda *_a, **_k: True)
     monkeypatch.setattr(mod, "_update_all_admin_sites", lambda *_a, **_k: [])
+    monkeypatch.setattr(mod, "_verify_recovery_webauthn_assertion", lambda *_a, **_k: (True, "ok"))
     monkeypatch.setattr("api.database.SessionLocal", lambda: _DB())
 
     body = {
         "token": token,
         "ppid": "did:lemma:ppid_recovery",
         "passkey_credential_id": "pk-recovery-1",
+        "webauthn_credential": {"id": "pk-recovery-1"},
     }
     first = client.post("/api/recovery/complete", json=body)
     second = client.post("/api/recovery/complete", json=body)

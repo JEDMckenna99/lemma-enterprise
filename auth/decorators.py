@@ -297,12 +297,67 @@ def optional_auth(f):
     return require_credential(allow_unauthenticated=True)(f)
 
 
-def require_api_key(f):
+def require_api_key(f=None, *, allow_credential_fallback: bool = True):
     """
-    Legacy API-key decorator, now requires a credential instead.
-    Endpoints previously gated by API key must present a signed credential.
+    Validate a hash-checked site/platform API key for machine-to-machine routes.
+
+    When ``allow_credential_fallback`` is True (default), requests without an API
+    key may still proceed via ``require_credential()`` for dual-mode site admin
+    routes that enforce ``require_site_ownership`` in the handler. Strict M2M
+    routes should pass ``allow_credential_fallback=False``.
     """
-    return require_credential()(f)
+
+    def decorator(fn):
+        @wraps(fn)
+        def wrapped(*args, **kwargs):
+            from api.site_access import reject_query_param_api_key, validate_site_api_key
+
+            query_reject = reject_query_param_api_key()
+            if query_reject:
+                return query_reject
+
+            api_key = (request.headers.get("X-API-Key") or "").strip()
+            if not api_key:
+                auth_header = (request.headers.get("Authorization") or "").strip()
+                if auth_header.startswith("Bearer "):
+                    candidate = auth_header[7:].strip()
+                    if (
+                        candidate
+                        and not candidate.startswith("{")
+                        and not candidate.startswith("lm_agent_")
+                    ):
+                        api_key = candidate
+
+            if api_key:
+                validation = validate_site_api_key(api_key)
+                if not validation.get("valid"):
+                    return _auth_error(
+                        "invalid_api_key",
+                        validation.get("error") or "Invalid API key",
+                        status=401,
+                        auth_method="api_key",
+                    )
+                g.api_key = api_key
+                g.api_key_info = validation
+                g.authenticated = True
+                g.auth_method = "api_key"
+                return fn(*args, **kwargs)
+
+            if allow_credential_fallback:
+                return require_credential()(fn)(*args, **kwargs)
+
+            return _auth_error(
+                "api_key_required",
+                "Site API key required in X-API-Key or Authorization: Bearer",
+                status=401,
+                auth_method="none",
+            )
+
+        return wrapped
+
+    if f is not None:
+        return decorator(f)
+    return decorator
 
 
 def require_permission_lemma(site_id="lemma.id", required_permissions=None):

@@ -440,6 +440,59 @@ def lookup_wallet_passkey_public_key(credential_id_b64: str) -> tuple[Optional[s
         db.close()
 
 
+def lookup_wallet_passkey_identity(credential_id_b64: str) -> tuple[Optional[str], Optional[str]]:
+    """Return (wallet_id, device_id) for a registered passkey credential."""
+    from api.database import SessionLocal, WalletPasskey
+
+    db = SessionLocal()
+    try:
+        row = (
+            db.query(WalletPasskey)
+            .filter_by(credential_id=str(credential_id_b64 or "").strip())
+            .filter(WalletPasskey.revoked_at.is_(None))
+            .first()
+        )
+        if not row:
+            return None, None
+        return str(row.wallet_id or "").strip() or None, str(row.device_id or "").strip() or None
+    finally:
+        db.close()
+
+
+def validate_fresh_passkey_identity_binding(
+    *,
+    passkey_credential_id: str,
+    wallet_id: str,
+    subject: str,
+) -> tuple[bool, str]:
+    """Ensure the passkey belongs to the claimed wallet/subject binding."""
+    registered_wallet_id, _device_id = lookup_wallet_passkey_identity(passkey_credential_id)
+    if not registered_wallet_id:
+        return False, "passkey_not_registered_on_server"
+
+    claimed_wallet = str(wallet_id or "").strip()
+    if claimed_wallet and claimed_wallet != registered_wallet_id:
+        return False, "wallet_id_mismatch"
+
+    subject_value = str(subject or "").strip()
+    if subject_value:
+        try:
+            from api.database import SessionLocal
+            from api.ishuman import resolve_wallet_id_for_ppid
+
+            db = SessionLocal()
+            try:
+                resolved_wallet = resolve_wallet_id_for_ppid(db, subject_value)
+            finally:
+                db.close()
+            if resolved_wallet and resolved_wallet != registered_wallet_id:
+                return False, "subject_wallet_mismatch"
+        except Exception as exc:
+            logger.warning("Fresh passkey subject binding check failed: %s", exc)
+
+    return True, "ok"
+
+
 def update_wallet_passkey_sign_count(credential_id_b64: str, new_sign_count: int) -> None:
     from api.database import SessionLocal, WalletPasskey
 
