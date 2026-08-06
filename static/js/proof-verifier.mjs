@@ -42,6 +42,8 @@ const SESSION_PRESENTATION_PREFIX = "lemma:site-session-presentation:v1";
 const ACTION_PRESENTATION_PREFIX = "lemma:site-action-presentation:v1";
 const ACTION_STAMP_VERSION = "action_stamp_v1";
 const DEFAULT_LEMMA_ORIGIN = "https://lemma.id";
+const DEFAULT_TRUST_BUNDLE_MIRROR =
+  "https://jedmckenna99.github.io/lemma-enterprise/trust-mirror/bloom-filter.json";
 const DEFAULT_REFRESH_MS = 15 * 60 * 1000;
 const DEFAULT_MAX_SESSION_AGE_S = 24 * 60 * 60;
 const DEFAULT_MAX_ACTION_AGE_S = 60;
@@ -891,22 +893,54 @@ async function verifyBloomSnapshot(snapshot, hashedRevokedIds, trustedIssuers) {
   if (!valid) throw new Error("bloom_snapshot_invalid_signature");
 }
 
-async function fetchSignedBundle(lemmaOrigin, fetchImpl, networkRootPubkeys) {
-  const url = `${lemmaOrigin.replace(/\/$/, "")}/api/revocation/bloom-filter`;
-  const res = await (fetchImpl || globalThis.fetch)(url);
-  if (!res.ok) throw new Error(`bloom_fetch_${res.status}`);
-  const data = await res.json();
-  if (!data.success) throw new Error("bloom_fetch_failed");
-  const issuers = await verifyTrustList(data.trust_list || {}, networkRootPubkeys);
-  await verifyBloomSnapshot(data.snapshot || {}, data.hashed_revoked_ids || [], issuers);
-  return {
-    sequenceNumber: Number(data.snapshot?.sequence_number || 0),
-    revokedHashSet: new Set(data.hashed_revoked_ids || []),
-    validUntilUnix: Number(data.snapshot?.valid_until_unix || 0),
-    fetchedAtMs: Date.now(),
-    maxStalenessSeconds: Number(data.snapshot?.max_staleness_seconds || DEFAULT_MAX_BLOOM_STALENESS_SECONDS),
-    issuers,
-  };
+function resolveTrustBundleUrls(lemmaOrigin, trustBundleUrls) {
+  if (Array.isArray(trustBundleUrls) && trustBundleUrls.length) {
+    return trustBundleUrls.map((u) => String(u).trim()).filter(Boolean);
+  }
+  const env = typeof process !== "undefined" ? process.env?.LEMMA_TRUST_BUNDLE_URLS : "";
+  if (env) {
+    return String(env)
+      .split(",")
+      .map((u) => u.trim())
+      .filter(Boolean);
+  }
+  const origin = String(lemmaOrigin || DEFAULT_LEMMA_ORIGIN).replace(/\/$/, "");
+  return [
+    `${origin}/api/revocation/bloom-filter`,
+    DEFAULT_TRUST_BUNDLE_MIRROR,
+  ];
+}
+
+async function fetchSignedBundleFromUrls(urls, fetchImpl, networkRootPubkeys) {
+  const errors = [];
+  for (const url of urls) {
+    try {
+      const res = await (fetchImpl || globalThis.fetch)(url);
+      if (!res.ok) throw new Error(`bloom_fetch_${res.status}`);
+      const data = await res.json();
+      if (!data.success) throw new Error("bloom_fetch_failed");
+      const issuers = await verifyTrustList(data.trust_list || {}, networkRootPubkeys);
+      await verifyBloomSnapshot(data.snapshot || {}, data.hashed_revoked_ids || [], issuers);
+      return {
+        sequenceNumber: Number(data.snapshot?.sequence_number || 0),
+        revokedHashSet: new Set(data.hashed_revoked_ids || []),
+        validUntilUnix: Number(data.snapshot?.valid_until_unix || 0),
+        fetchedAtMs: Date.now(),
+        maxStalenessSeconds: Number(
+          data.snapshot?.max_staleness_seconds || DEFAULT_MAX_BLOOM_STALENESS_SECONDS,
+        ),
+        issuers,
+      };
+    } catch (err) {
+      errors.push(`${url}: ${err?.message || err}`);
+    }
+  }
+  throw new Error(`trust_refresh_failed:${errors.join("; ")}`);
+}
+
+async function fetchSignedBundle(lemmaOrigin, fetchImpl, networkRootPubkeys, trustBundleUrls) {
+  const urls = resolveTrustBundleUrls(lemmaOrigin, trustBundleUrls);
+  return fetchSignedBundleFromUrls(urls, fetchImpl, networkRootPubkeys);
 }
 
 // ---------------------------------------------------------------------------
@@ -917,6 +951,7 @@ async function fetchSignedBundle(lemmaOrigin, fetchImpl, networkRootPubkeys) {
  * @param {object} options
  * @param {string} options.siteId                   Expected site_id binding.
  * @param {string} [options.lemmaOrigin]            Defaults to https://lemma.id.
+ * @param {string[]} [options.trustBundleUrls]      Ordered bloom/trust-list URLs (failover).
  * @param {number} [options.refreshMs]              Snapshot refresh interval. Defaults to 15 min.
  * @param {number} [options.maxSessionAgeSeconds]   Reject session assertions older than this. Defaults to 24h.
  * @param {Function} [options.fetch]                Custom fetch impl (e.g. for Cloudflare Workers).
@@ -925,6 +960,7 @@ async function fetchSignedBundle(lemmaOrigin, fetchImpl, networkRootPubkeys) {
 export function createVerifier({
   siteId,
   lemmaOrigin = DEFAULT_LEMMA_ORIGIN,
+  trustBundleUrls = null,
   refreshMs = DEFAULT_REFRESH_MS,
   maxSessionAgeSeconds = DEFAULT_MAX_SESSION_AGE_S,
   requireSessionAssertion = false,
@@ -953,7 +989,7 @@ export function createVerifier({
       || now - snapshot.fetchedAtMs > Math.min(refreshMs, snapshot.maxStalenessSeconds * 1000);
     if (!stale) return snapshot;
     if (inflight) return inflight;
-    inflight = fetchSignedBundle(lemmaOrigin, fetchImpl, networkRootPubkeys)
+    inflight = fetchSignedBundle(lemmaOrigin, fetchImpl, networkRootPubkeys, trustBundleUrls)
       .then((next) => {
         snapshot = next;
         return snapshot;
@@ -1394,6 +1430,12 @@ export async function verifyActionStamp(stamp, options) {
   return createVerifier(options).verifyActionStamp(stamp, options);
 }
 
+export {
+  resolveTrustBundleUrls,
+  DEFAULT_TRUST_BUNDLE_MIRROR,
+  DEFAULT_LEMMA_ORIGIN,
+};
+
 // CommonJS interop for Node.js require()
 if (typeof module !== "undefined" && typeof module.exports !== "undefined") {
   module.exports = {
@@ -1412,5 +1454,7 @@ if (typeof module !== "undefined" && typeof module.exports !== "undefined") {
     canonicalizeSiteHostname,
     browserCanonicalMessage,
     defaultNonceStoreMode,
+    resolveTrustBundleUrls,
+    DEFAULT_TRUST_BUNDLE_MIRROR,
   };
 }

@@ -100,13 +100,13 @@ def _load_default_entries() -> list[dict[str, Any]]:
 
     # Runtime federated issuer is authoritative signer for revocation artifacts.
     try:
-        from api.issuer_management import get_issuer_manager
+        from api.federated_signer import get_federated_issuer_metadata
 
-        issuer = get_issuer_manager().get_federated_issuer()
+        meta = get_federated_issuer_metadata()
         entry = _normalize_entry(
             {
-                "did": issuer.get_did(),
-                "public_key_hex": issuer.get_public_key_hex(),
+                "did": meta["did"],
+                "public_key_hex": meta["pubkey_hex"],
                 "key_id": "federated-current",
                 "status": "active",
                 "priority": 100,
@@ -173,7 +173,7 @@ def build_trust_list_signature_message(
 
 
 def build_signed_trust_list(*, generated_at_unix: int | None = None) -> dict[str, Any]:
-    from api.bloom_snapshot import _issuer_signing_material
+    from api.federated_signer import get_federated_signer
 
     entries = _load_default_entries()
     if not entries:
@@ -184,14 +184,14 @@ def build_signed_trust_list(*, generated_at_unix: int | None = None) -> dict[str
     version = 1
     content_hash = compute_trust_list_content_hash(entries)
 
-    private_key, public_key, signer_did = _issuer_signing_material()
     message = build_trust_list_signature_message(
         version=version,
         content_hash=content_hash,
         generated_at_unix=now,
         valid_until_unix=valid_until,
     )
-    signature = b64url_encode(sign_message(private_key, message))
+    signer = get_federated_signer()
+    signature = signer.sign_b64url(message)
 
     return {
         "version": version,
@@ -199,8 +199,8 @@ def build_signed_trust_list(*, generated_at_unix: int | None = None) -> dict[str
         "generated_at_unix": now,
         "valid_until_unix": valid_until,
         "content_hash": content_hash,
-        "signer_did": signer_did,
-        "signer_pubkey": public_key.public_bytes_raw().hex(),
+        "signer_did": signer.get_did(),
+        "signer_pubkey": signer.get_public_key_hex(),
         "signature": signature,
         "issuers": entries,
         "algorithm": "Ed25519-SHA256",

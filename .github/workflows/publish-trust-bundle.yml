@@ -1,0 +1,40 @@
+name: Publish trust bundle mirror
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: trust-bundle-mirror
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install verifier dependency
+        run: pip install "cryptography>=42"
+
+      - name: Fetch and verify primary bundle
+        run: |
+          python scripts/publish_trust_bundle.py \
+            --primary https://lemma.id/api/revocation/bloom-filter \
+            --output trust-mirror/bloom-filter.json
+
+      - name: Deploy mirror to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: trust-mirror
+          target-folder: trust-mirror
+          branch: gh-pages
+          commit-message: "chore: refresh trust bundle mirror"

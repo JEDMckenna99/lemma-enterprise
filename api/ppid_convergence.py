@@ -32,18 +32,10 @@ def build_convergence_canonical_message(artifact: dict) -> bytes:
 
 
 def _sign_convergence_digest(digest: bytes) -> tuple[str, str]:
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from api.federated_signer import get_federated_signer
 
-    from api.ishuman import _get_ishuman_issuer
-
-    issuer = _get_ishuman_issuer()
-    seed = bytes(issuer.signing_key_bytes())
-    if len(seed) != 32:
-        raise ValueError("issuer signing key seed must be 32 bytes")
-    sk = Ed25519PrivateKey.from_private_bytes(seed)
-    signature_hex = sk.sign(digest).hex()
-    issuer_did = issuer.get_did()
-    return signature_hex, issuer_did
+    signer = get_federated_signer()
+    return signer.sign_digest_hex(digest), signer.get_did()
 
 
 def sign_ppid_convergence_artifact(artifact: dict) -> dict:

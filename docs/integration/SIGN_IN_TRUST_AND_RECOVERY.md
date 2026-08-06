@@ -125,12 +125,40 @@ common misreads:
   receives it. (isHuman IDV is a separate, opt-in, paid step-up.)
 - **No profile data from lemma.** Sign-in returns `ppid` + `assurance` only —
   no email, name, or avatar. You own the profile; lemma owns the proof.
-- **No cross-site tracking.** PPIDs are **pairwise**: the id a user gets on your
-  site is derived from your hostname and is unlinkable to the id they get
-  anywhere else. lemma.id cannot correlate a user across sites, by design.
+- **No cross-site tracking by relying sites.** PPIDs are **pairwise**: the id a
+  user gets on your site is derived from your hostname and cannot be correlated
+  with the id they get anywhere else **by you or by other sites**. lemma.id does
+  not track users across sites, and there is no cross-site remap API. See
+  [Operator capability](#operator-capability-honest) below for what the operator
+  could technically do.
 - **No device attestation gate on your users.** Your site only ever sees a
   signed presentation and a `ppid`; you never allow/deny users by which passkey
   provider or authenticator they chose.
+
+---
+
+## Operator capability (honest)
+
+This section names what lemma.id **could** do technically, separate from what
+we **do** by policy and what **relying sites** can do.
+
+| Actor | Can correlate a user across sites? |
+|-------|-------------------------------------|
+| **Your site + other relying sites** | No — PPIDs are pairwise; you never receive a global user id |
+| **lemma.id operator (today)** | Could derive site PPIDs from server-held person roots at issuance; we don't, and there is no cross-site remap API |
+| **lemma.id operator (roadmap)** | Client-side-only derivation from sealed roots; issuance transparency log so forged credentials are detectable |
+
+**What we observe at issuance:** hostname, wallet id, and the target site's
+`ppid` — enough to bind a proof to your site, not enough for relying sites to
+link accounts. We do not receive your profile data, and we do not sell or share
+cross-site user lists.
+
+**What you should tell users:** their account id on your site cannot be linked
+to their account id on another site by you or by other sites. That property is
+cryptographic. Operator non-linkage is a policy commitment today, with
+architectural hardening on the roadmap (see
+[ISSUER_KEY_CUSTODY.md](../security/ISSUER_KEY_CUSTODY.md) and
+[OPERATIONAL_HARDENING.md](../architecture/OPERATIONAL_HARDENING.md)).
 
 ---
 

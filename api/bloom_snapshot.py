@@ -54,17 +54,13 @@ def build_signature_message(
 
 
 def _issuer_signing_material() -> tuple[Ed25519PrivateKey, Ed25519PublicKey, str]:
-    """Load federated network issuer Ed25519 key material."""
-    from api.issuer_management import get_issuer_manager
+    """Load federated network issuer Ed25519 key material (local signing process only)."""
+    from api.federated_signer import get_federated_signer
 
-    issuer = get_issuer_manager().get_federated_issuer()
-    seed = bytes(issuer.signing_key_bytes())
-    if len(seed) != 32:
-        raise ValueError("issuer signing seed must be 32 bytes")
-    private_key = Ed25519PrivateKey.from_private_bytes(seed)
-    public_key = private_key.public_key()
-    did = issuer.get_did()
-    return private_key, public_key, did
+    signer = get_federated_signer()
+    if not signer.has_local_seed():
+        raise RuntimeError("issuer signing material requires local federated seed")
+    return signer.signing_material()
 
 
 def sign_bloom_snapshot(
@@ -85,15 +81,18 @@ def sign_bloom_snapshot(
     count = len(hashed_revoked_ids)
     content_hash = compute_content_hash(hashed_revoked_ids, count)
 
-    private_key, public_key, issuer_did = _issuer_signing_material()
     message = build_signature_message(
         sequence_number=sequence_number,
         content_hash_hex=content_hash,
         generated_at_unix=generated_unix,
         valid_until_unix=valid_until_unix,
     )
-    signature = sign_message(private_key, message)
-    pubkey_hex = public_key.public_bytes_raw().hex()
+    from api.federated_signer import get_federated_signer
+
+    signer = get_federated_signer()
+    signature_b64 = signer.sign_b64url(message)
+    pubkey_hex = signer.get_public_key_hex()
+    issuer_did = signer.get_did()
 
     return {
         "sequence_number": int(sequence_number),
@@ -105,7 +104,7 @@ def sign_bloom_snapshot(
         "count": count,
         "issuer_did": issuer_did,
         "issuer_pubkey": pubkey_hex,
-        "signature": b64url_encode(signature),
+        "signature": signature_b64,
         "algorithm": "Ed25519-SHA256",
         "max_staleness_seconds": DEFAULT_BLOOM_STALENESS_SECONDS,
     }

@@ -357,11 +357,9 @@ def create_lemma_credential(user_id: str, stripe_session_id: str) -> Dict[str, A
         logger.info(f"🦀 Creating lemma credential using Rust engine for user {user_id}")
         
         # Use REAL crypto engine with consistent issuer
-        from .issuer_management import get_issuer_manager
-        issuer_manager = get_issuer_manager()
-        
-        # Get consistent federated issuer (same DID for all federated credentials)
-        federated_issuer = issuer_manager.get_federated_issuer()
+        from api.federated_signer import get_federated_signer
+
+        signer = get_federated_signer()
         
         # Create identity claims for federated network
         identity_claims = {
@@ -374,17 +372,17 @@ def create_lemma_credential(user_id: str, stripe_session_id: str) -> Dict[str, A
             "network_type": "federated_identity"
         }
         
+        from api.issuer_management import get_issuer_manager
+        issuer_manager = get_issuer_manager()
+
         # Generate deterministic user DID (users don't need new issuers)
         user_did = issuer_manager.generate_deterministic_user_did(user_id)
-        
+
         # Issue properly signed credential
-        credential_json = federated_issuer.issue_credential(
+        credential = signer.issue_credential(
             user_did,  # Real DID with public key
-            identity_claims
+            identity_claims,
         )
-        
-        # Parse the JSON response from Rust
-        credential = json.loads(credential_json)
         
         # Normalize W3C credentialSubject to claims for internal use
         # Rust uses W3C standard 'credentialSubject', we use 'claims' internally

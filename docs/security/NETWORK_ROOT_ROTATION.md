@@ -11,6 +11,9 @@ trust lists whose `signer_pubkey` is not in the pin set.
 
 Browser, Python, and Node verifiers must agree on the same pin set.
 
+Trust bundle distribution mirrors are documented in
+[TRUST_BUNDLE_MIRROR.md](../operations/TRUST_BUNDLE_MIRROR.md).
+
 ## Normal rotation (overlap)
 
 1. Generate the replacement root keypair offline or in a separate custody boundary.

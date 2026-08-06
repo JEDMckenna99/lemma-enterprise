@@ -52,6 +52,8 @@ value, including `staging` and unset, enables them.**
 > Rotation: maintain `_V1`, `_V2`, ... pepper/salt env vars concurrently and
 > flip `LEMMA_ACTIVE_ROOT_VERSION`. See Phase 3.1 in
 > [V2_DESIGN_IMPROVEMENTS.md](../architecture/V2_DESIGN_IMPROVEMENTS.md).
+> **Backup drill:**
+> [IDENTITY_ROOT_SECRET_BACKUP_DRILL.md](IDENTITY_ROOT_SECRET_BACKUP_DRILL.md).
 
 ### Didit Identity (current IDV rail: Phase 3.2)
 
@@ -106,6 +108,29 @@ Webhook endpoint (legacy): `/api/webhooks/stripe-identity`
 | `LEMMA_IDV_HANDOFF_TTL_SECONDS`     | Mobile handoff relay TTL (default `300`).                         |
 | `LEMMA_IDV_HANDOFF_STRICT_CLAIM`    | Default `1`; set `0` for legacy session-only handoff claim.         |
 | `LEMMA_ISHUMAN_DEMO_API_KEY_<SITE>` | Stable API key for a seeded demo relying site.                    |
+
+### Federated signing service (Option C custody)
+
+Separate Heroku app `lemma-signing` runs `signing_app.py` (`Procfile.signing`). Only
+that app should hold federated issuer seed decrypt; the public web app calls it
+when `LEMMA_SIGNING_SERVICE_URL` is set.
+
+| Variable | App | What it does |
+| -------- | --- | ------------ |
+| `LEMMA_SIGNING_SERVICE_URL` | web (`lemma-enterprise`) | Base URL of the private signing app (e.g. `https://lemma-signing.herokuapp.com`). When set, web dynos refuse `get_federated_issuer()` seed load. |
+| `LEMMA_SIGNING_SERVICE_TOKEN` | web + signing | Shared bearer secret for `/internal/*` routes. Required when URL is set. |
+| `LEMMA_SIGNING_SERVICE` | signing only | Set `1` on the signing app so it uses local seed signing. |
+
+Deploy: create Heroku app `lemma-signing`, same build slug, `heroku ps:scale web=1 -a lemma-signing`,
+set `Procfile` via `heroku buildpacks` or deploy with `Procfile.signing` renamed / `heroku config
+set PROCFILE=Procfile.signing`. Grant **only** the signing app IAM `kms:Decrypt` for the
+federated issuer ciphertext; remove federated decrypt from the web dyno role when cut over.
+
+### Trust bundle mirror failover
+
+| Variable | What it does |
+| -------- | ------------ |
+| `LEMMA_TRUST_BUNDLE_URLS` | Comma-separated bloom/trust-list bundle URLs tried in order by backend verifiers. Default: lemma.id primary + GitHub Pages mirror (see [TRUST_BUNDLE_MIRROR.md](TRUST_BUNDLE_MIRROR.md)). |
 
 ### isHuman v2 feature flags
 

@@ -19,9 +19,9 @@ Golden rules for the thread:
 
 ## Title options (pick one)
 
-- `Show HN: Sign in with lemma.id – passwordless login, no email, no passwords, no tracking`
-- `Show HN: Passwordless login where the site never sees an email and can't be tracked across sites`
-- `Show HN: A passkey login that gives each site an unlinkable, stable user ID`
+- `Show HN: Sign in with lemma.id – passwordless login, no email, no passwords, no cross-site tracking by sites`
+- `Show HN: Passwordless login where the site never sees an email and relying sites can't correlate users across sites`
+- `Show HN: A passkey login that gives each site a pairwise-private, stable user ID`
 
 Recommended: the first. It front-loads the three concrete properties and avoids
 buzzwords.
@@ -42,9 +42,11 @@ buzzwords.
 > - **The site never collects email/username/password**, and lemma never sends
 >   you profile data — you get `ppid` + assurance level, nothing else. You own
 >   the profile; we own the proof.
-> - **Per-site, unlinkable IDs.** The id a user gets on your site is derived from
->   your hostname and can't be correlated with the id they get anywhere else. We
->   can't track users across sites, by design.
+> - **Per-site, pairwise-private IDs.** The id a user gets on your site is derived
+>   from your hostname and can't be correlated with the id they get anywhere else
+>   **by relying sites** — you never receive a global user id. We don't track
+>   users across sites, and there is no cross-site remap API. (Operator capability
+>   is documented honestly in the trust/recovery doc linked below.)
 > - **You verify locally.** The verifier (`@lemma.id/proof-verifier`, Apache-2.0)
 >   runs on your backend and checks a signed presentation **offline** — no
 >   per-login call to us. It validates against a cached, signed issuer trust list
@@ -108,10 +110,9 @@ to any other auth method during a dual-run window with no involvement from us.
 
 Raw WebAuthn is a login primitive; you'd still build the account system,
 cross-device continuity, and — critically — you'd store each user's credential
-public key and get a per-site id you have to manage. lemma gives you a **stable,
-site-private, cross-site-unlinkable** id out of the box, no credential storage on
-your side, and an identity the user can reuse across sites *without* those sites
-being able to correlate them. If you only need a login button for one app and
+public key and get a per-site id you have to manage. lemma gives you a **stable, site-private, pairwise-private** id out of the box,
+no credential storage on your side, and an identity the user can reuse across
+sites *without* those sites being able to correlate them. If you only need a login button for one app and
 don't care about pairwise privacy, plain WebAuthn is a perfectly good choice —
 we say that in the docs.
 
@@ -133,10 +134,17 @@ allow/deny list applied to your users.
 ### "Do you see my users / can you track them across sites?"
 
 We don't receive your profile data (login returns `ppid` + assurance only), and
-PPIDs are pairwise: derived from your hostname and unlinkable to the id the same
-person gets on any other site. There is deliberately no "remap my users across
-domains" API because such an endpoint would enable exactly the cross-site
-correlation the design exists to prevent.
+PPIDs are pairwise: derived from your hostname so **relying sites** cannot
+correlate the id the same person gets on your site with the id they get
+anywhere else. We don't track users across sites, and there is deliberately no
+"remap my users across domains" API — such an endpoint would enable exactly the
+cross-site correlation the design exists to prevent.
+
+Honest operator caveat: at issuance we hold person-root material server-side, so
+lemma.id *could* derive site PPIDs. We don't, and the trust doc describes the
+roadmap for making that an architectural guarantee, not just a policy. The
+privacy guarantee your users care about is against **you and other sites**, and
+that one is cryptographic.
 
 ### "How do I know the privacy claims are true if it's not fully open source?"
 

@@ -182,21 +182,25 @@ def _assurance_meets_policy(actual: str | None, required: str) -> bool:
     return normalized == "ishuman"
 
 
-def _sign_with_issuer_for_browser(credential: dict, issuer) -> str:
-    """Sign the browser-canonical SHA-256 digest with the issuer's Ed25519 key.
+def _sign_with_issuer_for_browser(credential: dict, issuer=None) -> str:
+    """Sign the browser-canonical SHA-256 digest with Ed25519.
 
-    Returns hex-encoded 64-byte signature compatible with
-    static/js/ishuman-verifier.js _verifyCredentialCore signature check.
+    When *issuer* is provided (tests / explicit key material), sign with that
+    seed. Otherwise use the federated signer (local or remote).
     """
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-
-    seed = bytes(issuer.signing_key_bytes())
-    if len(seed) != 32:
-        raise ValueError("issuer signing key seed must be 32 bytes")
-    sk = Ed25519PrivateKey.from_private_bytes(seed)
     message = _browser_canonical_message(credential)
     digest = hashlib.sha256(message).digest()
-    return sk.sign(digest).hex()
+    if issuer is not None:
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+        seed = bytes(issuer.signing_key_bytes())
+        if len(seed) != 32:
+            raise ValueError("issuer signing key seed must be 32 bytes")
+        return Ed25519PrivateKey.from_private_bytes(seed).sign(digest).hex()
+
+    from api.federated_signer import get_federated_signer
+
+    return get_federated_signer().sign_digest_hex(digest)
 
 
 def _issue_ishuman_credential(
@@ -214,7 +218,6 @@ def _issue_ishuman_credential(
     *assurance* is ``passkey`` (wallet-bound, pre-IDV) or ``ishuman`` (IDV-backed).
     Site PPIDs are identical across tiers; assurance records proof strength only.
     """
-    issuer = _get_ishuman_issuer()
     now = int(time.time())
     prefix = "ishuman_site" if site_id else "ishuman_master"
     credential_id = f"{prefix}_{secrets.token_urlsafe(24)}"
@@ -265,29 +268,32 @@ def _issue_ishuman_credential(
         for key, value in claims.items()
     }
 
-    credential_json = issuer.issue_credential(ppid, claims_for_issuer)
-    credential = json.loads(credential_json)
+    from api.federated_signer import get_federated_signer, use_remote_federated_signer
+
+    signer = get_federated_signer()
+    if use_remote_federated_signer():
+        credential = signer.issue_credential(ppid, claims_for_issuer)
+    else:
+        issuer = _get_ishuman_issuer()
+        credential_json = issuer.issue_credential(ppid, claims_for_issuer)
+        credential = json.loads(credential_json)
+        try:
+            browser_sig_hex = _sign_with_issuer_for_browser(credential)
+            proof = credential.setdefault("proof", {})
+            proof["signatureValueWeb"] = browser_sig_hex
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to add browser-format signature to credential: %s", exc)
+
     credential["id"] = credential_id
     credential["claims"] = claims
     credential["credentialSubject"] = claims
 
     credential["issuerInfo"] = {
-        "did": issuer.get_did(),
-        "publicKey": issuer.get_public_key_hex(),
+        "did": signer.get_did(),
+        "publicKey": signer.get_public_key_hex(),
         "name": "Lemma isHuman Network",
         "verified": True,
     }
-
-    # Add a parallel signature in the browser-verifier canonical format so the
-    # JS isHuman verifier can locally verify credentials without bridging back
-    # to the Rust crypto engine. The native Rust signature stays in
-    # proof.signatureValue for server-side verification compatibility.
-    try:
-        browser_sig_hex = _sign_with_issuer_for_browser(credential, issuer)
-        proof = credential.setdefault("proof", {})
-        proof["signatureValueWeb"] = browser_sig_hex
-    except Exception as exc:  # noqa: BLE001, non-fatal: server still has Rust sig
-        logger.warning("Failed to add browser-format signature to credential: %s", exc)
 
     return credential
 

@@ -49,6 +49,12 @@ overnight.
 4. Flip `LEMMA_ACTIVE_ROOT_VERSION=V2`. New IDVs now derive under V2.
 5. Leave V1 in place until no active credential references it, then retire it.
 
+**Backup and restore drill:** before relying on rotation alone, maintain an
+offline encrypted backup of every in-use pepper/salt version and run the restore
+verification drill in
+[IDENTITY_ROOT_SECRET_BACKUP_DRILL.md](../operations/IDENTITY_ROOT_SECRET_BACKUP_DRILL.md).
+Script: `scripts/identity_root_backup_drill.py`.
+
 ### Cross-version continuity (UX cost)
 
 A user verified pre-rotation has different PPIDs post-rotation, because PPIDs

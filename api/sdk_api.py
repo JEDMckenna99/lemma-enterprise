@@ -964,13 +964,11 @@ def create_enhanced_identity_credential(user_id: str, session_id: str, idv_resul
         from lemma_crypto import PyMinimalIssuer
         
         # Get consistent federated issuer
-        from api.issuer_management import get_issuer_manager
-        issuer_manager = get_issuer_manager()
-        federated_issuer = issuer_manager.get_federated_issuer()
-        
-        # Get real DID and public key from crypto engine
-        issuer_did = federated_issuer.get_did()
-        issuer_public_key = federated_issuer.get_public_key_hex()
+        from api.federated_signer import get_federated_signer
+
+        signer = get_federated_signer()
+        issuer_did = signer.get_did()
+        issuer_public_key = signer.get_public_key_hex()
         
         # Register issuer DID with network registry
         issuer_info = {
@@ -982,7 +980,7 @@ def create_enhanced_identity_credential(user_id: str, session_id: str, idv_resul
         
         # Attempt to distribute DID to network (non-blocking)
         distribute_did_to_network(issuer_did, issuer_public_key, issuer_info)
-        logger.info(f"🦀 Creating federated identity credential with real Ed25519 issuer: {federated_issuer.get_did()[:50]}...")
+        logger.info(f"🦀 Creating federated identity credential with real Ed25519 issuer: {issuer_did[:50]}...")
         
         # Create enhanced identity claims
         identity_claims = {
@@ -997,10 +995,7 @@ def create_enhanced_identity_credential(user_id: str, session_id: str, idv_resul
         }
         
         # Issue properly signed credential
-        credential_json = federated_issuer.issue_credential(user_id, identity_claims)
-        
-        # Parse the JSON response from Rust
-        credential = json.loads(credential_json)
+        credential = signer.issue_credential(user_id, identity_claims)
         
         # The Rust engine has already created the credential with:
         # 1. packageType: 'identity' - Routes to identity package

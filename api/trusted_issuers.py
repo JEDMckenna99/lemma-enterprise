@@ -65,7 +65,9 @@ def _load_trusted_issuers() -> Set[str]:
             except Exception:
                 pass
         try:
-            federated_did = issuer_manager.get_federated_issuer().get_did()
+            from api.federated_signer import get_federated_issuer_metadata
+
+            federated_did = get_federated_issuer_metadata().get("did")
             if federated_did:
                 trusted.add(federated_did)
         except Exception:

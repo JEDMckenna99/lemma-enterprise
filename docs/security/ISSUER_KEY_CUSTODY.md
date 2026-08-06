@@ -1,6 +1,6 @@
 # Issuer key custody — design note
 
-Status: Draft for human review (no implementation until approved)  
+Status: Option C (separate signing app) chosen — implemented 2026-08-06  
 Date: 2026-07-28  
 Audience: Platform security / operator
 
@@ -51,11 +51,9 @@ Minimal service (separate VPC/security group) holding decrypt capability; app se
 
 ## Recommended direction (pending latency data)
 
-1. **Short term:** Option C sidecar with mTLS + digest-only API, single active issuer key, no seed in web dynos.
-2. **Medium term:** Migrate sidecar to Option A (KMS Sign) once Ed25519 latency is validated.
+1. **Short term (shipped):** Option C — separate `lemma-signing` Heroku app (`signing_app.py`, `Procfile.signing`). Web dynos call `LEMMA_SIGNING_SERVICE_URL` with bearer token; federated seed decrypt stays on the signing app only. See [ENVIRONMENT_CONFIG.md](../operations/ENVIRONMENT_CONFIG.md).
+2. **Medium term:** Migrate signing app backend to Option A (KMS Sign) once Ed25519 latency is validated.
 3. **Long term:** Option B only if compliance or threat model requires hardware non-exportability.
-
-Human decision required before implementation.
 
 ## Key rotation procedure (all options)
 
@@ -80,6 +78,4 @@ Document emergency rollback: re-enable previous key in trust list, disable new k
 
 | Date | Decision | Owner |
 |------|----------|-------|
-| TBD | Choose A / B / C | Operator |
-
-Implementation must not begin until a row exists in this table.
+| 2026-08-06 | Option C — separate `lemma-signing` app; web uses `api/federated_signer.py` remote client | Operator |

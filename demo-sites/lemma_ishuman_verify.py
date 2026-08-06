@@ -107,6 +107,26 @@ def default_nonce_store_mode() -> str:
 DEFAULT_NETWORK_ROOT_PUBKEYS_HEX: list[str] = [
     "3782cf10beea1dcc9a88127a5dbb71c6cba30c1c8c63327a83b8f09867d6a6c2",
 ]
+DEFAULT_TRUST_BUNDLE_MIRROR = (
+    "https://jedmckenna99.github.io/lemma-enterprise/trust-mirror/bloom-filter.json"
+)
+DEFAULT_LEMMA_ORIGIN = "https://lemma.id"
+
+
+def resolve_trust_bundle_urls(
+    lemma_origin: str,
+    trust_bundle_urls: Optional[list[str]] = None,
+) -> list[str]:
+    if trust_bundle_urls:
+        return [str(url).strip() for url in trust_bundle_urls if str(url).strip()]
+    env_raw = (__import__("os").getenv("LEMMA_TRUST_BUNDLE_URLS") or "").strip()
+    if env_raw:
+        return [part.strip() for part in env_raw.split(",") if part.strip()]
+    origin = str(lemma_origin or DEFAULT_LEMMA_ORIGIN).rstrip("/")
+    return [
+        f"{origin}/api/revocation/bloom-filter",
+        DEFAULT_TRUST_BUNDLE_MIRROR,
+    ]
 
 
 def _normalize_pubkey_hex(value: str) -> Optional[str]:
@@ -919,7 +939,8 @@ class VerificationContext:
         self,
         *,
         site_id: str,
-        lemma_origin: str = "https://lemma.id",
+        lemma_origin: str = DEFAULT_LEMMA_ORIGIN,
+        trust_bundle_urls: Optional[list[str]] = None,
         max_session_age_seconds: int = 24 * 60 * 60,
         refresh_seconds: int = 15 * 60,
         require_session_assertion: bool = False,
@@ -931,6 +952,10 @@ class VerificationContext:
     ) -> None:
         self.site_id = canonicalize_site_hostname(site_id)
         self.lemma_origin = lemma_origin.rstrip("/")
+        self.trust_bundle_urls = resolve_trust_bundle_urls(
+            self.lemma_origin,
+            trust_bundle_urls,
+        )
         self.max_session_age_seconds = max_session_age_seconds
         self.refresh_seconds = refresh_seconds
         self.require_session_assertion = require_session_assertion
@@ -953,7 +978,15 @@ class VerificationContext:
         return assurance_meets_policy(actual, required)
 
     def _fetch_signed_bundle(self) -> _Snapshot:
-        url = f"{self.lemma_origin}/api/revocation/bloom-filter"
+        errors: list[str] = []
+        for url in self.trust_bundle_urls:
+            try:
+                return self._fetch_signed_bundle_from_url(url)
+            except Exception as exc:  # noqa: BLE001 - collect failover errors
+                errors.append(f"{url}: {exc}")
+        raise RuntimeError(f"trust_refresh_failed:{'; '.join(errors)}")
+
+    def _fetch_signed_bundle_from_url(self, url: str) -> _Snapshot:
         with urllib.request.urlopen(url, timeout=10) as resp:  # noqa: S310, lemma.id only
             data = json.loads(resp.read().decode("utf-8"))
         if not data.get("success"):

@@ -218,7 +218,14 @@ class LemmaIssuerManager:
             db.close()
         
     def get_federated_issuer(self):
-        """Get consistent federated identity issuer (KMS-backed)"""
+        """Get consistent federated identity issuer (KMS-backed)."""
+        from api.federated_signer import is_signing_service_process, use_remote_federated_signer
+
+        if use_remote_federated_signer() and not is_signing_service_process():
+            raise RuntimeError(
+                "Federated issuer seed is not available on web dynos when "
+                "LEMMA_SIGNING_SERVICE_URL is set; use get_federated_signer() instead."
+            )
         issuer_key = 'federated_identity'
         
         if issuer_key not in self._issuers:
