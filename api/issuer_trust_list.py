@@ -173,7 +173,8 @@ def build_trust_list_signature_message(
 
 
 def build_signed_trust_list(*, generated_at_unix: int | None = None) -> dict[str, Any]:
-    from api.federated_signer import get_federated_signer
+    from api.bloom_snapshot import _issuer_signing_material
+    from api.federated_signer import get_federated_signer, use_remote_federated_signer
 
     entries = _load_default_entries()
     if not entries:
@@ -190,8 +191,15 @@ def build_signed_trust_list(*, generated_at_unix: int | None = None) -> dict[str
         generated_at_unix=now,
         valid_until_unix=valid_until,
     )
-    signer = get_federated_signer()
-    signature = signer.sign_b64url(message)
+    if use_remote_federated_signer():
+        signer = get_federated_signer()
+        signature = signer.sign_b64url(message)
+        signer_did = signer.get_did()
+        signer_pubkey = signer.get_public_key_hex()
+    else:
+        private_key, public_key, signer_did = _issuer_signing_material()
+        signature = b64url_encode(sign_message(private_key, message))
+        signer_pubkey = public_key.public_bytes_raw().hex()
 
     return {
         "version": version,
@@ -199,8 +207,8 @@ def build_signed_trust_list(*, generated_at_unix: int | None = None) -> dict[str
         "generated_at_unix": now,
         "valid_until_unix": valid_until,
         "content_hash": content_hash,
-        "signer_did": signer.get_did(),
-        "signer_pubkey": signer.get_public_key_hex(),
+        "signer_did": signer_did,
+        "signer_pubkey": signer_pubkey,
         "signature": signature,
         "issuers": entries,
         "algorithm": "Ed25519-SHA256",

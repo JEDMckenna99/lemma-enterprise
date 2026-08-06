@@ -87,12 +87,19 @@ def sign_bloom_snapshot(
         generated_at_unix=generated_unix,
         valid_until_unix=valid_until_unix,
     )
-    from api.federated_signer import get_federated_signer
+    from api.federated_signer import get_federated_signer, use_remote_federated_signer
 
-    signer = get_federated_signer()
-    signature_b64 = signer.sign_b64url(message)
-    pubkey_hex = signer.get_public_key_hex()
-    issuer_did = signer.get_did()
+    if use_remote_federated_signer():
+        signer = get_federated_signer()
+        signature_b64 = signer.sign_b64url(message)
+        pubkey_hex = signer.get_public_key_hex()
+        issuer_did = signer.get_did()
+    else:
+        # Local path keeps _issuer_signing_material so unit tests can patch it
+        # without requiring KMS / a live signing service.
+        private_key, public_key, issuer_did = _issuer_signing_material()
+        signature_b64 = b64url_encode(sign_message(private_key, message))
+        pubkey_hex = public_key.public_bytes_raw().hex()
 
     return {
         "sequence_number": int(sequence_number),

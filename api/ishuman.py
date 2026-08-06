@@ -270,30 +270,38 @@ def _issue_ishuman_credential(
 
     from api.federated_signer import get_federated_signer, use_remote_federated_signer
 
-    signer = get_federated_signer()
+    issuer = None
     if use_remote_federated_signer():
+        signer = get_federated_signer()
         credential = signer.issue_credential(ppid, claims_for_issuer)
+        issuer_did = signer.get_did()
+        issuer_pubkey = signer.get_public_key_hex()
     else:
+        # Prefer _get_ishuman_issuer so unit tests can patch a fake issuer
+        # without requiring KMS or LEMMA_SIGNING_SERVICE_URL.
         issuer = _get_ishuman_issuer()
         credential_json = issuer.issue_credential(ppid, claims_for_issuer)
         credential = json.loads(credential_json)
-        try:
-            browser_sig_hex = _sign_with_issuer_for_browser(credential)
-            proof = credential.setdefault("proof", {})
-            proof["signatureValueWeb"] = browser_sig_hex
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to add browser-format signature to credential: %s", exc)
+        issuer_did = issuer.get_did()
+        issuer_pubkey = issuer.get_public_key_hex()
 
+    # Finalize public credential shape before browser-canonical signing.
     credential["id"] = credential_id
     credential["claims"] = claims
     credential["credentialSubject"] = claims
-
     credential["issuerInfo"] = {
-        "did": signer.get_did(),
-        "publicKey": signer.get_public_key_hex(),
+        "did": issuer_did,
+        "publicKey": issuer_pubkey,
         "name": "Lemma isHuman Network",
         "verified": True,
     }
+
+    try:
+        browser_sig_hex = _sign_with_issuer_for_browser(credential, issuer)
+        proof = credential.setdefault("proof", {})
+        proof["signatureValueWeb"] = browser_sig_hex
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed to add browser-format signature to credential: %s", exc)
 
     return credential
 

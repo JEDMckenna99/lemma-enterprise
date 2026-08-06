@@ -237,13 +237,14 @@ def test_ishuman_verifier_bypasses_http_cache_for_revocation_refresh():
     with open(sdk_path, "r", encoding="utf-8") as handle:
         content = handle.read()
 
-    fetch_start = content.index(
-        "fetch(`${this.lemmaOrigin}/api/revocation/bloom-filter`"
-    )
-    fetch_end = content.index(");", fetch_start)
+    # Trust-bundle failover loops over this.trustBundleUrls; each fetch must
+    # bypass the browser HTTP cache (signed snapshot has a strict staleness bound).
+    fetch_start = content.index("const res = await fetch(url,")
+    fetch_end = content.index("});", fetch_start)
     fetch_call = content[fetch_start:fetch_end]
     assert "cache: 'no-store'" in fetch_call
     assert "credentials: 'omit'" in fetch_call
+    assert "this.trustBundleUrls" in content
 
 
 def test_ishuman_verifier_is_popup_only_no_bridge():

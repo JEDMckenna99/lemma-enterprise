@@ -94,19 +94,10 @@ class LocalFederatedSigner(FederatedSigner):
         return private_key.sign(digest).hex()
 
     def issue_credential(self, ppid: str, claims_for_issuer: dict[str, str]) -> dict[str, Any]:
-        import hashlib
-
-        from api.ishuman import _browser_canonical_message
-
+        # Rust/native credential only. Caller finalizes id/claims and adds
+        # signatureValueWeb via browser-canonical signing after that.
         credential_json = self._issuer.issue_credential(ppid, claims_for_issuer)
-        credential = json.loads(credential_json)
-        try:
-            digest = hashlib.sha256(_browser_canonical_message(credential)).digest()
-            proof = credential.setdefault("proof", {})
-            proof["signatureValueWeb"] = self.sign_digest_hex(digest)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to add browser-format signature: %s", exc)
-        return credential
+        return json.loads(credential_json)
 
 
 class RemoteFederatedSigner(FederatedSigner):

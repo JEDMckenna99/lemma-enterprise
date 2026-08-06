@@ -58,10 +58,21 @@ def build_fresh_passkey_canonical_message(artifact: dict) -> bytes:
 
 
 def _sign_fresh_passkey_digest(digest: bytes) -> tuple[str, str]:
-    from api.federated_signer import get_federated_signer
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-    signer = get_federated_signer()
-    return signer.sign_digest_hex(digest), signer.get_did()
+    from api.federated_signer import get_federated_signer, use_remote_federated_signer
+    from api.ishuman import _get_ishuman_issuer
+
+    if use_remote_federated_signer():
+        signer = get_federated_signer()
+        return signer.sign_digest_hex(digest), signer.get_did()
+
+    issuer = _get_ishuman_issuer()
+    seed = bytes(issuer.signing_key_bytes())
+    if len(seed) != 32:
+        raise ValueError("issuer signing key seed must be 32 bytes")
+    signature_hex = Ed25519PrivateKey.from_private_bytes(seed).sign(digest).hex()
+    return signature_hex, issuer.get_did()
 
 
 def sign_fresh_passkey_attestation(artifact: dict) -> dict:
