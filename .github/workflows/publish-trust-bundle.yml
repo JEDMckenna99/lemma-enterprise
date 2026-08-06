@@ -31,10 +31,13 @@ jobs:
             --primary https://lemma.id/api/revocation/bloom-filter \
             --output trust-mirror/bloom-filter.json
 
-      - name: Deploy mirror to GitHub Pages
+      - name: Deploy mirror artifact to gh-pages
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           folder: trust-mirror
           target-folder: trust-mirror
           branch: gh-pages
           commit-message: "chore: refresh trust bundle mirror"
+        # Private-repo raw URLs are not anonymously readable; the live public
+        # mirror is lemma-signing. Keep this artifact for operators / future
+        # public CDN cutover.

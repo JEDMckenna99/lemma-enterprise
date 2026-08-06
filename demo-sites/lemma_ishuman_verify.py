@@ -108,7 +108,7 @@ DEFAULT_NETWORK_ROOT_PUBKEYS_HEX: list[str] = [
     "3782cf10beea1dcc9a88127a5dbb71c6cba30c1c8c63327a83b8f09867d6a6c2",
 ]
 DEFAULT_TRUST_BUNDLE_MIRROR = (
-    "https://jedmckenna99.github.io/lemma-enterprise/trust-mirror/bloom-filter.json"
+    "https://lemma-signing-fc5969199cd5.herokuapp.com/api/revocation/bloom-filter"
 )
 DEFAULT_LEMMA_ORIGIN = "https://lemma.id"
 

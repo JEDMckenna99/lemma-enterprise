@@ -43,7 +43,7 @@ const ACTION_PRESENTATION_PREFIX = "lemma:site-action-presentation:v1";
 const ACTION_STAMP_VERSION = "action_stamp_v1";
 const DEFAULT_LEMMA_ORIGIN = "https://lemma.id";
 const DEFAULT_TRUST_BUNDLE_MIRROR =
-  "https://jedmckenna99.github.io/lemma-enterprise/trust-mirror/bloom-filter.json";
+  "https://lemma-signing-fc5969199cd5.herokuapp.com/api/revocation/bloom-filter";
 const DEFAULT_REFRESH_MS = 15 * 60 * 1000;
 const DEFAULT_MAX_SESSION_AGE_S = 24 * 60 * 60;
 const DEFAULT_MAX_ACTION_AGE_S = 60;

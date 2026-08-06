@@ -20,10 +20,13 @@ DEFAULT_PRIMARY = "https://lemma.id/api/revocation/bloom-filter"
 
 def _load_verifier_module():
     path = REPO_ROOT / "packages" / "proof-verifier-py" / "lemma_proof_verifier.py"
-    spec = importlib.util.spec_from_file_location("lemma_proof_verifier_publish", path)
+    name = "lemma_proof_verifier_publish"
+    spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"unable to load verifier module from {path}")
     mod = importlib.util.module_from_spec(spec)
+    # dataclasses requires the module to be registered before exec_module.
+    sys.modules[name] = mod
     spec.loader.exec_module(mod)
     return mod
 

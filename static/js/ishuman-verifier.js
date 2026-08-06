@@ -48,7 +48,7 @@ if (typeof window !== 'undefined' && (window.ProofVerifier || window.IsHumanVeri
 
 const LEMMA_ORIGIN = 'https://lemma.id';
 const DEFAULT_TRUST_BUNDLE_MIRROR =
-    'https://jedmckenna99.github.io/lemma-enterprise/trust-mirror/bloom-filter.json';
+    'https://lemma-signing-fc5969199cd5.herokuapp.com/api/revocation/bloom-filter';
 const SESSION_PRESENTATION_PREFIX = 'lemma:site-session-presentation:v1';
 const DEFAULT_SESSION_TTL_SECONDS = 24 * 60 * 60;
 const MIN_SESSION_TTL_SECONDS = 60;

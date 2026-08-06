@@ -4,10 +4,20 @@ The signed bloom-filter + issuer trust-list bundle is served live at:
 
 - Primary: `https://lemma.id/api/revocation/bloom-filter`
 
-A verified mirror is published every five minutes by
-[`.github/workflows/publish-trust-bundle.yml`](../../.github/workflows/publish-trust-bundle.yml):
+Default public mirror (separate Heroku app from the main web dynos):
 
-- Mirror: `https://jedmckenna99.github.io/lemma-enterprise/trust-mirror/bloom-filter.json`
+- `https://lemma-signing-fc5969199cd5.herokuapp.com/api/revocation/bloom-filter`
+
+That origin serves the same signed bloom + trust-list builders as lemma.id, using
+the federated signer that already lives on `lemma-signing`. Verifiers try the
+primary lemma.id URL first, then this mirror.
+
+Optional offline publisher (for a future public CDN / GitHub Pages once the
+repo or Pages site is publicly readable):
+
+- Script: `scripts/publish_trust_bundle.py`
+- Workflow: [`.github/workflows/publish-trust-bundle.yml`](../../.github/workflows/publish-trust-bundle.yml)
+- Branch artifact: `gh-pages` / `trust-mirror/bloom-filter.json`
 
 ## How it works
 
