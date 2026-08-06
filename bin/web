@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Shared web entrypoint: lemma-signing sets LEMMA_SIGNING_SERVICE=1.
+set -euo pipefail
+
+PORT="${PORT:-5000}"
+
+if [ "${LEMMA_SIGNING_SERVICE:-}" = "1" ]; then
+  exec gunicorn signing_app:app \
+    --bind "0.0.0.0:${PORT}" \
+    --workers "${WEB_CONCURRENCY:-1}" \
+    --timeout "${GUNICORN_TIMEOUT:-30}"
+fi
+
+exec gunicorn app:app \
+  --worker-class gevent \
+  --workers "${WEB_CONCURRENCY:-2}" \
+  --worker-connections "${GUNICORN_WORKER_CONNECTIONS:-1000}" \
+  --timeout "${GUNICORN_TIMEOUT:-120}" \
+  --graceful-timeout "${GUNICORN_GRACEFUL_TIMEOUT:-30}" \
+  --keep-alive "${GUNICORN_KEEPALIVE:-5}"
