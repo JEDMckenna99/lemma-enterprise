@@ -17,12 +17,19 @@ Two distinct concerns:
 
 from __future__ import annotations
 
+import http.client
 import ipaddress
+import logging
 import socket
+import ssl
+from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 from urllib.parse import urlparse
 
+logger = logging.getLogger(__name__)
+
 _ALLOWED_OUTBOUND_SCHEMES = {"http", "https"}
+_DEFAULT_FETCH_MAX_BYTES = 64 * 1024
 
 
 def _ip_is_public(ip: ipaddress._BaseAddress) -> bool:
@@ -53,6 +60,88 @@ def _ip_is_public(ip: ipaddress._BaseAddress) -> bool:
     return True
 
 
+@dataclass(frozen=True)
+class SafeOutboundTarget:
+    """DNS-validated outbound target with a pinned public IP for the request."""
+
+    url: str
+    scheme: str
+    hostname: str
+    port: int
+    path: str
+    pinned_ip: str
+
+
+def resolve_safe_outbound_target(url: Optional[str]) -> Tuple[Optional[SafeOutboundTarget], str]:
+    """
+    Resolve ``url`` once and return a target pinned to a public IP.
+
+    Fails closed if the scheme is not http(s), the host cannot be resolved, or
+    *any* DNS answer is non-public. Callers should connect to ``pinned_ip`` while
+    keeping TLS SNI / Host equal to ``hostname`` so DNS rebinding between check
+    and connect cannot retarget the request.
+    """
+    if not url or not isinstance(url, str):
+        return None, "empty_url"
+
+    parsed = urlparse(url.strip())
+    scheme = (parsed.scheme or "").lower()
+    if scheme not in _ALLOWED_OUTBOUND_SCHEMES:
+        return None, "scheme_not_allowed"
+
+    host = parsed.hostname
+    if not host:
+        return None, "missing_host"
+
+    default_port = 443 if scheme == "https" else 80
+    try:
+        port = parsed.port or default_port
+    except ValueError:
+        return None, "invalid_port"
+
+    try:
+        infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+    except Exception:
+        return None, "dns_resolution_failed"
+
+    if not infos:
+        return None, "dns_no_records"
+
+    public_ips: list[str] = []
+    for info in infos:
+        sockaddr = info[4]
+        ip_str = sockaddr[0]
+        # Strip IPv6 scope id if present (e.g. "fe80::1%eth0").
+        ip_str = ip_str.split("%", 1)[0]
+        try:
+            ip = ipaddress.ip_address(ip_str)
+        except ValueError:
+            return None, "invalid_ip"
+        if not _ip_is_public(ip):
+            return None, "private_or_reserved_ip"
+        if ip_str not in public_ips:
+            public_ips.append(ip_str)
+
+    if not public_ips:
+        return None, "dns_no_records"
+
+    path = parsed.path or "/"
+    if parsed.query:
+        path = f"{path}?{parsed.query}"
+
+    return (
+        SafeOutboundTarget(
+            url=url.strip(),
+            scheme=scheme,
+            hostname=host,
+            port=int(port),
+            path=path,
+            pinned_ip=public_ips[0],
+        ),
+        "ok",
+    )
+
+
 def is_safe_outbound_url(url: Optional[str]) -> Tuple[bool, str]:
     """
     Validate a URL is safe for the server to fetch (SSRF guard).
@@ -63,49 +152,75 @@ def is_safe_outbound_url(url: Optional[str]) -> Tuple[bool, str]:
     (169.254.0.0/16 incl. the cloud metadata endpoint, fe80::/10), and other
     reserved/multicast/unspecified ranges.
 
-    Note: this validates at resolution time. It is a strong first-line defense
-    but does not by itself defeat DNS-rebinding TOCTOU; callers that need that
-    should additionally pin the connection to the validated address.
+    Prefer ``fetch_safe_outbound_text`` (or ``resolve_safe_outbound_target`` plus
+    a pinned connect) for actual fetches so DNS rebinding cannot retarget the
+    connection after this check.
     """
-    if not url or not isinstance(url, str):
-        return False, "empty_url"
+    target, reason = resolve_safe_outbound_target(url)
+    return target is not None, reason
 
-    parsed = urlparse(url.strip())
-    scheme = (parsed.scheme or "").lower()
-    if scheme not in _ALLOWED_OUTBOUND_SCHEMES:
-        return False, "scheme_not_allowed"
 
-    host = parsed.hostname
-    if not host:
-        return False, "missing_host"
+def fetch_safe_outbound_text(
+    url: Optional[str],
+    *,
+    timeout: float = 10.0,
+    max_bytes: int = _DEFAULT_FETCH_MAX_BYTES,
+    method: str = "GET",
+) -> Tuple[bool, str, Optional[str]]:
+    """
+    Fetch ``url`` with DNS validated once and the TCP connect pinned to that IP.
 
-    default_port = 443 if scheme == "https" else 80
+    TLS uses SNI + certificate verification for the original hostname. Redirects
+    are not followed. Response bodies larger than ``max_bytes`` fail closed.
+    Returns ``(ok, reason, body_text)``.
+    """
+    target, reason = resolve_safe_outbound_target(url)
+    if target is None:
+        return False, reason, None
+
+    conn: Optional[http.client.HTTPConnection] = None
     try:
-        port = parsed.port or default_port
-    except ValueError:
-        return False, "invalid_port"
-
-    try:
-        infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
-    except Exception:
-        return False, "dns_resolution_failed"
-
-    if not infos:
-        return False, "dns_no_records"
-
-    for info in infos:
-        sockaddr = info[4]
-        ip_str = sockaddr[0]
-        # Strip IPv6 scope id if present (e.g. "fe80::1%eth0").
-        ip_str = ip_str.split("%", 1)[0]
-        try:
-            ip = ipaddress.ip_address(ip_str)
-        except ValueError:
-            return False, "invalid_ip"
-        if not _ip_is_public(ip):
-            return False, "private_or_reserved_ip"
-
-    return True, "ok"
+        sock = socket.create_connection((target.pinned_ip, target.port), timeout=timeout)
+        if target.scheme == "https":
+            context = ssl.create_default_context()
+            sock = context.wrap_socket(sock, server_hostname=target.hostname)
+            conn = http.client.HTTPSConnection(target.hostname, target.port, timeout=timeout)
+        else:
+            conn = http.client.HTTPConnection(target.hostname, target.port, timeout=timeout)
+        # Pin the already-validated socket so a later DNS answer cannot retarget us.
+        conn.sock = sock
+        conn.request(
+            method.upper(),
+            target.path,
+            headers={
+                "Host": target.hostname,
+                "Accept": "text/plain,*/*",
+                "Connection": "close",
+                "User-Agent": "lemma-url-safety/1.0",
+            },
+        )
+        response = conn.getresponse()
+        # Redirects are never followed — callers must not chase Location.
+        if response.status in {301, 302, 303, 307, 308}:
+            return False, "redirect_not_allowed", None
+        raw = response.read(max_bytes + 1)
+        if len(raw) > max_bytes:
+            return False, "response_too_large", None
+        if response.status != 200:
+            return False, f"http_{response.status}", None
+        return True, "ok", raw.decode("utf-8", errors="replace")
+    except ssl.SSLError as exc:
+        logger.warning("Pinned outbound TLS failed for %s: %s", target.hostname, exc)
+        return False, "tls_failed", None
+    except Exception as exc:
+        logger.warning("Pinned outbound fetch failed for %s: %s", target.hostname, exc)
+        return False, "fetch_failed", None
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 def is_safe_relative_redirect(target: Optional[str]) -> bool:

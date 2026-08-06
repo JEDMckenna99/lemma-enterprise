@@ -241,22 +241,46 @@
         const params = new URLSearchParams(window.location.search);
         const PLATFORM_SITE_IDS = new Set(['lemma.id', 'lemma_platform']);
         const platformHost = /^lemma\.id$/i.test(window.location.hostname.replace(/^www\./i, ''));
-        const openerOriginParam = (params.get('origin') || '').trim();
+        // Server-minted flow binding (Wave 3). When present, opener origin + site
+        // come only from this object — never from independently attacker-controlled
+        // query params.
+        const SERVER_FLOW = {{ verify_flow_binding|default(none)|tojson }};
+        const FLOW_STATE_ERROR = {{ verify_flow_state_error|default(none)|tojson }};
+        const FLOW_STATE_REQUIRED = {{ 'true' if verify_flow_state_required|default(false) else 'false' }};
+        if (FLOW_STATE_ERROR) {
+            document.addEventListener('DOMContentLoaded', () => {
+                const el = document.getElementById('status') || document.body;
+                if (el) {
+                    el.textContent = 'This verification link is missing a server-issued flow state. Re-open Sign in with lemma.id from the relying site.';
+                }
+            });
+        }
+        const openerOriginParam = SERVER_FLOW
+            ? String(SERVER_FLOW.opener_origin || '').trim()
+            : (params.get('origin') || '').trim();
         const requestingSite = (() => {
+            if (SERVER_FLOW && SERVER_FLOW.site_id) return String(SERVER_FLOW.site_id).trim();
             const raw = (params.get('site_id') || '').trim();
             if (raw) return raw;
             return platformHost ? 'lemma.id' : 'customer site';
         })();
         const openerOrigin = openerOriginParam
             || (platformHost && PLATFORM_SITE_IDS.has(requestingSite) ? window.location.origin : '*');
-        const issueMode = params.get('issue_mode') || '';
+        const issueMode = (SERVER_FLOW && SERVER_FLOW.issue_mode)
+            ? String(SERVER_FLOW.issue_mode)
+            : (params.get('issue_mode') || '');
         const requiredAssurance = (() => {
-            const raw = (params.get('required_assurance') || 'ishuman').trim().toLowerCase();
+            const bound = SERVER_FLOW && SERVER_FLOW.required_assurance
+                ? String(SERVER_FLOW.required_assurance).trim().toLowerCase()
+                : '';
+            const raw = (bound || params.get('required_assurance') || 'ishuman').trim().toLowerCase();
             if (issueMode === 'fresh_idv') return 'ishuman';
             return raw === 'passkey' ? 'passkey' : 'ishuman';
         })();
         const refreshReason = params.get('refresh_reason') || '';
-        const requestNonce = params.get('request_nonce') || '';
+        const requestNonce = (SERVER_FLOW && SERVER_FLOW.request_nonce)
+            ? String(SERVER_FLOW.request_nonce)
+            : (params.get('request_nonce') || '');
         const clientSessionNonce = params.get('session_nonce') || '';
         const bloomSequence = Number(params.get('bloom_sequence') || 0);
         const sessionTtlSec = Number(params.get('session_ttl_sec') || (24 * 60 * 60));
@@ -281,6 +305,9 @@
         const handoffId = (params.get('handoff_id') || '').trim();
         const handoffMk = (params.get('mk') || '').trim();
         const ishumanSessionParam = (params.get('ishuman_session') || '').trim();
+        // Cross-site proof delivery requires server flow binding when enforced.
+        const crossSiteCeremony = isSiteProofIssue || isFreshIdv || isActionSign || isPasskeySetup;
+        const flowStateBlocked = !!(FLOW_STATE_REQUIRED && crossSiteCeremony && !SERVER_FLOW);
 
         /** Drop handoff AES key from the address bar so it does not linger in history. */
         function scrubHandoffSecretsFromUrl() {
@@ -295,7 +322,9 @@
         scrubHandoffSecretsFromUrl();
         const popupToken = (params.get('popup_token') || '').trim();
         const flowMode = (params.get('flow_mode') || '').trim();
-        const redirectReturn = (params.get('redirect_return') || '').trim();
+        const redirectReturn = (SERVER_FLOW && SERVER_FLOW.redirect_return)
+            ? String(SERVER_FLOW.redirect_return).trim()
+            : (params.get('redirect_return') || '').trim();
         const previewType = (params.get('preview_type') || '').trim();
         const previewState = (params.get('preview_state') || 'ready').trim();
         const isPreviewMode = !!previewType;
@@ -2581,6 +2610,16 @@
         }
 
         (async function boot() {
+            if (FLOW_STATE_ERROR || flowStateBlocked) {
+                setStatus(
+                    'This verification link is missing a server-issued flow state. Re-open Sign in with lemma.id from the relying site.',
+                    'error',
+                );
+                try {
+                    document.getElementById('primary-btn')?.classList.add('hidden');
+                } catch (_) { /* ignore */ }
+                return;
+            }
             if (renderPopupPreview()) return;
 
             // A cross-origin IDV round-trip (e.g. Didit) can sever window.opener

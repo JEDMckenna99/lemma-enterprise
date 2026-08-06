@@ -42,6 +42,8 @@ const SESSION_PRESENTATION_PREFIX = "lemma:site-session-presentation:v1";
 const ACTION_PRESENTATION_PREFIX = "lemma:site-action-presentation:v1";
 const ACTION_STAMP_VERSION = "action_stamp_v1";
 const DEFAULT_LEMMA_ORIGIN = "https://lemma.id";
+const DEFAULT_TRUST_BUNDLE_MIRROR =
+  "https://lemma-signing-fc5969199cd5.herokuapp.com/api/revocation/bloom-filter";
 const DEFAULT_REFRESH_MS = 15 * 60 * 1000;
 const DEFAULT_MAX_SESSION_AGE_S = 24 * 60 * 60;
 const DEFAULT_MAX_ACTION_AGE_S = 60;
@@ -53,6 +55,20 @@ const FRESH_PASSKEY_SCHEMA = "fresh_passkey_attestation.v1";
 const DEFAULT_FRESH_PASSKEY_MAX_AGE_S = 120;
 const NONCE_STORE_MODE_OPTIONAL = "optional";
 const NONCE_STORE_MODE_REQUIRED = "required";
+
+function defaultNonceStoreMode() {
+  const env = typeof process !== "undefined" ? process.env : undefined;
+  const explicit = String(env?.LEMMA_NONCE_STORE_MODE || "").trim().toLowerCase();
+  if (explicit === NONCE_STORE_MODE_OPTIONAL || explicit === NONCE_STORE_MODE_REQUIRED) {
+    return explicit;
+  }
+  for (const key of ["NODE_ENV", "ENVIRONMENT", "FLASK_ENV"]) {
+    if (String(env?.[key] || "").trim().toLowerCase() === "production") {
+      return NONCE_STORE_MODE_REQUIRED;
+    }
+  }
+  return NONCE_STORE_MODE_OPTIONAL;
+}
 const BLOOM_SNAPSHOT_PREFIX = "lemma:bloom-snapshot:v1";
 const TRUST_LIST_PREFIX = "lemma:issuer-trust-list:v1";
 const TIME_SKEW_SECONDS = 300;
@@ -256,6 +272,29 @@ function flattenTrustedIssuerPubkeys(issuers) {
   return out;
 }
 
+function pubkeysForIssuer(issuers, issuerDid, fallbackPubkeys = []) {
+  const did = String(issuerDid || "").trim();
+  if (!did) return [];
+  if (issuers instanceof Map) {
+    const keySet = issuers.get(did);
+    if (!keySet) return [];
+    if (keySet instanceof Set) return [...keySet].map((p) => String(p).toLowerCase()).sort();
+    if (Array.isArray(keySet)) return keySet.map((p) => String(p).toLowerCase()).sort();
+    return [];
+  }
+  if (issuers && typeof issuers === "object") {
+    const entry = issuers[did];
+    if (!entry) return [];
+    if (entry instanceof Set) return [...entry].map((p) => String(p).toLowerCase()).sort();
+    if (Array.isArray(entry)) return entry.map((p) => String(p).toLowerCase()).sort();
+    if (entry.pubkeys_hex) {
+      return [...entry.pubkeys_hex].map((p) => String(p).toLowerCase()).sort();
+    }
+    return [];
+  }
+  return (fallbackPubkeys || []).map((p) => String(p).trim().toLowerCase()).filter(Boolean);
+}
+
 export function assuranceMeetsPolicy(actual, required) {
   if (!actual) return false;
   const policy = String(required || "ishuman").toLowerCase();
@@ -390,9 +429,10 @@ export function validateCredentialRequiredFields(credential) {
   return null;
 }
 
-function buildConvergenceCanonicalMessage(artifact) {
-  return new TextEncoder().encode([
-    CONVERGENCE_PREFIX,
+function buildConvergenceCanonicalMessage(artifact, { includeIssuer = true } = {}) {
+  const lines = [CONVERGENCE_PREFIX];
+  if (includeIssuer) lines.push(String(artifact.issuer || "").trim());
+  lines.push(
     String(artifact.site_id || "").trim(),
     String(artifact.legacy_ppid || "").trim(),
     String(artifact.canonical_ppid || "").trim(),
@@ -400,18 +440,31 @@ function buildConvergenceCanonicalMessage(artifact) {
     String(artifact.nonce || "").trim(),
     String(Number(artifact.issued_at_unix || 0)),
     String(Number(artifact.expires_at_unix || 0)),
-  ].join("\n"));
+  );
+  return new TextEncoder().encode(lines.join("\n"));
 }
 
 async function verifyPpidConvergenceArtifact(
   artifact,
-  { siteId, canonicalPpid, trustedIssuerPubkeys, nowUnix },
+  {
+    siteId,
+    canonicalPpid,
+    trustedIssuerPubkeys = [],
+    trustedIssuers = null,
+    expectedIssuerDid = null,
+    nowUnix,
+  },
 ) {
   if (!artifact || typeof artifact !== "object") {
     return { ok: false, reason: "convergence_missing" };
   }
   if (String(artifact.schema || "") !== CONVERGENCE_SCHEMA) {
     return { ok: false, reason: "convergence_schema_mismatch" };
+  }
+  const issuerDid = String(artifact.issuer || "").trim();
+  if (!issuerDid) return { ok: false, reason: "convergence_issuer_missing" };
+  if (expectedIssuerDid && issuerDid !== String(expectedIssuerDid).trim()) {
+    return { ok: false, reason: "convergence_issuer_mismatch" };
   }
   if (String(artifact.site_id || "").trim() !== String(siteId || "").trim()) {
     return { ok: false, reason: "convergence_site_mismatch" };
@@ -429,6 +482,7 @@ async function verifyPpidConvergenceArtifact(
   if (!signatureHex) return { ok: false, reason: "convergence_signature_missing" };
   const unsigned = {
     schema: artifact.schema,
+    issuer: artifact.issuer,
     convergence_id: artifact.convergence_id,
     site_id: artifact.site_id,
     legacy_ppid: artifact.legacy_ppid,
@@ -437,17 +491,27 @@ async function verifyPpidConvergenceArtifact(
     expires_at_unix: artifact.expires_at_unix,
     nonce: artifact.nonce,
   };
-  const digest = await sha256Bytes(buildConvergenceCanonicalMessage(unsigned));
-  for (const pubkeyHex of trustedIssuerPubkeys) {
-    try {
-      const ok = await verifySiteEd25519Digest(
-        hexToBytes(pubkeyHex),
-        hexToBytes(signatureHex),
-        digest,
-      );
-      if (ok) return { ok: true, reason: "valid", legacyPpid: String(artifact.legacy_ppid || "").trim() || null };
-    } catch {
-      continue;
+  const pubkeys = pubkeysForIssuer(trustedIssuers, issuerDid, trustedIssuerPubkeys);
+  if (!pubkeys.length) return { ok: false, reason: "convergence_untrusted_issuer" };
+  const signature = hexToBytes(signatureHex);
+  const digests = [
+    await sha256Bytes(buildConvergenceCanonicalMessage(unsigned, { includeIssuer: true })),
+    await sha256Bytes(buildConvergenceCanonicalMessage(unsigned, { includeIssuer: false })),
+  ];
+  for (const digest of digests) {
+    for (const pubkeyHex of pubkeys) {
+      try {
+        // Signatures cover the SHA-256 digest; do not hash again.
+        if (await verifyEd25519(hexToBytes(pubkeyHex), digest, signature)) {
+          return {
+            ok: true,
+            reason: "valid",
+            legacyPpid: String(artifact.legacy_ppid || "").trim() || null,
+          };
+        }
+      } catch {
+        continue;
+      }
     }
   }
   return { ok: false, reason: "convergence_invalid_signature" };
@@ -615,10 +679,13 @@ export async function buildActionCommitment({
   return bytesToHex(digest);
 }
 
-function buildFreshPasskeyCanonicalMessage(artifact) {
-  return new TextEncoder().encode([
+function buildFreshPasskeyCanonicalMessage(artifact, { includeIssuer = true } = {}) {
+  const lines = [
     FRESH_PASSKEY_PREFIX,
     String(artifact.schema || FRESH_PASSKEY_SCHEMA).trim(),
+  ];
+  if (includeIssuer) lines.push(String(artifact.issuer || "").trim());
+  lines.push(
     String(artifact.site_id || "").trim(),
     String(artifact.credential_id || "").trim(),
     String(artifact.subject || "").trim(),
@@ -626,7 +693,8 @@ function buildFreshPasskeyCanonicalMessage(artifact) {
     String(artifact.attestation_id || "").trim(),
     String(artifact.issued_at_unix ?? ""),
     String(artifact.expires_at_unix ?? ""),
-  ].join("\n"));
+  );
+  return new TextEncoder().encode(lines.join("\n"));
 }
 
 export async function verifyFreshPasskeyAttestation(
@@ -637,6 +705,8 @@ export async function verifyFreshPasskeyAttestation(
     subject,
     actionCommitment,
     trustedIssuerPubkeys = [],
+    trustedIssuers = null,
+    expectedIssuerDid = null,
     nowUnix = Math.floor(Date.now() / 1000),
     maxAgeSeconds = DEFAULT_FRESH_PASSKEY_MAX_AGE_S,
   },
@@ -646,6 +716,11 @@ export async function verifyFreshPasskeyAttestation(
   }
   if (String(attestation.schema || "") !== FRESH_PASSKEY_SCHEMA) {
     return { ok: false, reason: "fresh_passkey_schema_mismatch" };
+  }
+  const issuerDid = String(attestation.issuer || "").trim();
+  if (!issuerDid) return { ok: false, reason: "fresh_passkey_issuer_missing" };
+  if (expectedIssuerDid && issuerDid !== String(expectedIssuerDid).trim()) {
+    return { ok: false, reason: "fresh_passkey_issuer_mismatch" };
   }
   if (String(attestation.site_id || "").trim() !== String(siteId || "").trim()) {
     return { ok: false, reason: "fresh_passkey_site_mismatch" };
@@ -676,6 +751,7 @@ export async function verifyFreshPasskeyAttestation(
   if (!signatureHex) return { ok: false, reason: "fresh_passkey_signature_missing" };
   const unsigned = {
     schema: attestation.schema,
+    issuer: attestation.issuer,
     attestation_id: attestation.attestation_id,
     site_id: attestation.site_id,
     credential_id: attestation.credential_id,
@@ -684,11 +760,18 @@ export async function verifyFreshPasskeyAttestation(
     issued_at_unix: attestation.issued_at_unix,
     expires_at_unix: attestation.expires_at_unix,
   };
-  const digest = await sha256Bytes(buildFreshPasskeyCanonicalMessage(unsigned));
+  const pubkeys = pubkeysForIssuer(trustedIssuers, issuerDid, trustedIssuerPubkeys);
+  if (!pubkeys.length) return { ok: false, reason: "fresh_passkey_untrusted_issuer" };
   const signature = hexToBytes(signatureHex);
-  for (const pubkeyHex of trustedIssuerPubkeys) {
-    if (await verifyEd25519(hexToBytes(pubkeyHex), digest, signature)) {
-      return { ok: true, reason: "valid" };
+  const digests = [
+    await sha256Bytes(buildFreshPasskeyCanonicalMessage(unsigned, { includeIssuer: true })),
+    await sha256Bytes(buildFreshPasskeyCanonicalMessage(unsigned, { includeIssuer: false })),
+  ];
+  for (const digest of digests) {
+    for (const pubkeyHex of pubkeys) {
+      if (await verifyEd25519(hexToBytes(pubkeyHex), digest, signature)) {
+        return { ok: true, reason: "valid" };
+      }
     }
   }
   return { ok: false, reason: "fresh_passkey_invalid_signature" };
@@ -877,22 +960,54 @@ async function verifyBloomSnapshot(snapshot, hashedRevokedIds, trustedIssuers) {
   if (!valid) throw new Error("bloom_snapshot_invalid_signature");
 }
 
-async function fetchSignedBundle(lemmaOrigin, fetchImpl, networkRootPubkeys) {
-  const url = `${lemmaOrigin.replace(/\/$/, "")}/api/revocation/bloom-filter`;
-  const res = await (fetchImpl || globalThis.fetch)(url);
-  if (!res.ok) throw new Error(`bloom_fetch_${res.status}`);
-  const data = await res.json();
-  if (!data.success) throw new Error("bloom_fetch_failed");
-  const issuers = await verifyTrustList(data.trust_list || {}, networkRootPubkeys);
-  await verifyBloomSnapshot(data.snapshot || {}, data.hashed_revoked_ids || [], issuers);
-  return {
-    sequenceNumber: Number(data.snapshot?.sequence_number || 0),
-    revokedHashSet: new Set(data.hashed_revoked_ids || []),
-    validUntilUnix: Number(data.snapshot?.valid_until_unix || 0),
-    fetchedAtMs: Date.now(),
-    maxStalenessSeconds: Number(data.snapshot?.max_staleness_seconds || DEFAULT_MAX_BLOOM_STALENESS_SECONDS),
-    issuers,
-  };
+function resolveTrustBundleUrls(lemmaOrigin, trustBundleUrls) {
+  if (Array.isArray(trustBundleUrls) && trustBundleUrls.length) {
+    return trustBundleUrls.map((u) => String(u).trim()).filter(Boolean);
+  }
+  const env = typeof process !== "undefined" ? process.env?.LEMMA_TRUST_BUNDLE_URLS : "";
+  if (env) {
+    return String(env)
+      .split(",")
+      .map((u) => u.trim())
+      .filter(Boolean);
+  }
+  const origin = String(lemmaOrigin || DEFAULT_LEMMA_ORIGIN).replace(/\/$/, "");
+  return [
+    `${origin}/api/revocation/bloom-filter`,
+    DEFAULT_TRUST_BUNDLE_MIRROR,
+  ];
+}
+
+async function fetchSignedBundleFromUrls(urls, fetchImpl, networkRootPubkeys) {
+  const errors = [];
+  for (const url of urls) {
+    try {
+      const res = await (fetchImpl || globalThis.fetch)(url);
+      if (!res.ok) throw new Error(`bloom_fetch_${res.status}`);
+      const data = await res.json();
+      if (!data.success) throw new Error("bloom_fetch_failed");
+      const issuers = await verifyTrustList(data.trust_list || {}, networkRootPubkeys);
+      await verifyBloomSnapshot(data.snapshot || {}, data.hashed_revoked_ids || [], issuers);
+      return {
+        sequenceNumber: Number(data.snapshot?.sequence_number || 0),
+        revokedHashSet: new Set(data.hashed_revoked_ids || []),
+        validUntilUnix: Number(data.snapshot?.valid_until_unix || 0),
+        fetchedAtMs: Date.now(),
+        maxStalenessSeconds: Number(
+          data.snapshot?.max_staleness_seconds || DEFAULT_MAX_BLOOM_STALENESS_SECONDS,
+        ),
+        issuers,
+      };
+    } catch (err) {
+      errors.push(`${url}: ${err?.message || err}`);
+    }
+  }
+  throw new Error(`trust_refresh_failed:${errors.join("; ")}`);
+}
+
+async function fetchSignedBundle(lemmaOrigin, fetchImpl, networkRootPubkeys, trustBundleUrls) {
+  const urls = resolveTrustBundleUrls(lemmaOrigin, trustBundleUrls);
+  return fetchSignedBundleFromUrls(urls, fetchImpl, networkRootPubkeys);
 }
 
 // ---------------------------------------------------------------------------
@@ -903,6 +1018,7 @@ async function fetchSignedBundle(lemmaOrigin, fetchImpl, networkRootPubkeys) {
  * @param {object} options
  * @param {string} options.siteId                   Expected site_id binding.
  * @param {string} [options.lemmaOrigin]            Defaults to https://lemma.id.
+ * @param {string[]} [options.trustBundleUrls]      Ordered bloom/trust-list URLs (failover).
  * @param {number} [options.refreshMs]              Snapshot refresh interval. Defaults to 15 min.
  * @param {number} [options.maxSessionAgeSeconds]   Reject session assertions older than this. Defaults to 24h.
  * @param {Function} [options.fetch]                Custom fetch impl (e.g. for Cloudflare Workers).
@@ -911,18 +1027,22 @@ async function fetchSignedBundle(lemmaOrigin, fetchImpl, networkRootPubkeys) {
 export function createVerifier({
   siteId,
   lemmaOrigin = DEFAULT_LEMMA_ORIGIN,
+  trustBundleUrls = null,
   refreshMs = DEFAULT_REFRESH_MS,
   maxSessionAgeSeconds = DEFAULT_MAX_SESSION_AGE_S,
   requireSessionAssertion = false,
   requiredAssurance = "ishuman",
   maxActionAgeSeconds = DEFAULT_MAX_ACTION_AGE_S,
-  nonceStoreMode = NONCE_STORE_MODE_OPTIONAL,
+  nonceStoreMode = null,
   freshPasskeyMaxAgeSeconds = DEFAULT_FRESH_PASSKEY_MAX_AGE_S,
   networkRootPubkeys = null,
   fetch: fetchImpl,
 } = {}) {
   if (!siteId) throw new Error("siteId required");
   const canonicalSiteId = canonicalizeSiteHostname(siteId);
+  const resolvedNonceStoreMode = String(
+    nonceStoreMode || defaultNonceStoreMode(),
+  ).toLowerCase();
   let snapshot = null;
   let inflight = null;
 
@@ -936,7 +1056,7 @@ export function createVerifier({
       || now - snapshot.fetchedAtMs > Math.min(refreshMs, snapshot.maxStalenessSeconds * 1000);
     if (!stale) return snapshot;
     if (inflight) return inflight;
-    inflight = fetchSignedBundle(lemmaOrigin, fetchImpl, networkRootPubkeys)
+    inflight = fetchSignedBundle(lemmaOrigin, fetchImpl, networkRootPubkeys, trustBundleUrls)
       .then((next) => {
         snapshot = next;
         return snapshot;
@@ -997,8 +1117,14 @@ export function createVerifier({
     if (boundSiteErr || boundSite !== canonicalSiteId) {
       return { ok: false, reason: "site_id_mismatch", boundSiteId: boundSiteRaw };
     }
-    const expiresAt = Number(claims.expiresAt || 0);
-    if (expiresAt && expiresAt < Math.floor(Date.now() / 1000)) {
+    if (claims.expiresAt === undefined || claims.expiresAt === null || claims.expiresAt === "") {
+      return { ok: false, reason: "expiresAt_missing" };
+    }
+    const expiresAt = Number(claims.expiresAt);
+    if (!Number.isFinite(expiresAt) || expiresAt <= 0) {
+      return { ok: false, reason: "expiresAt_malformed" };
+    }
+    if (expiresAt < Math.floor(Date.now() / 1000)) {
       return { ok: false, reason: "expired" };
     }
 
@@ -1038,18 +1164,22 @@ export function createVerifier({
       if (sessionSiteErr || sessionSite !== canonicalSiteId) {
         return { ok: false, reason: "session_site_id_mismatch" };
       }
-    } else if (requireSessionAssertion && sitePubkeyB64) {
+    } else if (requireSessionAssertion) {
+      // Fail closed: missing site key must not bypass PoP when required.
+      if (!sitePubkeyB64) {
+        return { ok: false, reason: "credential_missing_site_signing_pubkey" };
+      }
       return { ok: false, reason: "session_assertion_required" };
     }
 
     let legacyPpid = null;
     const convergence = presentation.ppid_convergence;
     if (convergence) {
-      const trustedPubkeys = flattenTrustedIssuerPubkeys(bundle.issuers);
       const conv = await verifyPpidConvergenceArtifact(convergence, {
         siteId: canonicalSiteId,
         canonicalPpid: credential.subject || "",
-        trustedIssuerPubkeys: trustedPubkeys,
+        trustedIssuers: bundle.issuers,
+        expectedIssuerDid: issuerDid,
       });
       if (!conv.ok) return conv;
       legacyPpid = conv.legacyPpid || null;
@@ -1180,7 +1310,9 @@ export function createVerifier({
 
     const nonce = String(assertion.nonce || inner.nonce || "").trim();
     if (!nonce) return { ok: false, reason: "action_nonce_missing" };
-    const mode = String(actionNonceStoreMode || nonceStoreMode || NONCE_STORE_MODE_OPTIONAL).toLowerCase();
+    const mode = String(
+      actionNonceStoreMode || resolvedNonceStoreMode || defaultNonceStoreMode(),
+    ).toLowerCase();
     if (mode === NONCE_STORE_MODE_REQUIRED && !nonceStore) {
       return { ok: false, reason: "action_nonce_store_required" };
     }
@@ -1200,16 +1332,13 @@ export function createVerifier({
         bodyHash: expectedBodyHash,
       });
       const bundle = await ensureFresh();
-      const trustedPubkeys = [];
-      for (const pubkeys of bundle.issuers.values()) {
-        for (const pubkeyHex of pubkeys) trustedPubkeys.push(pubkeyHex);
-      }
       const fp = await verifyFreshPasskeyAttestation(attestation, {
         siteId: canonicalSiteId,
         credentialId: String(credential.id || credResult.credentialId || ""),
         subject: String(credential.subject || credResult.ppid || ""),
         actionCommitment,
-        trustedIssuerPubkeys: trustedPubkeys,
+        trustedIssuers: bundle.issuers,
+        expectedIssuerDid: credResult.issuerDid || credential.issuer,
         maxAgeSeconds: freshPasskeyMaxAgeSeconds,
       });
       if (!fp.ok) return fp;
@@ -1375,6 +1504,12 @@ export async function verifyActionStamp(stamp, options) {
   return createVerifier(options).verifyActionStamp(stamp, options);
 }
 
+export {
+  resolveTrustBundleUrls,
+  DEFAULT_TRUST_BUNDLE_MIRROR,
+  DEFAULT_LEMMA_ORIGIN,
+};
+
 // CommonJS interop for Node.js require()
 if (typeof module !== "undefined" && typeof module.exports !== "undefined") {
   module.exports = {
@@ -1392,5 +1527,8 @@ if (typeof module !== "undefined" && typeof module.exports !== "undefined") {
     createLemmaCheckPolicyStore,
     canonicalizeSiteHostname,
     browserCanonicalMessage,
+    defaultNonceStoreMode,
+    resolveTrustBundleUrls,
+    DEFAULT_TRUST_BUNDLE_MIRROR,
   };
 }

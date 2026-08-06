@@ -53,6 +53,7 @@ def fresh_passkey_begin():
         passkey_credential_id=passkey_credential_id,
         wallet_id=wallet_id,
         subject=subject,
+        site_id=site_id,
     )
     if not ok_bind:
         return jsonify({"success": False, "error": bind_reason}), 403
@@ -120,6 +121,7 @@ def fresh_passkey_complete():
         passkey_credential_id=credential_id_b64,
         wallet_id=str(stored.get("wallet_id") or ""),
         subject=str(stored.get("subject") or ""),
+        site_id=str(stored.get("site_id") or ""),
     )
     if not ok_bind:
         return jsonify({"success": False, "error": bind_reason}), 403

@@ -25,7 +25,7 @@ Reconciled conflicts:
 | Topic | Agent Ops stance | GA / isHuman stance |
 | ----- | ---------------- | ------------------- |
 | Deploy verification | `run_agent_ops_e2e.ps1`, pilot release gates | `auth-launch-gate.yml` on every `main` push |
-| Proof enforcement rollout | `LEMMA_ENFORCE_PROOF_REQUIRED=0` default; shadow via `LEMMA_AUTHZ_PROOF_SHADOW=1` | Enable hard enforcement after client proof headers ship |
+| Proof enforcement rollout | `LEMMA_ENFORCE_PROOF_REQUIRED=0` default; staged `LEMMA_ENFORCE_PROOF_REQUIRED_CRITICAL`; shadow via `LEMMA_AUTHZ_PROOF_SHADOW=1` | Enable critical gate first, then global enforce after client proof headers ship (see `docs/operations/ENVIRONMENT_CONFIG.md`) |
 | IDV / demo scope | Out of scope here | Didit default at `/demo`; Stripe legacy only |
 | Network revocation | Agent proof revocation via control plane | isHuman network-revoke retired (HTTP 410); site-block only |
 

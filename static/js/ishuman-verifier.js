@@ -1398,9 +1398,48 @@ class ProofVerifier {
         }
     }
 
-    _signActionViaPopup(signParams) {
+    async _mintVerifyFlowState(fields = {}) {
+        try {
+            const resp = await fetch(`${this.lemmaOrigin}/api/verify/flow-state`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    site_id: fields.site_id || this.siteId,
+                    issue_mode: fields.issue_mode || '',
+                    redirect_return: fields.redirect_return || '',
+                    request_nonce: fields.request_nonce || '',
+                    required_assurance: fields.required_assurance || '',
+                }),
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok || !data?.success || !data?.flow_state) {
+                if (this.debug) {
+                    console.warn('[isHuman] flow-state mint failed:', data?.error || resp.status);
+                }
+                return null;
+            }
+            return String(data.flow_state);
+        } catch (err) {
+            if (this.debug) console.warn('[isHuman] flow-state mint error:', err?.message || err);
+            return null;
+        }
+    }
+
+    async _signActionViaPopup(signParams) {
         const requestNonce = randomNonceB64(16);
+        const requiredAssurance = String(signParams.requiredAssurance || '').trim().toLowerCase();
+        const flowState = await this._mintVerifyFlowState({
+            site_id: this.siteId,
+            issue_mode: 'action_sign',
+            redirect_return: window.location.href,
+            request_nonce: requestNonce,
+            required_assurance: requiredAssurance,
+        });
+        if (!flowState) {
+            return { ok: false, reason: 'flow_state_mint_failed' };
+        }
         const popupUrl = new URL(`${this.lemmaOrigin}${this.idvPopupPath}`);
+        popupUrl.searchParams.set('flow_state', flowState);
         popupUrl.searchParams.set('origin', window.location.origin);
         popupUrl.searchParams.set('site_id', this.siteId);
         popupUrl.searchParams.set('issue_mode', 'action_sign');
@@ -1416,7 +1455,6 @@ class ProofVerifier {
             popupUrl.searchParams.set('server_nonce', signParams.serverNonce || '');
             popupUrl.searchParams.set('action_commitment', signParams.actionCommitment || '');
         }
-        const requiredAssurance = String(signParams.requiredAssurance || '').trim().toLowerCase();
         if (requiredAssurance === 'passkey' || requiredAssurance === 'ishuman') {
             popupUrl.searchParams.set('required_assurance', requiredAssurance);
         }
@@ -1429,7 +1467,7 @@ class ProofVerifier {
             popupUrl.searchParams.set('flow_mode', 'redirect');
             popupUrl.searchParams.set('redirect_return', window.location.href);
             window.location.assign(popupUrl.toString());
-            return Promise.resolve({ ok: false, reason: 'redirect_started' });
+            return { ok: false, reason: 'redirect_started' };
         }
 
         return _openManagedLemmaPopup(
@@ -2159,15 +2197,28 @@ class ProofVerifier {
         return this._result(true, credential.subject, 'valid', t0, null, session);
     }
 
-    _issueSiteProofViaPopup(options = {}) {
+    async _issueSiteProofViaPopup(options = {}) {
         const requestNonce = randomNonceB64(16);
         const sessionNonce = randomNonceB64(32);
         const bloomSequence = Number(this._bloomSnapshot?.sequence_number ?? 0);
+        const issueMode = options.freshIdv ? 'fresh_idv' : 'site_proof';
+        const requiredAssurance = this._activeRequiredAssurance || this.requiredAssurance || 'ishuman';
+        const flowState = await this._mintVerifyFlowState({
+            site_id: this.siteId,
+            issue_mode: issueMode,
+            redirect_return: window.location.href,
+            request_nonce: requestNonce,
+            required_assurance: requiredAssurance,
+        });
+        if (!flowState) {
+            return { ok: false, reason: 'flow_state_mint_failed', detail: null };
+        }
 
         const popupUrl = new URL(`${this.lemmaOrigin}${this.idvPopupPath}`);
+        popupUrl.searchParams.set('flow_state', flowState);
         popupUrl.searchParams.set('origin', window.location.origin);
         popupUrl.searchParams.set('site_id', this.siteId);
-        popupUrl.searchParams.set('issue_mode', options.freshIdv ? 'fresh_idv' : 'site_proof');
+        popupUrl.searchParams.set('issue_mode', issueMode);
         if (options.refreshReason) {
             popupUrl.searchParams.set('refresh_reason', String(options.refreshReason));
         }
@@ -2179,7 +2230,6 @@ class ProofVerifier {
         popupUrl.searchParams.set('bloom_sequence', String(bloomSequence));
         popupUrl.searchParams.set('session_ttl_sec', String(this.sessionTtlSec));
         popupUrl.searchParams.set('redirect_return', window.location.href);
-        const requiredAssurance = this._activeRequiredAssurance || this.requiredAssurance || 'ishuman';
         if (requiredAssurance === 'passkey' || requiredAssurance === 'ishuman') {
             popupUrl.searchParams.set('required_assurance', requiredAssurance);
         }
@@ -2252,10 +2302,16 @@ class ProofVerifier {
         });
     }
 
-    _unlockViaPopup() {
+    async _unlockViaPopup() {
+        const siteId = this.siteId || 'lemma.id';
+        const flowState = await this._mintVerifyFlowState({
+            site_id: siteId,
+            issue_mode: 'unlock',
+        });
         const popupUrl = new URL(`${this.lemmaOrigin}${this.idvPopupPath}`);
+        if (flowState) popupUrl.searchParams.set('flow_state', flowState);
         popupUrl.searchParams.set('origin', window.location.origin);
-        popupUrl.searchParams.set('site_id', this.siteId || 'lemma.id');
+        popupUrl.searchParams.set('site_id', siteId);
         popupUrl.searchParams.set('issue_mode', 'unlock');
 
         return _openManagedLemmaPopup(
@@ -2284,8 +2340,17 @@ class ProofVerifier {
         });
     }
 
-    _provisionViaPopup() {
+    async _provisionViaPopup() {
+        const flowState = await this._mintVerifyFlowState({
+            site_id: this.siteId,
+            issue_mode: 'site_proof',
+            redirect_return: window.location.href,
+        });
+        if (!flowState) {
+            return { ok: false, detail: null, reason: 'flow_state_mint_failed' };
+        }
         const popupUrl = new URL(`${this.lemmaOrigin}${this.idvPopupPath}`);
+        popupUrl.searchParams.set('flow_state', flowState);
         popupUrl.searchParams.set('origin', window.location.origin);
         popupUrl.searchParams.set('site_id', this.siteId);
 

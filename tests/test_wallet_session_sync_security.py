@@ -26,8 +26,10 @@ def test_origin_allowed_rejects_boundary_bypass(monkeypatch):
 def test_lemma_origin_allowed_rejects_substring_spoof(monkeypatch):
     monkeypatch.setattr(wallet_session_sync, "_ALLOW_DEV_ORIGINS", False)
 
+    # Wave 3: exact identity hosts only (no *.lemma.id wildcard trust).
     assert wallet_session_sync._lemma_origin_allowed("https://lemma.id") is True
-    assert wallet_session_sync._lemma_origin_allowed("https://wallet.lemma.id") is True
+    assert wallet_session_sync._lemma_origin_allowed("https://www.lemma.id") is True
+    assert wallet_session_sync._lemma_origin_allowed("https://wallet.lemma.id") is False
     assert wallet_session_sync._lemma_origin_allowed("https://lemma.id.attacker.com") is False
 
 

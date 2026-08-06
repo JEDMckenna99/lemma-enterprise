@@ -14,6 +14,12 @@ def fixture_ishuman_demo_client(fake_ishuman_db_session_factory, monkeypatch):
     from api.ishuman_demo import ishuman_demo_bp
 
     monkeypatch.setattr("api.database.SessionLocal", fake_ishuman_db_session_factory.session_local)
+    # UI/content tests open /verify without minting flow-state; Wave 3 enforcement
+    # is covered by tests/test_security_containment_wave3.py.
+    monkeypatch.setattr(
+        "api.verify_flow_state.require_verify_flow_state",
+        lambda: False,
+    )
     app = Flask(
         __name__,
         template_folder=str(ROOT / "templates"),

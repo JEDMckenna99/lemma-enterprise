@@ -3,6 +3,7 @@ Account Recovery API
 Allows developers to recover access using their API key + site_id
 """
 
+import base64
 import logging
 import secrets
 import hashlib
@@ -10,6 +11,7 @@ import json
 import os
 import threading
 from datetime import datetime, timezone, timedelta
+from typing import Optional
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for
 from flask_cors import cross_origin
 from api.admin_issuance_notifications import notify_admin_lemma_issued
@@ -151,23 +153,80 @@ def _validate_replacement_passkey_proof(data: dict) -> tuple[bool, str, str, str
     return True, "ok", ppid, passkey_credential_id
 
 
+RECOVERY_CHALLENGE_PREFIX = "recovery_webauthn:"
+RECOVERY_CHALLENGE_TTL_SECONDS = 300
+
+
+def _recovery_challenge_store_key(challenge_key: str) -> str:
+    return f"{RECOVERY_CHALLENGE_PREFIX}{challenge_key}"
+
+
+def _peek_recovery_token(token_hash: str) -> Optional[dict]:
+    """Return unused, unexpired recovery token data without consuming it."""
+    if redis_client:
+        try:
+            data = redis_client.get(f"{RECOVERY_TOKEN_PREFIX}{token_hash}")
+            if not data:
+                return None
+            token_data = json.loads(data)
+            if token_data.get("used"):
+                return None
+            expires_at = token_data.get("expires_at")
+            if isinstance(expires_at, str):
+                expires_at = datetime.fromisoformat(expires_at)
+            if expires_at and expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            if expires_at and expires_at < datetime.now(timezone.utc):
+                return None
+            return token_data
+        except Exception as exc:
+            logger.error(f"Redis recovery token peek failed: {exc}")
+            return None
+    with _recovery_memory_lock:
+        token_data = recovery_tokens_memory.get(token_hash)
+        if not token_data or token_data.get("used"):
+            return None
+        expires_at = token_data.get("expires_at")
+        if expires_at and expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at and expires_at < datetime.now(timezone.utc):
+            return None
+        return dict(token_data)
+
+
 def _verify_recovery_webauthn_assertion(
     data: dict,
     *,
     token_hash: str,
     passkey_credential_id: str,
+    ppid: str,
 ) -> tuple[bool, str]:
-    """Verify a WebAuthn assertion for the replacement passkey during recovery."""
+    """Verify a WebAuthn assertion bound to a server-minted recovery challenge."""
     credential = data.get("webauthn_credential") or data.get("credential")
+    challenge_key = str(data.get("challenge_key") or "").strip()
     if not isinstance(credential, dict):
         return False, "replacement_webauthn_required"
+    if not challenge_key:
+        return False, "recovery_challenge_required"
 
+    from auth.redis_store import consume as redis_consume
     from api.fresh_passkey_attestation import (
         lookup_wallet_passkey_public_key,
         verify_wallet_webauthn_assertion,
     )
     from api.fresh_passkey_attestation import allowed_fresh_passkey_origins
     from api.passkey_auth import RP_ID
+
+    stored = redis_consume(_recovery_challenge_store_key(challenge_key))
+    if not isinstance(stored, dict):
+        return False, "recovery_challenge_invalid"
+
+    if str(stored.get("token_hash") or "") != token_hash:
+        return False, "recovery_challenge_token_mismatch"
+    if str(stored.get("passkey_credential_id") or "") != passkey_credential_id:
+        return False, "recovery_challenge_passkey_mismatch"
+    if str(stored.get("ppid") or "") != ppid:
+        return False, "recovery_challenge_ppid_mismatch"
 
     credential_id_b64 = str(credential.get("id") or "").strip()
     if not credential_id_b64 or credential_id_b64 != passkey_credential_id:
@@ -177,7 +236,11 @@ def _verify_recovery_webauthn_assertion(
     if not public_key_b64:
         return False, "replacement_passkey_not_registered"
 
-    challenge = hashlib.sha256(f"recovery:{token_hash}".encode()).digest()
+    try:
+        challenge = base64.urlsafe_b64decode(str(stored.get("challenge") or "") + "==")
+    except Exception:
+        return False, "recovery_challenge_malformed"
+
     ok, reason, _new_sign_count = verify_wallet_webauthn_assertion(
         credential=credential,
         expected_challenge=challenge,
@@ -472,6 +535,63 @@ def validate_recovery_token():
         return jsonify({'success': False, 'error': 'Validation failed'}), 500
 
 
+@account_recovery_bp.route('/api/recovery/webauthn/begin', methods=['POST'])
+@cross_origin()
+def begin_recovery_webauthn():
+    """Mint a one-time WebAuthn challenge bound to the recovery token + passkey/PPID."""
+    try:
+        data = request.get_json() or {}
+        token = str(data.get('token') or '').strip()
+        ok_proof, proof_err, ppid, passkey_credential_id = _validate_replacement_passkey_proof(data)
+        if not token:
+            return jsonify({'success': False, 'error': 'Token required'}), 400
+        if not ok_proof:
+            return jsonify({'success': False, 'error': proof_err}), 400
+
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        token_data = _peek_recovery_token(token_hash)
+        if not token_data:
+            return jsonify({'success': False, 'error': 'Invalid or expired token'}), 400
+
+        from api.fresh_passkey_attestation import lookup_wallet_passkey_public_key
+        from api.passkey_auth import RP_ID
+        from auth.redis_store import store as redis_store
+
+        public_key_b64, _sign_count = lookup_wallet_passkey_public_key(passkey_credential_id)
+        if not public_key_b64:
+            return jsonify({'success': False, 'error': 'replacement_passkey_not_registered'}), 400
+
+        challenge = secrets.token_bytes(32)
+        challenge_b64 = base64.urlsafe_b64encode(challenge).decode('utf-8').rstrip('=')
+        challenge_key = f"rec_{secrets.token_urlsafe(16)}"
+        redis_store(
+            _recovery_challenge_store_key(challenge_key),
+            {
+                'challenge': challenge_b64,
+                'token_hash': token_hash,
+                'passkey_credential_id': passkey_credential_id,
+                'ppid': ppid,
+                'site_id': token_data.get('site_id'),
+            },
+            ttl_seconds=RECOVERY_CHALLENGE_TTL_SECONDS,
+        )
+        return jsonify({
+            'success': True,
+            'challenge_key': challenge_key,
+            'challenge': challenge_b64,
+            'rp_id': RP_ID,
+            'allow_credentials': [{
+                'type': 'public-key',
+                'id': passkey_credential_id,
+            }],
+            'timeout': 60000,
+            'user_verification': 'required',
+        })
+    except Exception as e:
+        logger.error(f"Recovery webauthn begin failed: {e}")
+        return jsonify({'success': False, 'error': 'recovery_webauthn_begin_failed'}), 500
+
+
 @account_recovery_bp.route('/api/recovery/complete', methods=['POST'])
 @cross_origin()
 def complete_recovery():
@@ -480,8 +600,9 @@ def complete_recovery():
 
     Requires:
       1. API key + email token (initiate step)
-      2. Atomically consumed one-time recovery token
-      3. Replacement passkey credential id + wallet-derived PPID from the new device
+      2. Server-minted WebAuthn challenge from /api/recovery/webauthn/begin
+      3. Atomically consumed one-time recovery token
+      4. Replacement passkey credential id + wallet-derived PPID from the new device
     """
     try:
         data = request.get_json() or {}
@@ -502,6 +623,7 @@ def complete_recovery():
             data,
             token_hash=token_hash,
             passkey_credential_id=passkey_credential_id,
+            ppid=ppid,
         )
         if not ok_webauthn:
             return jsonify({'success': False, 'error': webauthn_err}), 403

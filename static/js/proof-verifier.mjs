@@ -272,6 +272,29 @@ function flattenTrustedIssuerPubkeys(issuers) {
   return out;
 }
 
+function pubkeysForIssuer(issuers, issuerDid, fallbackPubkeys = []) {
+  const did = String(issuerDid || "").trim();
+  if (!did) return [];
+  if (issuers instanceof Map) {
+    const keySet = issuers.get(did);
+    if (!keySet) return [];
+    if (keySet instanceof Set) return [...keySet].map((p) => String(p).toLowerCase()).sort();
+    if (Array.isArray(keySet)) return keySet.map((p) => String(p).toLowerCase()).sort();
+    return [];
+  }
+  if (issuers && typeof issuers === "object") {
+    const entry = issuers[did];
+    if (!entry) return [];
+    if (entry instanceof Set) return [...entry].map((p) => String(p).toLowerCase()).sort();
+    if (Array.isArray(entry)) return entry.map((p) => String(p).toLowerCase()).sort();
+    if (entry.pubkeys_hex) {
+      return [...entry.pubkeys_hex].map((p) => String(p).toLowerCase()).sort();
+    }
+    return [];
+  }
+  return (fallbackPubkeys || []).map((p) => String(p).trim().toLowerCase()).filter(Boolean);
+}
+
 export function assuranceMeetsPolicy(actual, required) {
   if (!actual) return false;
   const policy = String(required || "ishuman").toLowerCase();
@@ -406,9 +429,10 @@ export function validateCredentialRequiredFields(credential) {
   return null;
 }
 
-function buildConvergenceCanonicalMessage(artifact) {
-  return new TextEncoder().encode([
-    CONVERGENCE_PREFIX,
+function buildConvergenceCanonicalMessage(artifact, { includeIssuer = true } = {}) {
+  const lines = [CONVERGENCE_PREFIX];
+  if (includeIssuer) lines.push(String(artifact.issuer || "").trim());
+  lines.push(
     String(artifact.site_id || "").trim(),
     String(artifact.legacy_ppid || "").trim(),
     String(artifact.canonical_ppid || "").trim(),
@@ -416,18 +440,31 @@ function buildConvergenceCanonicalMessage(artifact) {
     String(artifact.nonce || "").trim(),
     String(Number(artifact.issued_at_unix || 0)),
     String(Number(artifact.expires_at_unix || 0)),
-  ].join("\n"));
+  );
+  return new TextEncoder().encode(lines.join("\n"));
 }
 
 async function verifyPpidConvergenceArtifact(
   artifact,
-  { siteId, canonicalPpid, trustedIssuerPubkeys, nowUnix },
+  {
+    siteId,
+    canonicalPpid,
+    trustedIssuerPubkeys = [],
+    trustedIssuers = null,
+    expectedIssuerDid = null,
+    nowUnix,
+  },
 ) {
   if (!artifact || typeof artifact !== "object") {
     return { ok: false, reason: "convergence_missing" };
   }
   if (String(artifact.schema || "") !== CONVERGENCE_SCHEMA) {
     return { ok: false, reason: "convergence_schema_mismatch" };
+  }
+  const issuerDid = String(artifact.issuer || "").trim();
+  if (!issuerDid) return { ok: false, reason: "convergence_issuer_missing" };
+  if (expectedIssuerDid && issuerDid !== String(expectedIssuerDid).trim()) {
+    return { ok: false, reason: "convergence_issuer_mismatch" };
   }
   if (String(artifact.site_id || "").trim() !== String(siteId || "").trim()) {
     return { ok: false, reason: "convergence_site_mismatch" };
@@ -445,6 +482,7 @@ async function verifyPpidConvergenceArtifact(
   if (!signatureHex) return { ok: false, reason: "convergence_signature_missing" };
   const unsigned = {
     schema: artifact.schema,
+    issuer: artifact.issuer,
     convergence_id: artifact.convergence_id,
     site_id: artifact.site_id,
     legacy_ppid: artifact.legacy_ppid,
@@ -453,17 +491,27 @@ async function verifyPpidConvergenceArtifact(
     expires_at_unix: artifact.expires_at_unix,
     nonce: artifact.nonce,
   };
-  const digest = await sha256Bytes(buildConvergenceCanonicalMessage(unsigned));
-  for (const pubkeyHex of trustedIssuerPubkeys) {
-    try {
-      const ok = await verifySiteEd25519Digest(
-        hexToBytes(pubkeyHex),
-        hexToBytes(signatureHex),
-        digest,
-      );
-      if (ok) return { ok: true, reason: "valid", legacyPpid: String(artifact.legacy_ppid || "").trim() || null };
-    } catch {
-      continue;
+  const pubkeys = pubkeysForIssuer(trustedIssuers, issuerDid, trustedIssuerPubkeys);
+  if (!pubkeys.length) return { ok: false, reason: "convergence_untrusted_issuer" };
+  const signature = hexToBytes(signatureHex);
+  const digests = [
+    await sha256Bytes(buildConvergenceCanonicalMessage(unsigned, { includeIssuer: true })),
+    await sha256Bytes(buildConvergenceCanonicalMessage(unsigned, { includeIssuer: false })),
+  ];
+  for (const digest of digests) {
+    for (const pubkeyHex of pubkeys) {
+      try {
+        // Signatures cover the SHA-256 digest; do not hash again.
+        if (await verifyEd25519(hexToBytes(pubkeyHex), digest, signature)) {
+          return {
+            ok: true,
+            reason: "valid",
+            legacyPpid: String(artifact.legacy_ppid || "").trim() || null,
+          };
+        }
+      } catch {
+        continue;
+      }
     }
   }
   return { ok: false, reason: "convergence_invalid_signature" };
@@ -631,10 +679,13 @@ export async function buildActionCommitment({
   return bytesToHex(digest);
 }
 
-function buildFreshPasskeyCanonicalMessage(artifact) {
-  return new TextEncoder().encode([
+function buildFreshPasskeyCanonicalMessage(artifact, { includeIssuer = true } = {}) {
+  const lines = [
     FRESH_PASSKEY_PREFIX,
     String(artifact.schema || FRESH_PASSKEY_SCHEMA).trim(),
+  ];
+  if (includeIssuer) lines.push(String(artifact.issuer || "").trim());
+  lines.push(
     String(artifact.site_id || "").trim(),
     String(artifact.credential_id || "").trim(),
     String(artifact.subject || "").trim(),
@@ -642,7 +693,8 @@ function buildFreshPasskeyCanonicalMessage(artifact) {
     String(artifact.attestation_id || "").trim(),
     String(artifact.issued_at_unix ?? ""),
     String(artifact.expires_at_unix ?? ""),
-  ].join("\n"));
+  );
+  return new TextEncoder().encode(lines.join("\n"));
 }
 
 export async function verifyFreshPasskeyAttestation(
@@ -653,6 +705,8 @@ export async function verifyFreshPasskeyAttestation(
     subject,
     actionCommitment,
     trustedIssuerPubkeys = [],
+    trustedIssuers = null,
+    expectedIssuerDid = null,
     nowUnix = Math.floor(Date.now() / 1000),
     maxAgeSeconds = DEFAULT_FRESH_PASSKEY_MAX_AGE_S,
   },
@@ -662,6 +716,11 @@ export async function verifyFreshPasskeyAttestation(
   }
   if (String(attestation.schema || "") !== FRESH_PASSKEY_SCHEMA) {
     return { ok: false, reason: "fresh_passkey_schema_mismatch" };
+  }
+  const issuerDid = String(attestation.issuer || "").trim();
+  if (!issuerDid) return { ok: false, reason: "fresh_passkey_issuer_missing" };
+  if (expectedIssuerDid && issuerDid !== String(expectedIssuerDid).trim()) {
+    return { ok: false, reason: "fresh_passkey_issuer_mismatch" };
   }
   if (String(attestation.site_id || "").trim() !== String(siteId || "").trim()) {
     return { ok: false, reason: "fresh_passkey_site_mismatch" };
@@ -692,6 +751,7 @@ export async function verifyFreshPasskeyAttestation(
   if (!signatureHex) return { ok: false, reason: "fresh_passkey_signature_missing" };
   const unsigned = {
     schema: attestation.schema,
+    issuer: attestation.issuer,
     attestation_id: attestation.attestation_id,
     site_id: attestation.site_id,
     credential_id: attestation.credential_id,
@@ -700,11 +760,18 @@ export async function verifyFreshPasskeyAttestation(
     issued_at_unix: attestation.issued_at_unix,
     expires_at_unix: attestation.expires_at_unix,
   };
-  const digest = await sha256Bytes(buildFreshPasskeyCanonicalMessage(unsigned));
+  const pubkeys = pubkeysForIssuer(trustedIssuers, issuerDid, trustedIssuerPubkeys);
+  if (!pubkeys.length) return { ok: false, reason: "fresh_passkey_untrusted_issuer" };
   const signature = hexToBytes(signatureHex);
-  for (const pubkeyHex of trustedIssuerPubkeys) {
-    if (await verifyEd25519(hexToBytes(pubkeyHex), digest, signature)) {
-      return { ok: true, reason: "valid" };
+  const digests = [
+    await sha256Bytes(buildFreshPasskeyCanonicalMessage(unsigned, { includeIssuer: true })),
+    await sha256Bytes(buildFreshPasskeyCanonicalMessage(unsigned, { includeIssuer: false })),
+  ];
+  for (const digest of digests) {
+    for (const pubkeyHex of pubkeys) {
+      if (await verifyEd25519(hexToBytes(pubkeyHex), digest, signature)) {
+        return { ok: true, reason: "valid" };
+      }
     }
   }
   return { ok: false, reason: "fresh_passkey_invalid_signature" };
@@ -1050,8 +1117,14 @@ export function createVerifier({
     if (boundSiteErr || boundSite !== canonicalSiteId) {
       return { ok: false, reason: "site_id_mismatch", boundSiteId: boundSiteRaw };
     }
-    const expiresAt = Number(claims.expiresAt || 0);
-    if (expiresAt && expiresAt < Math.floor(Date.now() / 1000)) {
+    if (claims.expiresAt === undefined || claims.expiresAt === null || claims.expiresAt === "") {
+      return { ok: false, reason: "expiresAt_missing" };
+    }
+    const expiresAt = Number(claims.expiresAt);
+    if (!Number.isFinite(expiresAt) || expiresAt <= 0) {
+      return { ok: false, reason: "expiresAt_malformed" };
+    }
+    if (expiresAt < Math.floor(Date.now() / 1000)) {
       return { ok: false, reason: "expired" };
     }
 
@@ -1091,18 +1164,22 @@ export function createVerifier({
       if (sessionSiteErr || sessionSite !== canonicalSiteId) {
         return { ok: false, reason: "session_site_id_mismatch" };
       }
-    } else if (requireSessionAssertion && sitePubkeyB64) {
+    } else if (requireSessionAssertion) {
+      // Fail closed: missing site key must not bypass PoP when required.
+      if (!sitePubkeyB64) {
+        return { ok: false, reason: "credential_missing_site_signing_pubkey" };
+      }
       return { ok: false, reason: "session_assertion_required" };
     }
 
     let legacyPpid = null;
     const convergence = presentation.ppid_convergence;
     if (convergence) {
-      const trustedPubkeys = flattenTrustedIssuerPubkeys(bundle.issuers);
       const conv = await verifyPpidConvergenceArtifact(convergence, {
         siteId: canonicalSiteId,
         canonicalPpid: credential.subject || "",
-        trustedIssuerPubkeys: trustedPubkeys,
+        trustedIssuers: bundle.issuers,
+        expectedIssuerDid: issuerDid,
       });
       if (!conv.ok) return conv;
       legacyPpid = conv.legacyPpid || null;
@@ -1255,16 +1332,13 @@ export function createVerifier({
         bodyHash: expectedBodyHash,
       });
       const bundle = await ensureFresh();
-      const trustedPubkeys = [];
-      for (const pubkeys of bundle.issuers.values()) {
-        for (const pubkeyHex of pubkeys) trustedPubkeys.push(pubkeyHex);
-      }
       const fp = await verifyFreshPasskeyAttestation(attestation, {
         siteId: canonicalSiteId,
         credentialId: String(credential.id || credResult.credentialId || ""),
         subject: String(credential.subject || credResult.ppid || ""),
         actionCommitment,
-        trustedIssuerPubkeys: trustedPubkeys,
+        trustedIssuers: bundle.issuers,
+        expectedIssuerDid: credResult.issuerDid || credential.issuer,
         maxAgeSeconds: freshPasskeyMaxAgeSeconds,
       });
       if (!fp.ok) return fp;

@@ -16,19 +16,32 @@ CONVERGENCE_SCHEMA = "ppid_convergence.v1"
 CONVERGENCE_TTL_SECONDS = 3600
 
 
-def build_convergence_canonical_message(artifact: dict) -> bytes:
+def build_convergence_canonical_message(artifact: dict, *, include_issuer: bool = True) -> bytes:
     """Byte-exact convergence signing input (see CANONICAL_MESSAGES.md §9)."""
-    lines = [
-        CONVERGENCE_PREFIX,
-        str(artifact.get("site_id") or "").strip(),
-        str(artifact.get("legacy_ppid") or "").strip(),
-        str(artifact.get("canonical_ppid") or "").strip(),
-        str(artifact.get("convergence_id") or "").strip(),
-        str(artifact.get("nonce") or "").strip(),
-        str(int(artifact.get("issued_at_unix") or 0)),
-        str(int(artifact.get("expires_at_unix") or 0)),
-    ]
+    lines = [CONVERGENCE_PREFIX]
+    if include_issuer:
+        lines.append(str(artifact.get("issuer") or "").strip())
+    lines.extend(
+        [
+            str(artifact.get("site_id") or "").strip(),
+            str(artifact.get("legacy_ppid") or "").strip(),
+            str(artifact.get("canonical_ppid") or "").strip(),
+            str(artifact.get("convergence_id") or "").strip(),
+            str(artifact.get("nonce") or "").strip(),
+            str(int(artifact.get("issued_at_unix") or 0)),
+            str(int(artifact.get("expires_at_unix") or 0)),
+        ]
+    )
     return "\n".join(lines).encode("utf-8")
+
+
+def _artifact_signing_issuer_did() -> str:
+    from api.federated_signer import get_federated_signer, use_remote_federated_signer
+    from api.ishuman import _get_ishuman_issuer
+
+    if use_remote_federated_signer():
+        return str(get_federated_signer().get_did() or "").strip()
+    return str(_get_ishuman_issuer().get_did() or "").strip()
 
 
 def _sign_convergence_digest(digest: bytes) -> tuple[str, str]:
@@ -51,13 +64,35 @@ def _sign_convergence_digest(digest: bytes) -> tuple[str, str]:
 
 def sign_ppid_convergence_artifact(artifact: dict) -> dict:
     """Attach issuer + Ed25519 proof to a convergence artifact dict."""
-    message = build_convergence_canonical_message(artifact)
+    signed = dict(artifact)
+    signed["issuer"] = _artifact_signing_issuer_did()
+    message = build_convergence_canonical_message(signed, include_issuer=True)
     digest = hashlib.sha256(message).digest()
     signature_hex, issuer_did = _sign_convergence_digest(digest)
-    signed = dict(artifact)
     signed["issuer"] = issuer_did
     signed["proof"] = {"signatureValueWeb": signature_hex}
     return signed
+
+
+def _pubkeys_for_issuer(
+    *,
+    issuer_did: str,
+    trusted_issuer_pubkeys: Optional[list[str]] = None,
+    trusted_issuers: Optional[dict] = None,
+) -> list[str]:
+    did = str(issuer_did or "").strip()
+    if not did:
+        return []
+    if trusted_issuers is not None:
+        entry = trusted_issuers.get(did) if hasattr(trusted_issuers, "get") else None
+        if entry is None:
+            return []
+        if hasattr(entry, "pubkeys_hex"):
+            return sorted(str(p).lower() for p in entry.pubkeys_hex)
+        if isinstance(entry, (set, list, tuple)):
+            return sorted(str(p).lower() for p in entry)
+        return []
+    return [str(p).strip().lower() for p in (trusted_issuer_pubkeys or []) if str(p).strip()]
 
 
 def verify_ppid_convergence_artifact(
@@ -65,10 +100,12 @@ def verify_ppid_convergence_artifact(
     *,
     site_id: str,
     canonical_ppid: str,
-    trusted_issuer_pubkeys: list[str],
+    trusted_issuer_pubkeys: Optional[list[str]] = None,
+    trusted_issuers: Optional[dict] = None,
+    expected_issuer_did: Optional[str] = None,
     now_unix: Optional[int] = None,
 ) -> tuple[bool, str]:
-    """Verify a convergence artifact against trusted Lemma issuer keys."""
+    """Verify a convergence artifact against the claimed issuer's keys only."""
     from cryptography.exceptions import InvalidSignature
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
@@ -76,6 +113,11 @@ def verify_ppid_convergence_artifact(
         return False, "convergence_missing"
     if str(artifact.get("schema") or "") != CONVERGENCE_SCHEMA:
         return False, "convergence_schema_mismatch"
+    issuer_did = str(artifact.get("issuer") or "").strip()
+    if not issuer_did:
+        return False, "convergence_issuer_missing"
+    if expected_issuer_did and issuer_did != str(expected_issuer_did).strip():
+        return False, "convergence_issuer_mismatch"
     if str(artifact.get("site_id") or "").strip() != str(site_id or "").strip():
         return False, "convergence_site_mismatch"
     if str(artifact.get("canonical_ppid") or "").strip() != str(canonical_ppid or "").strip():
@@ -105,6 +147,7 @@ def verify_ppid_convergence_artifact(
         key: artifact[key]
         for key in (
             "schema",
+            "issuer",
             "convergence_id",
             "site_id",
             "legacy_ppid",
@@ -115,18 +158,26 @@ def verify_ppid_convergence_artifact(
         )
         if key in artifact
     }
-    digest = hashlib.sha256(build_convergence_canonical_message(unsigned)).digest()
-    verified = False
-    for pubkey_hex in trusted_issuer_pubkeys:
-        try:
-            Ed25519PublicKey.from_public_bytes(bytes.fromhex(pubkey_hex)).verify(signature, digest)
-            verified = True
-            break
-        except (InvalidSignature, ValueError):
-            continue
-    if not verified:
-        return False, "convergence_invalid_signature"
-    return True, "valid"
+    pubkeys = _pubkeys_for_issuer(
+        issuer_did=issuer_did,
+        trusted_issuer_pubkeys=trusted_issuer_pubkeys,
+        trusted_issuers=trusted_issuers,
+    )
+    if not pubkeys:
+        return False, "convergence_untrusted_issuer"
+
+    digests = [
+        hashlib.sha256(build_convergence_canonical_message(unsigned, include_issuer=True)).digest(),
+        hashlib.sha256(build_convergence_canonical_message(unsigned, include_issuer=False)).digest(),
+    ]
+    for digest in digests:
+        for pubkey_hex in pubkeys:
+            try:
+                Ed25519PublicKey.from_public_bytes(bytes.fromhex(pubkey_hex)).verify(signature, digest)
+                return True, "valid"
+            except (InvalidSignature, ValueError):
+                continue
+    return False, "convergence_invalid_signature"
 
 
 def record_person_convergence_event(

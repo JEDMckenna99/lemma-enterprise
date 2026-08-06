@@ -264,19 +264,33 @@ def create_app():
         
         return response
 
-    # Initialize components
+    # Initialize components. Soft deps (Sentry/Stripe) may fail open; CSRF and
+    # rate limiting are mandatory in production (Wave 3 containment).
+    def _is_prod_boot() -> bool:
+        try:
+            from api.config import is_production
+            return bool(is_production())
+        except Exception:
+            env = (os.getenv("FLASK_ENV") or os.getenv("ENVIRONMENT") or "").strip().lower()
+            return env == "production"
+
     try:
-        # Initialize error monitoring FIRST (catch initialization errors too)
         from monitoring.sentry_config import init_sentry
         sentry_enabled = init_sentry(app)
         if sentry_enabled:
             logger.info("✅ Sentry error monitoring active")
-        
-        # Initialize CSRF protection
+    except Exception as e:
+        logger.warning(f"⚠️ Sentry initialization failed (continuing): {e}")
+
+    try:
         from auth.decorators import init_csrf_protection
         init_csrf_protection(app)
+    except Exception as e:
+        logger.error(f"❌ CSRF initialization failed: {e}")
+        if _is_prod_boot():
+            raise
 
-        # Initialize rate limiting (brute force protection)
+    try:
         from auth.rate_limiter import create_limiter
         limiter = create_limiter(app)
         app.limiter = limiter  # Store on app for blueprint access
@@ -287,15 +301,18 @@ def create_app():
             (os.getenv("LEMMA_SESSION_REVOCATION_DEGRADED_MODE") or "fail_open"),
         )
         logger.info("✅ Rate limiter initialized")
+    except Exception as e:
+        logger.error(f"❌ Rate limiter initialization failed: {e}")
+        if _is_prod_boot():
+            raise
 
-        # Initialize Stripe manager
+    try:
         from billing.stripe_manager import init_stripe
         init_stripe()
-
-        logger.info("✅ Core components initialized successfully")
-
     except Exception as e:
-        logger.warning(f"⚠️ Some components failed to initialize: {e}")
+        logger.warning(f"⚠️ Stripe initialization failed (continuing): {e}")
+
+    logger.info("✅ Core components initialized successfully")
 
     # ================================================================================
     # ESSENTIAL API BLUEPRINTS ONLY
@@ -626,6 +643,14 @@ def create_app():
         logger.info("✅ isHuman Demo registered")
     except Exception as e:
         logger.error(f"❌ Failed to register isHuman Demo: {e}")
+
+    # Server-minted /verify flow-state binding (opener origin + site_id)
+    try:
+        from api.verify_flow_state import verify_flow_state_bp
+        app.register_blueprint(verify_flow_state_bp)
+        logger.info("✅ Verify flow-state API registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Verify flow-state API: {e}")
 
     # Optional background freshness client for local-first authz runtime state.
     try:

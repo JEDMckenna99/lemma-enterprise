@@ -2554,6 +2554,7 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
             freshness_age_seconds = None
             freshness_max_age_seconds = None
             step_up_required = False
+            agent_proof_bypass = False
 
             def _finalize_auth_response(response_obj, credential_info=None, auth_elapsed_ms=None):
                 response = make_response(response_obj)
@@ -2568,6 +2569,8 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
                 response.headers['X-Lemma-Auth-Shadow-Decision'] = str(shadow_decision)
                 response.headers['X-Lemma-Auth-Shadow-Reason'] = str(shadow_reason or "")
                 response.headers['X-Lemma-Auth-Profile'] = str(shadow_profile)
+                if agent_proof_bypass:
+                    response.headers['X-Lemma-Auth-Proof-Bypass'] = 'agent_compat'
                 if freshness_age_seconds is not None:
                     response.headers['X-Lemma-Auth-Freshness-Age-S'] = f"{float(freshness_age_seconds):.3f}"
                 if freshness_max_age_seconds is not None:
@@ -2577,12 +2580,18 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
 
             policy, effective_required_scope = _resolve_route_policy_scope(required_scope)
             expected_mode = str(getattr(policy, "auth_mode", "compat_bearer") or "compat_bearer")
+            risk_tier = str(getattr(policy, "risk_tier", "low") or "low")
             mode_decision = evaluate_mode_policy(
                 expected_mode=expected_mode,
                 headers=request.headers,
                 compat_sunset_utc=getattr(policy, "compat_bearer_sunset_utc", None),
+                risk_tier=risk_tier,
             )
             effective_mode = mode_decision.effective_mode
+            agent_proof_bypass = bool(getattr(mode_decision, "agent_proof_bypass", False))
+            if agent_proof_bypass and _shadow_proof_eval_enabled():
+                shadow_decision = "bypass"
+                shadow_reason = mode_decision.reason_code or "AUTH_PROOF_BYPASS_AGENT_COMPAT"
             if not mode_decision.allowed:
                 return _finalize_auth_response(
                     _error_with_decision(

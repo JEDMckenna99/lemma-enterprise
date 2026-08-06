@@ -7,7 +7,6 @@ Authentication: Requires wallet credential (PPID) or API key
 
 import time
 import json
-import base64
 import logging
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, g
@@ -62,70 +61,43 @@ def _site_has_existing_owner(site_id: str, site_domain: str, caller_ppid: str) -
 
 
 def _authenticate_developer():
-    """
-    Authenticate developer via wallet credential or API key.
-    
-    Returns: (customer_id, ppid) or (None, None) if auth fails
-    """
-    # Method 1: PPID from auth decorators
-    ppid = getattr(g, 'ppid', None)
-    if ppid and ppid.startswith('did:lemma:ppid_'):
-        from api.customer_accounts import customer_manager
-        customer = customer_manager.get_customer_by_ppid(ppid)
-        if customer:
-            return customer.customer_id, ppid
+    """Resolve developer identity only from verified request principal (g.*).
 
-    # Method 1b: Full lemma header
-    raw_lemma = request.headers.get('X-Lemma-Credential')
-    if raw_lemma:
-        try:
-            text = str(raw_lemma).strip()
-            if text.startswith('{'):
-                credential = json.loads(text)
-            else:
-                padded = text + ('=' * (-len(text) % 4))
-                decoded = base64.urlsafe_b64decode(padded.encode('utf-8')).decode('utf-8')
-                credential = json.loads(decoded)
-            claims = credential.get('claims') or credential.get('credentialSubject') or {}
-            lemma_ppid = credential.get('subject') or credential.get('sub') or claims.get('ppid') or claims.get('id')
-            if lemma_ppid and str(lemma_ppid).startswith('did:lemma:ppid_'):
-                from api.customer_accounts import customer_manager
-                customer = customer_manager.get_customer_by_ppid(str(lemma_ppid))
-                if customer:
-                    return customer.customer_id, str(lemma_ppid)
-        except Exception:
-            pass
-    
-    # Method 2: Bearer token with credential
-    auth_header = request.headers.get('Authorization', '')
-    if auth_header.startswith('Bearer '):
-        try:
-            credential_json = auth_header.split(' ', 1)[1]
-            # Try JSON credential first
-            credential = json.loads(credential_json)
-            subject = credential.get('subject', '')
-            if subject.startswith('did:lemma:'):
-                from api.customer_accounts import customer_manager
-                customer = customer_manager.get_customer_by_did(subject)
-                if customer:
-                    return customer.customer_id, subject
-        except json.JSONDecodeError:
-            # Not JSON, treat as API key
-            api_key = auth_header.replace('Bearer ', '').strip()
-            from api.customer_accounts import customer_manager
-            customer = customer_manager.get_customer_by_api_key(api_key)
-            if customer:
-                return customer.customer_id, f"did:lemma:customer:{customer.customer_id}"
-    
-    # Method 3: X-API-Key header
-    api_key = request.headers.get('X-API-Key')
-    if api_key:
-        from api.customer_accounts import customer_manager
-        customer = customer_manager.get_customer_by_api_key(api_key)
-        if customer:
-            return customer.customer_id, f"did:lemma:customer:{customer.customer_id}"
-    
+    ``@require_customer_or_admin`` already verified the credential. Do not
+    re-parse unsigned Authorization / X-Lemma-Credential bodies here — that
+    previously allowed a format-only credential to select a different customer.
+    """
+    ppid = getattr(g, 'ppid', None)
+    if not ppid or not str(ppid).startswith('did:lemma:ppid_'):
+        return None, None
+
+    from api.customer_accounts import customer_manager
+
+    customer = customer_manager.get_customer_by_ppid(str(ppid))
+    if customer:
+        return customer.customer_id, str(ppid)
     return None, None
+
+
+def _require_domain_proof_for_bootstrap(data: dict, site_domain: str) -> tuple[bool, str]:
+    """First-time site claim must prove control of the hostname."""
+    token = str(
+        data.get('domain_verification_token')
+        or data.get('verification_token')
+        or ''
+    ).strip()
+    method = str(
+        data.get('domain_verification_method')
+        or data.get('verification_method')
+        or 'dns'
+    ).strip() or 'dns'
+    if not token:
+        return False, 'domain_verification_required'
+    from api.domain_ownership import consume_verified_domain_proof
+
+    if not consume_verified_domain_proof(site_domain, token, method):
+        return False, 'domain_verification_failed'
+    return True, 'ok'
 
 
 @developer_self_issue_bp.route('/api/developer/issue-self-permission', methods=['POST'])
@@ -204,6 +176,19 @@ def issue_self_permission():
                 'error': 'You do not have access to this site',
                 'code': 'UNAUTHORIZED_SITE_ACCESS',
             }), 403
+
+        if not caller_owns_site:
+            ok_proof, proof_err = _require_domain_proof_for_bootstrap(data, site_domain)
+            if not ok_proof:
+                return jsonify({
+                    'success': False,
+                    'error': proof_err,
+                    'code': proof_err.upper(),
+                    'message': (
+                        'First-time site bootstrap requires a verified domain proof. '
+                        'Start verification via /api/customer/domain-verification/start.'
+                    ),
+                }), 403
 
         logger.info(f"Developer self-issue: {permission_level} for {site_domain} (customer: {customer_id})")
         

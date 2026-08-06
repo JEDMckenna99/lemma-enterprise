@@ -163,7 +163,24 @@ Defaults match [api/config.py](../../api/config.py) and
 | `LEMMA_PPID_CONVERGENCE_ENABLED`      | `false` | Issue signed convergence artifacts on provisional→known person rebind (requires one-PPID model). |
 | `LEMMA_PPID_REQUIRE_PERSON_ROOT`      | `true`  | Fail closed on authoritative server-side PPID derivation instead of legacy wallet-secret fallback. Set `0` only for emergency rollback. |
 | `LEMMA_ENFORCE_PROOF_REQUIRED`        | `false` | Hard-enforce `proof_required` auth mode on high-risk Agent Ops mutations. Set `1` after client proof headers ship (`static/js/lemma-auth-headers.js`). |
+| `LEMMA_ENFORCE_PROOF_REQUIRED_CRITICAL` | `false` | Staged gate: when `1`, agent-bearer bypass is denied on `risk_tier=critical` `proof_required` routes even if global enforce is off. Enable this before global enforce. |
 | `LEMMA_AUTHZ_PROOF_SHADOW`            | `1`     | Evaluate proof chains in shadow mode (log mismatches without blocking). Set `0` only for emergency rollback once hard enforcement is on. |
+
+#### Proof-required enablement checklist
+
+1. Confirm Agent Ops / dashboard clients send `X-Lemma-Proof` (or `X-Lemma-Proof-Ref`) via `static/js/lemma-auth-headers.js` on mutate routes.
+2. Keep `LEMMA_AUTHZ_PROOF_SHADOW=1` and watch for `X-Lemma-Auth-Proof-Bypass: agent_compat` / shadow bypass reasons in production logs.
+3. Stage: `heroku config:set LEMMA_ENFORCE_PROOF_REQUIRED_CRITICAL=1` — blocks critical routes (e.g. bootstrap-admin) without proofs; leave high-tier agent bearer compat on.
+4. Soak critical gate; fix any remaining agent clients.
+5. Global: `heroku config:set LEMMA_ENFORCE_PROOF_REQUIRED=1`.
+6. After soak with no false denies, optionally set `LEMMA_AUTHZ_PROOF_SHADOW=0` only if you no longer need shadow telemetry (keep `1` by default).
+
+#### Redis TLS enablement checklist
+
+1. Confirm Heroku Redis / provider presents a CA-verifiable cert chain.
+2. Set `LEMMA_REDIS_SSL_CERT_REQS=required` (Wave 2 opt-in; default remains `none` with warning on Heroku).
+3. Restart dynos; verify sessions/rate-limit/recovery still work.
+4. Roll back with `LEMMA_REDIS_SSL_CERT_REQS=none` only for emergency.
 
 ### Network revocation (retired)
 

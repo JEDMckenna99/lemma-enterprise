@@ -209,35 +209,52 @@ def verify_credential_with_trust(credential: dict) -> dict:
             or credential.get("expires_at")
             or credential.get("expirationDate")
         )
-        if expires_at:
-            try:
-                expires_ts = float(expires_at)
-            except (ValueError, TypeError):
-                from datetime import datetime as _dt
+        if not expires_at:
+            result["not_expired"] = False
+            result["reason"] = "expires_at_missing"
+            return result
+        try:
+            expires_ts = float(expires_at)
+        except (ValueError, TypeError):
+            from datetime import datetime as _dt
 
-                try:
-                    parsed = _dt.fromisoformat(
-                        str(expires_at).replace("Z", "+00:00")
-                    )
-                    expires_ts = parsed.timestamp()
-                except Exception:
-                    expires_ts = None
-            if expires_ts is not None and expires_ts < time.time():
+            try:
+                parsed = _dt.fromisoformat(
+                    str(expires_at).replace("Z", "+00:00")
+                )
+                expires_ts = parsed.timestamp()
+            except Exception:
                 result["not_expired"] = False
-                result["reason"] = "expired"
+                result["reason"] = "expires_at_malformed"
                 return result
+        if expires_ts <= 0:
+            result["not_expired"] = False
+            result["reason"] = "expires_at_missing"
+            return result
+        if expires_ts < time.time():
+            result["not_expired"] = False
+            result["reason"] = "expired"
+            return result
 
         credential_id = credential.get("id")
         if credential_id:
             try:
-                from api.revocation_verifier import is_credential_revoked
+                from api.revocation_verifier import check_revocation_candidate
 
-                if is_credential_revoked(credential_id):
+                rev_status = check_revocation_candidate(credential_id)
+                if rev_status == "revoked":
                     result["not_revoked"] = False
                     result["reason"] = "revoked"
                     return result
+                if rev_status == "unavailable":
+                    result["not_revoked"] = False
+                    result["reason"] = "revocation_unavailable"
+                    return result
             except Exception as exc:
                 logger.warning(f"Revocation check unavailable: {exc}")
+                result["not_revoked"] = False
+                result["reason"] = "revocation_unavailable"
+                return result
 
         local_issuer = issuer_did and issuer_did.startswith("did:lemma:local_cli")
         try:

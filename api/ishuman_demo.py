@@ -340,6 +340,7 @@ def signin_flow_mock_page():
 def _render_verify_ceremony_page():
     """Shared proof-verifier ceremony UI (unlock, site proof, IDV, action sign)."""
     from api.config import passkey_assurance_enabled
+    from api.verify_flow_state import require_verify_flow_state, resolve_flow_state
 
     ctx = _demo_page_context()
     headers = {
@@ -347,10 +348,45 @@ def _render_verify_ceremony_page():
         "Pragma": "no-cache",
         "Expires": "0",
     }
-    if request.args.get("preview_type"):
+    preview_type = (request.args.get("preview_type") or "").strip()
+    if preview_type:
         # The design-QA gallery embeds only inert preview-mode renders. Keep the
         # live ceremony unframeable while allowing these same-origin previews.
         headers["X-Frame-Options"] = "SAMEORIGIN"
+
+    flow_token = (request.args.get("flow_state") or "").strip()
+    flow_binding = resolve_flow_state(flow_token) if flow_token else None
+    # Live cross-site ceremonies require server-minted flow state. Previews and
+    # unlock-only same-origin flows may proceed without it.
+    issue_mode = (request.args.get("issue_mode") or "").strip()
+    needs_flow = issue_mode in {
+        "site_proof",
+        "fresh_idv",
+        "action_sign",
+        "passkey_setup",
+    } or bool(request.args.get("site_id"))
+    if (
+        require_verify_flow_state()
+        and not preview_type
+        and needs_flow
+        and not flow_binding
+    ):
+        return (
+            render_template(
+                "wallet_ishuman_idv.html",
+                demo_test_verify_enabled=False,
+                demo_test_token="",
+                skeleton_idv_enabled=False,
+                qr_demo_idv_enabled=False,
+                passkey_assurance_enabled=passkey_assurance_enabled(),
+                verify_flow_binding=None,
+                verify_flow_state_required=True,
+                verify_flow_state_error="flow_state_required",
+            ),
+            400,
+            headers,
+        )
+
     return render_template(
         "wallet_ishuman_idv.html",
         demo_test_verify_enabled=ctx["demo_test_verify_enabled"],
@@ -358,6 +394,9 @@ def _render_verify_ceremony_page():
         skeleton_idv_enabled=ctx["skeleton_idv_enabled"],
         qr_demo_idv_enabled=ctx["qr_demo_idv_enabled"],
         passkey_assurance_enabled=passkey_assurance_enabled(),
+        verify_flow_binding=flow_binding,
+        verify_flow_state_required=require_verify_flow_state(),
+        verify_flow_state_error=None,
     ), 200, headers
 
 

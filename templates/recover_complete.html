@@ -348,6 +348,52 @@
                     throw new Error('Replacement passkey and lemma.id PPID are required to complete recovery.');
                 }
 
+                const beginRes = await fetch('/api/recovery/webauthn/begin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        token: token,
+                        ppid: ppid,
+                        passkey_credential_id: passkeyCredentialId,
+                    }),
+                });
+                const beginData = await beginRes.json().catch(() => ({}));
+                if (!beginRes.ok || !beginData.success) {
+                    throw new Error(beginData.error || 'Recovery WebAuthn begin failed');
+                }
+
+                const b64urlToBuf = (value) => {
+                    const pad = '='.repeat((4 - (value.length % 4)) % 4);
+                    const b64 = (value + pad).replace(/-/g, '+').replace(/_/g, '/');
+                    const bin = atob(b64);
+                    const out = new Uint8Array(bin.length);
+                    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+                    return out.buffer;
+                };
+                const bufToB64url = (buf) => {
+                    const bytes = new Uint8Array(buf);
+                    let bin = '';
+                    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+                    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+                };
+
+                const assertion = await navigator.credentials.get({
+                    publicKey: {
+                        challenge: b64urlToBuf(beginData.challenge),
+                        rpId: beginData.rp_id || 'lemma.id',
+                        allowCredentials: [{
+                            type: 'public-key',
+                            id: b64urlToBuf(passkeyCredentialId),
+                        }],
+                        userVerification: 'required',
+                        timeout: beginData.timeout || 60000,
+                    },
+                });
+                if (!assertion) {
+                    throw new Error('Passkey assertion cancelled');
+                }
+
                 const response = await fetch('/api/recovery/complete', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -357,6 +403,17 @@
                         ppid: ppid,
                         passkey_credential_id: passkeyCredentialId,
                         passkey_signin: passkeySignIn,
+                        challenge_key: beginData.challenge_key,
+                        webauthn_credential: {
+                            id: assertion.id,
+                            rawId: bufToB64url(assertion.rawId),
+                            type: assertion.type,
+                            response: {
+                                authenticatorData: bufToB64url(assertion.response.authenticatorData),
+                                clientDataJSON: bufToB64url(assertion.response.clientDataJSON),
+                                signature: bufToB64url(assertion.response.signature),
+                            },
+                        },
                     })
                 });
                 

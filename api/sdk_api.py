@@ -53,9 +53,16 @@ def _sdk_idv_session_key(session_id: str) -> str:
     return f"sdk:idv:session:{(session_id or '').strip()}"
 
 
+def _api_key_fingerprint(api_key: str) -> str:
+    """Stable non-reversible fingerprint for logs/session binding."""
+    import hashlib
+
+    return hashlib.sha256((api_key or "").strip().encode("utf-8")).hexdigest()[:16]
+
+
 def _store_sdk_idv_session(session_id: str, *, api_key: str, user_id: str) -> None:
     payload = {
-        "api_key": (api_key or "").strip(),
+        "api_key_fp": _api_key_fingerprint(api_key),
         "user_id": (user_id or "").strip(),
         "started_at": time.time(),
     }
@@ -91,7 +98,16 @@ def _consume_sdk_idv_session(session_id: str, *, api_key: str) -> dict | None:
         if not data:
             return None
 
-    if (data.get("api_key") or "").strip() != (api_key or "").strip():
+    stored_fp = (data.get("api_key_fp") or "").strip()
+    legacy_key = (data.get("api_key") or "").strip()
+    if stored_fp:
+        if stored_fp != _api_key_fingerprint(api_key):
+            return None
+    elif legacy_key:
+        # Compat for in-flight sessions created before fingerprint storage.
+        if legacy_key != (api_key or "").strip():
+            return None
+    else:
         return None
     return data
 
@@ -410,10 +426,19 @@ def validate_api_key(f):
             if validation_result.get('valid'):
                 request.api_key = api_key
                 request.api_key_info = validation_result
-                logger.info(f"✅ Valid API key for customer: {validation_result.get('customer_id')}, site: {validation_result.get('site_id')}")
+                logger.info(
+                    "✅ Valid API key for customer: %s, site: %s, key_fp=%s",
+                    validation_result.get('customer_id'),
+                    validation_result.get('site_id'),
+                    _api_key_fingerprint(api_key),
+                )
                 return f(*args, **kwargs)
             else:
-                logger.warning(f"❌ Invalid API key: {api_key[:12]}... - {validation_result.get('error')}")
+                logger.warning(
+                    "❌ Invalid API key: fp=%s - %s",
+                    _api_key_fingerprint(api_key),
+                    validation_result.get('error'),
+                )
                 return jsonify({
                     'success': False,
                     'error': 'invalid_api_key',
@@ -444,7 +469,10 @@ def check_credentials():
         start_time = time.time()
         data = request.get_json() or {}
         
-        logger.info(f"🔍 SDK credential check request from API key: {request.api_key}")
+        logger.info(
+            "🔍 SDK credential check request from API key fp=%s",
+            _api_key_fingerprint(request.api_key),
+        )
         
         # Check session for existing credentials
         session_credentials = session.get('lemma_credentials', [])
@@ -671,11 +699,11 @@ def start_identity_verification():
                 'message': session_result.get('message', 'Failed to create verification session')
             }), 500
         
-        # Store session info for completion (server-bound to initiating API key)
+        # Store session info for completion (server-bound to initiating API key fingerprint)
         session['sdk_verification_session'] = {
             'session_id': session_result['session_id'],
             'user_id': user_id,
-            'api_key': request.api_key,
+            'api_key_fp': _api_key_fingerprint(request.api_key),
             'started_at': time.time()
         }
         _store_sdk_idv_session(

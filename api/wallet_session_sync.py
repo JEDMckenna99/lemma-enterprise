@@ -236,7 +236,8 @@ def _lemma_origin_allowed(origin: str | None) -> bool:
     hostname = _origin_hostname(origin)
     if not hostname:
         return False
-    if hostname == 'lemma.id' or hostname.endswith('.lemma.id'):
+    # Wave 3: exact identity hosts only (no *.lemma.id wildcard).
+    if hostname in {'lemma.id', 'www.lemma.id'}:
         return True
     if _ALLOW_DEV_ORIGINS and hostname in {'localhost', '127.0.0.1'}:
         return True

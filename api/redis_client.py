@@ -100,7 +100,21 @@ def get_shared_redis(
 
             kwargs = _build_kwargs(decode_responses=decode_responses)
             if redis_url.startswith("rediss://"):
-                kwargs["ssl_cert_reqs"] = ssl.CERT_NONE
+                # Heroku Redis historically needs CERT_NONE; prefer verified TLS
+                # when LEMMA_REDIS_SSL_CERT_REQS=required (or CERT_REQUIRED).
+                cert_mode = (
+                    os.getenv("LEMMA_REDIS_SSL_CERT_REQS") or "none"
+                ).strip().lower()
+                if cert_mode in {"required", "cert_required", "ssl.cert_required"}:
+                    kwargs["ssl_cert_reqs"] = ssl.CERT_REQUIRED
+                else:
+                    kwargs["ssl_cert_reqs"] = ssl.CERT_NONE
+                    logger.warning(
+                        "Redis TLS certificate verification disabled "
+                        "(LEMMA_REDIS_SSL_CERT_REQS=%s). Set to 'required' in "
+                        "environments with a verifiable CA.",
+                        cert_mode or "none",
+                    )
 
             client = redis.from_url(redis_url, **kwargs)
             if ping:

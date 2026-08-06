@@ -47,6 +47,8 @@ if (typeof window !== 'undefined' && (window.ProofVerifier || window.IsHumanVeri
 }
 
 const LEMMA_ORIGIN = 'https://lemma.id';
+const DEFAULT_TRUST_BUNDLE_MIRROR =
+    'https://lemma-signing-fc5969199cd5.herokuapp.com/api/revocation/bloom-filter';
 const SESSION_PRESENTATION_PREFIX = 'lemma:site-session-presentation:v1';
 const DEFAULT_SESSION_TTL_SECONDS = 24 * 60 * 60;
 const MIN_SESSION_TTL_SECONDS = 60;
@@ -89,6 +91,17 @@ const _popupFlows = {
 };
 /** @type {BroadcastChannel|null} */
 let _popupChannel = null;
+
+function resolveTrustBundleUrls(lemmaOrigin, trustBundleUrls) {
+    if (Array.isArray(trustBundleUrls) && trustBundleUrls.length) {
+        return trustBundleUrls.map((u) => String(u).trim()).filter(Boolean);
+    }
+    const origin = String(lemmaOrigin || LEMMA_ORIGIN).replace(/\/$/, '');
+    return [
+        `${origin}/api/revocation/bloom-filter`,
+        DEFAULT_TRUST_BUNDLE_MIRROR,
+    ];
+}
 
 function isMobileLikeUserAgent(ua) {
     return /iPhone|iPad|iPod|Android|Mobi/i.test(String(ua || ''));
@@ -738,6 +751,10 @@ class ProofVerifier {
         const rawSiteId = config.siteId || (typeof window !== 'undefined' ? window.location.hostname : '');
         this.siteId = this._canonicalizeSiteId(rawSiteId);
         this.lemmaOrigin = config.lemmaOrigin || LEMMA_ORIGIN;
+        this.trustBundleUrls = resolveTrustBundleUrls(
+            this.lemmaOrigin,
+            config.trustBundleUrls,
+        );
         this.debug = !!config.debug;
         this.isBlockedLocally = config.isBlockedLocally || null;
         this.autoProvision = !!config.autoProvision;
@@ -1381,9 +1398,48 @@ class ProofVerifier {
         }
     }
 
-    _signActionViaPopup(signParams) {
+    async _mintVerifyFlowState(fields = {}) {
+        try {
+            const resp = await fetch(`${this.lemmaOrigin}/api/verify/flow-state`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    site_id: fields.site_id || this.siteId,
+                    issue_mode: fields.issue_mode || '',
+                    redirect_return: fields.redirect_return || '',
+                    request_nonce: fields.request_nonce || '',
+                    required_assurance: fields.required_assurance || '',
+                }),
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok || !data?.success || !data?.flow_state) {
+                if (this.debug) {
+                    console.warn('[isHuman] flow-state mint failed:', data?.error || resp.status);
+                }
+                return null;
+            }
+            return String(data.flow_state);
+        } catch (err) {
+            if (this.debug) console.warn('[isHuman] flow-state mint error:', err?.message || err);
+            return null;
+        }
+    }
+
+    async _signActionViaPopup(signParams) {
         const requestNonce = randomNonceB64(16);
+        const requiredAssurance = String(signParams.requiredAssurance || '').trim().toLowerCase();
+        const flowState = await this._mintVerifyFlowState({
+            site_id: this.siteId,
+            issue_mode: 'action_sign',
+            redirect_return: window.location.href,
+            request_nonce: requestNonce,
+            required_assurance: requiredAssurance,
+        });
+        if (!flowState) {
+            return { ok: false, reason: 'flow_state_mint_failed' };
+        }
         const popupUrl = new URL(`${this.lemmaOrigin}${this.idvPopupPath}`);
+        popupUrl.searchParams.set('flow_state', flowState);
         popupUrl.searchParams.set('origin', window.location.origin);
         popupUrl.searchParams.set('site_id', this.siteId);
         popupUrl.searchParams.set('issue_mode', 'action_sign');
@@ -1399,7 +1455,6 @@ class ProofVerifier {
             popupUrl.searchParams.set('server_nonce', signParams.serverNonce || '');
             popupUrl.searchParams.set('action_commitment', signParams.actionCommitment || '');
         }
-        const requiredAssurance = String(signParams.requiredAssurance || '').trim().toLowerCase();
         if (requiredAssurance === 'passkey' || requiredAssurance === 'ishuman') {
             popupUrl.searchParams.set('required_assurance', requiredAssurance);
         }
@@ -1412,7 +1467,7 @@ class ProofVerifier {
             popupUrl.searchParams.set('flow_mode', 'redirect');
             popupUrl.searchParams.set('redirect_return', window.location.href);
             window.location.assign(popupUrl.toString());
-            return Promise.resolve({ ok: false, reason: 'redirect_started' });
+            return { ok: false, reason: 'redirect_started' };
         }
 
         return _openManagedLemmaPopup(
@@ -1950,49 +2005,45 @@ class ProofVerifier {
         }
 
         const prevSequence = this._bloomSnapshot?.sequence_number;
+        const urls = this.trustBundleUrls;
+        let lastError = null;
 
-        try {
-            // Never let the browser HTTP cache satisfy a trust refresh. The
-            // signed snapshot has a strict staleness bound, and some browsers
-            // can retain an older response beyond its Cache-Control max-age.
-            // The endpoint maintains its own short server-side cache.
-            const res = await fetch(`${this.lemmaOrigin}/api/revocation/bloom-filter`, {
-                cache: 'no-store',
-                credentials: 'omit',
-            });
-            const data = await res.json();
-            const trustList = data.trust_list || null;
-            const snapshot = data.snapshot || {
-                sequence_number: data.sequence_number,
-                generated_at_unix: data.generated_at_unix,
-                valid_until_unix: data.valid_until_unix,
-                content_hash: data.content_hash,
-                issuer_did: data.issuer_did,
-                issuer_pubkey: data.issuer_pubkey,
-                signature: data.signature,
-                count: data.count,
-                max_staleness_seconds: data.max_bloom_staleness_seconds,
-            };
-            const hashedIds = Array.isArray(data.hashed_revoked_ids) ? data.hashed_revoked_ids : [];
+        for (const url of urls) {
+            try {
+                const res = await fetch(url, {
+                    cache: 'no-store',
+                    credentials: 'omit',
+                });
+                if (!res.ok) {
+                    throw new Error(`bloom_fetch_${res.status}`);
+                }
+                const data = await res.json();
+                const trustList = data.trust_list || null;
+                const snapshot = data.snapshot || {
+                    sequence_number: data.sequence_number,
+                    generated_at_unix: data.generated_at_unix,
+                    valid_until_unix: data.valid_until_unix,
+                    content_hash: data.content_hash,
+                    issuer_did: data.issuer_did,
+                    issuer_pubkey: data.issuer_pubkey,
+                    signature: data.signature,
+                    count: data.count,
+                    max_staleness_seconds: data.max_bloom_staleness_seconds,
+                };
+                const hashedIds = Array.isArray(data.hashed_revoked_ids) ? data.hashed_revoked_ids : [];
 
-            if (data.success && hashedIds.length >= 0 && snapshot.signature) {
+                if (!(data.success && hashedIds.length >= 0 && snapshot.signature)) {
+                    throw new Error('bloom_fetch_failed');
+                }
                 const trustListResult = await verifySignedTrustList(trustList, this.networkRootPubkeys);
                 if (!trustListResult.ok) {
-                    this._bloomTrusted = false;
-                    this._trustListTrusted = false;
-                    this._bloomSnapshot = null;
-                    this._trustedIssuers = new Map();
-                    if (this.debug) console.warn('[isHuman] trust list rejected:', trustListResult.reason);
-                    return;
+                    throw new Error(trustListResult.reason || 'trust_list_rejected');
                 }
                 this._trustedIssuers = trustListResult.issuers;
                 this._trustListTrusted = true;
                 const trust = await verifyBloomSnapshot(snapshot, hashedIds, this._trustedIssuers);
                 if (!trust.ok) {
-                    this._bloomTrusted = false;
-                    this._bloomSnapshot = null;
-                    if (this.debug) console.warn('[isHuman] bloom snapshot rejected:', trust.reason);
-                    return;
+                    throw new Error(trust.reason || 'bloom_snapshot_rejected');
                 }
                 const newSequence = snapshot.sequence_number;
                 if (
@@ -2012,43 +2063,57 @@ class ProofVerifier {
                     localStorage.setItem('ishuman_bloom', JSON.stringify({
                         ids: hashedIds,
                         ts: now,
+                        sequence: snapshot.sequence_number,
                         snapshot,
                     }));
-                    localStorage.setItem(TRUST_LIST_STORAGE_KEY, JSON.stringify({
-                        trust_list: trustList,
-                        ts: now,
-                    }));
-                } catch { /* quota exceeded, ignore */ }
-            } else {
-                this._bloomTrusted = false;
-                this._trustListTrusted = false;
+                    if (trustList) {
+                        localStorage.setItem(TRUST_LIST_STORAGE_KEY, JSON.stringify({
+                            trust_list: trustList,
+                            ts: now,
+                        }));
+                    }
+                } catch (_storageErr) {
+                    // ignore quota / private mode
+                }
+                return;
+            } catch (err) {
+                lastError = err;
+                if (this.debug) console.warn('[isHuman] trust bundle fetch failed:', url, err);
             }
-        } catch {
-            this._bloomTrusted = false;
-            this._trustListTrusted = false;
-            try {
-                const cached = JSON.parse(localStorage.getItem('ishuman_bloom') || '{}');
-                const trustCached = JSON.parse(localStorage.getItem(TRUST_LIST_STORAGE_KEY) || '{}');
-                if (cached.ids && cached.snapshot && trustCached.trust_list) {
-                    const trustListResult = await verifySignedTrustList(trustCached.trust_list, this.networkRootPubkeys);
-                    if (trustListResult.ok) {
-                        const trust = await verifyBloomSnapshot(
-                            cached.snapshot,
-                            cached.ids,
-                            trustListResult.issuers,
-                        );
-                        if (trust.ok) {
-                            this._trustedIssuers = trustListResult.issuers;
-                            this._trustListTrusted = true;
-                            this._bloomFilter = new Set(cached.ids);
-                            this._bloomSyncedAt = cached.ts || 0;
-                            this._bloomTrusted = true;
-                            this._bloomSnapshot = cached.snapshot;
-                        }
+        }
+
+        this._bloomTrusted = false;
+        this._trustListTrusted = false;
+        this._bloomSnapshot = null;
+        this._trustedIssuers = new Map();
+        if (this.debug && lastError) {
+            console.warn('[isHuman] all trust bundle URLs failed:', lastError);
+        }
+        try {
+            const cached = JSON.parse(localStorage.getItem('ishuman_bloom') || '{}');
+            const trustCached = JSON.parse(localStorage.getItem(TRUST_LIST_STORAGE_KEY) || '{}');
+            const cachedTrustList = trustCached.trust_list || trustCached;
+            const cachedSnapshot = cached.snapshot;
+            const cachedIds = cached.ids;
+            if (cachedIds && cachedSnapshot && cachedTrustList) {
+                const trustListResult = await verifySignedTrustList(cachedTrustList, this.networkRootPubkeys);
+                if (trustListResult.ok) {
+                    const trust = await verifyBloomSnapshot(
+                        cachedSnapshot,
+                        cachedIds,
+                        trustListResult.issuers,
+                    );
+                    if (trust.ok) {
+                        this._trustedIssuers = trustListResult.issuers;
+                        this._trustListTrusted = true;
+                        this._bloomFilter = new Set(cachedIds);
+                        this._bloomSyncedAt = cached.ts || 0;
+                        this._bloomTrusted = true;
+                        this._bloomSnapshot = cachedSnapshot;
                     }
                 }
-            } catch { /* ignore */ }
-        }
+            }
+        } catch { /* ignore */ }
     }
 
     // ------------------------------------------------------------------
@@ -2132,15 +2197,28 @@ class ProofVerifier {
         return this._result(true, credential.subject, 'valid', t0, null, session);
     }
 
-    _issueSiteProofViaPopup(options = {}) {
+    async _issueSiteProofViaPopup(options = {}) {
         const requestNonce = randomNonceB64(16);
         const sessionNonce = randomNonceB64(32);
         const bloomSequence = Number(this._bloomSnapshot?.sequence_number ?? 0);
+        const issueMode = options.freshIdv ? 'fresh_idv' : 'site_proof';
+        const requiredAssurance = this._activeRequiredAssurance || this.requiredAssurance || 'ishuman';
+        const flowState = await this._mintVerifyFlowState({
+            site_id: this.siteId,
+            issue_mode: issueMode,
+            redirect_return: window.location.href,
+            request_nonce: requestNonce,
+            required_assurance: requiredAssurance,
+        });
+        if (!flowState) {
+            return { ok: false, reason: 'flow_state_mint_failed', detail: null };
+        }
 
         const popupUrl = new URL(`${this.lemmaOrigin}${this.idvPopupPath}`);
+        popupUrl.searchParams.set('flow_state', flowState);
         popupUrl.searchParams.set('origin', window.location.origin);
         popupUrl.searchParams.set('site_id', this.siteId);
-        popupUrl.searchParams.set('issue_mode', options.freshIdv ? 'fresh_idv' : 'site_proof');
+        popupUrl.searchParams.set('issue_mode', issueMode);
         if (options.refreshReason) {
             popupUrl.searchParams.set('refresh_reason', String(options.refreshReason));
         }
@@ -2152,7 +2230,6 @@ class ProofVerifier {
         popupUrl.searchParams.set('bloom_sequence', String(bloomSequence));
         popupUrl.searchParams.set('session_ttl_sec', String(this.sessionTtlSec));
         popupUrl.searchParams.set('redirect_return', window.location.href);
-        const requiredAssurance = this._activeRequiredAssurance || this.requiredAssurance || 'ishuman';
         if (requiredAssurance === 'passkey' || requiredAssurance === 'ishuman') {
             popupUrl.searchParams.set('required_assurance', requiredAssurance);
         }
@@ -2225,10 +2302,16 @@ class ProofVerifier {
         });
     }
 
-    _unlockViaPopup() {
+    async _unlockViaPopup() {
+        const siteId = this.siteId || 'lemma.id';
+        const flowState = await this._mintVerifyFlowState({
+            site_id: siteId,
+            issue_mode: 'unlock',
+        });
         const popupUrl = new URL(`${this.lemmaOrigin}${this.idvPopupPath}`);
+        if (flowState) popupUrl.searchParams.set('flow_state', flowState);
         popupUrl.searchParams.set('origin', window.location.origin);
-        popupUrl.searchParams.set('site_id', this.siteId || 'lemma.id');
+        popupUrl.searchParams.set('site_id', siteId);
         popupUrl.searchParams.set('issue_mode', 'unlock');
 
         return _openManagedLemmaPopup(
@@ -2257,8 +2340,17 @@ class ProofVerifier {
         });
     }
 
-    _provisionViaPopup() {
+    async _provisionViaPopup() {
+        const flowState = await this._mintVerifyFlowState({
+            site_id: this.siteId,
+            issue_mode: 'site_proof',
+            redirect_return: window.location.href,
+        });
+        if (!flowState) {
+            return { ok: false, detail: null, reason: 'flow_state_mint_failed' };
+        }
         const popupUrl = new URL(`${this.lemmaOrigin}${this.idvPopupPath}`);
+        popupUrl.searchParams.set('flow_state', flowState);
         popupUrl.searchParams.set('origin', window.location.origin);
         popupUrl.searchParams.set('site_id', this.siteId);
 

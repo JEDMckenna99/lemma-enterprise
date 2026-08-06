@@ -59,7 +59,18 @@ def _redis_storage_uri() -> str:
         if client is None:
             raise RuntimeError("shared redis unavailable")
         if REDIS_URL.startswith('rediss://'):
-            storage_uri = f"{REDIS_URL}?ssl_cert_reqs=none"
+            cert_mode = (
+                os.getenv("LEMMA_REDIS_SSL_CERT_REQS") or "none"
+            ).strip().lower()
+            if cert_mode in {"required", "cert_required", "ssl.cert_required"}:
+                storage_uri = f"{REDIS_URL}?ssl_cert_reqs=required"
+            else:
+                storage_uri = f"{REDIS_URL}?ssl_cert_reqs=none"
+                logger.warning(
+                    "Rate limiter Redis TLS cert verification disabled "
+                    "(LEMMA_REDIS_SSL_CERT_REQS=%s)",
+                    cert_mode or "none",
+                )
         else:
             storage_uri = REDIS_URL
         logger.info("Rate limiter using Redis storage")

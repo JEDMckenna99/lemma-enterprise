@@ -356,18 +356,44 @@ def validate_credential_required_fields(credential: dict) -> Optional[str]:
     return None
 
 
-def build_convergence_canonical_message(artifact: dict) -> bytes:
-    lines = [
-        CONVERGENCE_PREFIX,
-        str(artifact.get("site_id") or "").strip(),
-        str(artifact.get("legacy_ppid") or "").strip(),
-        str(artifact.get("canonical_ppid") or "").strip(),
-        str(artifact.get("convergence_id") or "").strip(),
-        str(artifact.get("nonce") or "").strip(),
-        str(int(artifact.get("issued_at_unix") or 0)),
-        str(int(artifact.get("expires_at_unix") or 0)),
-    ]
+def build_convergence_canonical_message(artifact: dict, *, include_issuer: bool = True) -> bytes:
+    lines = [CONVERGENCE_PREFIX]
+    if include_issuer:
+        lines.append(str(artifact.get("issuer") or "").strip())
+    lines.extend(
+        [
+            str(artifact.get("site_id") or "").strip(),
+            str(artifact.get("legacy_ppid") or "").strip(),
+            str(artifact.get("canonical_ppid") or "").strip(),
+            str(artifact.get("convergence_id") or "").strip(),
+            str(artifact.get("nonce") or "").strip(),
+            str(int(artifact.get("issued_at_unix") or 0)),
+            str(int(artifact.get("expires_at_unix") or 0)),
+        ]
+    )
     return "\n".join(lines).encode("utf-8")
+
+
+def _pubkeys_for_issuer(
+    *,
+    issuer_did: str,
+    trusted_issuer_pubkeys: Optional[list[str]] = None,
+    trusted_issuers: Optional[dict] = None,
+) -> list[str]:
+    """Resolve pubkeys for one issuer DID only (never flatten all issuers)."""
+    did = str(issuer_did or "").strip()
+    if not did:
+        return []
+    if trusted_issuers is not None:
+        entry = trusted_issuers.get(did) if hasattr(trusted_issuers, "get") else None
+        if entry is None:
+            return []
+        if hasattr(entry, "pubkeys_hex"):
+            return sorted(str(p).lower() for p in entry.pubkeys_hex)
+        if isinstance(entry, (set, list, tuple)):
+            return sorted(str(p).lower() for p in entry)
+        return []
+    return [str(p).strip().lower() for p in (trusted_issuer_pubkeys or []) if str(p).strip()]
 
 
 def verify_ppid_convergence_artifact(
@@ -375,13 +401,20 @@ def verify_ppid_convergence_artifact(
     *,
     site_id: str,
     canonical_ppid: str,
-    trusted_issuer_pubkeys: list[str],
+    trusted_issuer_pubkeys: Optional[list[str]] = None,
+    trusted_issuers: Optional[dict] = None,
+    expected_issuer_did: Optional[str] = None,
     now_unix: Optional[int] = None,
 ) -> tuple[bool, str]:
     if not isinstance(artifact, dict):
         return False, "convergence_missing"
     if str(artifact.get("schema") or "") != CONVERGENCE_SCHEMA:
         return False, "convergence_schema_mismatch"
+    issuer_did = str(artifact.get("issuer") or "").strip()
+    if not issuer_did:
+        return False, "convergence_issuer_missing"
+    if expected_issuer_did and issuer_did != str(expected_issuer_did).strip():
+        return False, "convergence_issuer_mismatch"
     if str(artifact.get("site_id") or "").strip() != str(site_id or "").strip():
         return False, "convergence_site_mismatch"
     if str(artifact.get("canonical_ppid") or "").strip() != str(canonical_ppid or "").strip():
@@ -408,6 +441,7 @@ def verify_ppid_convergence_artifact(
         key: artifact[key]
         for key in (
             "schema",
+            "issuer",
             "convergence_id",
             "site_id",
             "legacy_ppid",
@@ -418,13 +452,24 @@ def verify_ppid_convergence_artifact(
         )
         if key in artifact
     }
-    digest = hashlib.sha256(build_convergence_canonical_message(unsigned)).digest()
-    for pubkey_hex in trusted_issuer_pubkeys:
-        try:
-            Ed25519PublicKey.from_public_bytes(bytes.fromhex(pubkey_hex)).verify(signature, digest)
-            return True, "valid"
-        except (InvalidSignature, ValueError):
-            continue
+    pubkeys = _pubkeys_for_issuer(
+        issuer_did=issuer_did,
+        trusted_issuer_pubkeys=trusted_issuer_pubkeys,
+        trusted_issuers=trusted_issuers,
+    )
+    if not pubkeys:
+        return False, "convergence_untrusted_issuer"
+    digests = [
+        hashlib.sha256(build_convergence_canonical_message(unsigned, include_issuer=True)).digest(),
+        hashlib.sha256(build_convergence_canonical_message(unsigned, include_issuer=False)).digest(),
+    ]
+    for digest in digests:
+        for pubkey_hex in pubkeys:
+            try:
+                Ed25519PublicKey.from_public_bytes(bytes.fromhex(pubkey_hex)).verify(signature, digest)
+                return True, "valid"
+            except (InvalidSignature, ValueError):
+                continue
     return False, "convergence_invalid_signature"
 
 
@@ -689,18 +734,24 @@ def build_action_commitment(
     return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
 
 
-def build_fresh_passkey_canonical_message(artifact: dict) -> bytes:
+def build_fresh_passkey_canonical_message(artifact: dict, *, include_issuer: bool = True) -> bytes:
     lines = [
         FRESH_PASSKEY_PREFIX,
         str(artifact.get("schema") or FRESH_PASSKEY_SCHEMA).strip(),
-        str(artifact.get("site_id") or "").strip(),
-        str(artifact.get("credential_id") or "").strip(),
-        str(artifact.get("subject") or "").strip(),
-        str(artifact.get("action_commitment") or "").strip().lower(),
-        str(artifact.get("attestation_id") or "").strip(),
-        str(int(artifact.get("issued_at_unix") or 0)),
-        str(int(artifact.get("expires_at_unix") or 0)),
     ]
+    if include_issuer:
+        lines.append(str(artifact.get("issuer") or "").strip())
+    lines.extend(
+        [
+            str(artifact.get("site_id") or "").strip(),
+            str(artifact.get("credential_id") or "").strip(),
+            str(artifact.get("subject") or "").strip(),
+            str(artifact.get("action_commitment") or "").strip().lower(),
+            str(artifact.get("attestation_id") or "").strip(),
+            str(int(artifact.get("issued_at_unix") or 0)),
+            str(int(artifact.get("expires_at_unix") or 0)),
+        ]
+    )
     return "\n".join(lines).encode("utf-8")
 
 
@@ -711,7 +762,9 @@ def verify_fresh_passkey_attestation(
     credential_id: str,
     subject: str,
     action_commitment: str,
-    trusted_issuer_pubkeys: list[str],
+    trusted_issuer_pubkeys: Optional[list[str]] = None,
+    trusted_issuers: Optional[dict] = None,
+    expected_issuer_did: Optional[str] = None,
     now_unix: Optional[int] = None,
     max_age_seconds: int = DEFAULT_FRESH_PASSKEY_MAX_AGE_SECONDS,
 ) -> tuple[bool, str]:
@@ -719,6 +772,11 @@ def verify_fresh_passkey_attestation(
         return False, "fresh_passkey_missing"
     if str(attestation.get("schema") or "") != FRESH_PASSKEY_SCHEMA:
         return False, "fresh_passkey_schema_mismatch"
+    issuer_did = str(attestation.get("issuer") or "").strip()
+    if not issuer_did:
+        return False, "fresh_passkey_issuer_missing"
+    if expected_issuer_did and issuer_did != str(expected_issuer_did).strip():
+        return False, "fresh_passkey_issuer_mismatch"
     if str(attestation.get("site_id") or "").strip() != str(site_id or "").strip():
         return False, "fresh_passkey_site_mismatch"
     if str(attestation.get("credential_id") or "").strip() != str(credential_id or "").strip():
@@ -752,6 +810,7 @@ def verify_fresh_passkey_attestation(
         key: attestation[key]
         for key in (
             "schema",
+            "issuer",
             "attestation_id",
             "site_id",
             "credential_id",
@@ -762,13 +821,24 @@ def verify_fresh_passkey_attestation(
         )
         if key in attestation
     }
-    digest = hashlib.sha256(build_fresh_passkey_canonical_message(unsigned)).digest()
-    for pubkey_hex in trusted_issuer_pubkeys:
-        try:
-            Ed25519PublicKey.from_public_bytes(bytes.fromhex(pubkey_hex)).verify(signature, digest)
-            return True, "valid"
-        except (InvalidSignature, ValueError):
-            continue
+    pubkeys = _pubkeys_for_issuer(
+        issuer_did=issuer_did,
+        trusted_issuer_pubkeys=trusted_issuer_pubkeys,
+        trusted_issuers=trusted_issuers,
+    )
+    if not pubkeys:
+        return False, "fresh_passkey_untrusted_issuer"
+    digests = [
+        hashlib.sha256(build_fresh_passkey_canonical_message(unsigned, include_issuer=True)).digest(),
+        hashlib.sha256(build_fresh_passkey_canonical_message(unsigned, include_issuer=False)).digest(),
+    ]
+    for digest in digests:
+        for pubkey_hex in pubkeys:
+            try:
+                Ed25519PublicKey.from_public_bytes(bytes.fromhex(pubkey_hex)).verify(signature, digest)
+                return True, "valid"
+            except (InvalidSignature, ValueError):
+                continue
     return False, "fresh_passkey_invalid_signature"
 
 
@@ -1137,10 +1207,15 @@ class VerificationContext:
         if bound_err or bound_site != self.site_id:
             return self.Result(False, "site_id_mismatch", bound_site_id=bound_site_raw)
         try:
-            expires_at = int(claims.get("expiresAt") or 0)
+            expires_raw = claims.get("expiresAt")
+            if expires_raw in (None, ""):
+                return self.Result(False, "expiresAt_missing")
+            expires_at = int(expires_raw)
         except (TypeError, ValueError):
             return self.Result(False, "expiresAt_malformed")
-        if expires_at and expires_at < int(time.time()):
+        if expires_at <= 0:
+            return self.Result(False, "expiresAt_missing")
+        if expires_at < int(time.time()):
             return self.Result(False, "expired")
 
         # 3. Local Bloom revocation check (credential id, subject/PPID, wallet id)
@@ -1180,20 +1255,21 @@ class VerificationContext:
             )
             if session_site_err or session_site != self.site_id:
                 return self.Result(False, "session_site_id_mismatch")
-        elif self.require_session_assertion and site_pubkey_b64:
+        elif self.require_session_assertion:
+            # Fail closed: missing site key must not bypass PoP when required.
+            if not site_pubkey_b64:
+                return self.Result(False, "credential_missing_site_signing_pubkey")
             return self.Result(False, "session_assertion_required")
 
         legacy_ppid = None
         convergence = (presentation or {}).get("ppid_convergence")
         if convergence:
-            trusted_pubkeys: list[str] = []
-            for trusted_issuer in snapshot.issuers.values():
-                trusted_pubkeys.extend(sorted(trusted_issuer.pubkeys_hex))
             ok_conv, conv_reason = verify_ppid_convergence_artifact(
                 convergence,
                 site_id=self.site_id,
                 canonical_ppid=credential.get("subject") or "",
-                trusted_issuer_pubkeys=trusted_pubkeys,
+                trusted_issuers=snapshot.issuers,
+                expected_issuer_did=issuer_did,
             )
             if not ok_conv:
                 return self.Result(False, conv_reason)
@@ -1369,16 +1445,14 @@ class VerificationContext:
                 body_hash=expected_body_hash,
             )
             snapshot = self._ensure_fresh_snapshot()
-            trusted_pubkeys: list[str] = []
-            for trusted_issuer in snapshot.issuers.values():
-                trusted_pubkeys.extend(sorted(trusted_issuer.pubkeys_hex))
             ok_fp, fp_reason = verify_fresh_passkey_attestation(
                 attestation,
                 site_id=self.site_id,
                 credential_id=str(credential.get("id") or cred_result.credential_id or ""),
                 subject=str(credential.get("subject") or cred_result.ppid or ""),
                 action_commitment=action_commitment,
-                trusted_issuer_pubkeys=trusted_pubkeys,
+                trusted_issuers=snapshot.issuers,
+                expected_issuer_did=cred_result.issuer_did or credential.get("issuer"),
                 max_age_seconds=self.fresh_passkey_max_age_seconds,
             )
             if not ok_fp:

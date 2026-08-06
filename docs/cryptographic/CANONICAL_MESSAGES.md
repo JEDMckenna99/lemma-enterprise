@@ -132,17 +132,21 @@ compact separators (`,` and `:`) with no insignificant whitespace.
 
 - **When issued:** only when a provisional wallet rebinds to a known document-anchored
   person and the site-scoped legacy PPID differs from the canonical PPID.
-- **Inputs:** `site_id`, `legacy_ppid`, `canonical_ppid`, `convergence_id`, `nonce`,
-  `issued_at_unix`, `expires_at_unix`.
+- **Inputs:** `issuer` (signing issuer DID), `site_id`, `legacy_ppid`, `canonical_ppid`,
+  `convergence_id`, `nonce`, `issued_at_unix`, `expires_at_unix`.
 - **Canonicalization:** newline-joined (`\n`) lines, in this exact order, prefixed by
   `lemma:ppid-convergence:v1`; each value `.strip()`-ed (numbers stringified). SHA-256
-  digest is Ed25519-signed by the Lemma isHuman issuer key.
+  digest is Ed25519-signed by the Lemma isHuman issuer key. Wave 4 binds `issuer` into
+  the signed bytes; verifiers accept only that issuer's pubkeys (not a flattened trust
+  list). Legacy pre-Wave-4 signatures (issuer omitted from the message) are accepted
+  during grace if the artifact still carries a matching trusted `issuer` field.
 - **Reference:** `api/ppid_convergence.py::build_convergence_canonical_message`;
   Python verifier `verify_ppid_convergence_artifact`; JS verifier
   `verifyPpidConvergenceArtifact`.
 - **Test vector:**
   ```
   lemma:ppid-convergence:v1
+  did:lemma:issuer:federated
   example.com
   did:lemma:ppid_legacy0123456789abcdef0123456789abcdef0123456789abcdef01234567
   did:lemma:ppid_canon0123456789abcdef0123456789abcdef0123456789abcdef012345678
@@ -156,15 +160,18 @@ compact separators (`,` and `:`) with no insignificant whitespace.
 
 - **When issued:** only after lemma.id verifies a new WebAuthn assertion for a
   wallet/device passkey registered server-side.
-- **Inputs:** `site_id`, `credential_id`, `subject` (PPID), opaque
-  `action_commitment`, `attestation_id`, `issued_at_unix`, `expires_at_unix`.
+- **Inputs:** `issuer` (signing issuer DID), `site_id`, `credential_id`, `subject` (PPID),
+  opaque `action_commitment`, `attestation_id`, `issued_at_unix`, `expires_at_unix`.
 - **Action commitment (site-local, privacy-preserving):** SHA-256 hex digest of
   newline-joined (`\n`) lines prefixed by `lemma:action-commitment:v1` over
   `server_nonce`, `site_id`, `action`, `method`, `path`, `body_hash`. lemma.id
   never receives the raw action name or body, only the commitment hash.
 - **Canonicalization:** newline-joined lines prefixed by
-  `lemma:fresh-passkey-attestation:v1`; each value `.strip()`-ed (numbers
-  stringified). SHA-256 digest is Ed25519-signed by the Lemma isHuman issuer key.
+  `lemma:fresh-passkey-attestation:v1` then `schema`, then `issuer`, then the remaining
+  fields; each value `.strip()`-ed (numbers stringified). SHA-256 digest is
+  Ed25519-signed by the Lemma isHuman issuer key. Verifiers scope pubkey checks to the
+  artifact's `issuer` only (Wave 4). Legacy signatures without issuer in the message
+  remain acceptable during grace when `issuer` is present and trusted.
 - **Reference:** `api/fresh_passkey_attestation.py`; Python verifier
   `verify_fresh_passkey_attestation`; JS verifier `verifyFreshPasskeyAttestation`.
 

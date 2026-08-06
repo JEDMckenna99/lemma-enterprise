@@ -52,7 +52,9 @@ RP_NAME = os.getenv('PASSKEY_RP_NAME', 'Lemma')
 ORIGIN = os.getenv('PASSKEY_ORIGIN', 'https://lemma.id')
 EXPECTED_ORIGIN = os.getenv('PASSKEY_EXPECTED_ORIGIN', 'https://lemma.id')
 
-# SECURITY: Allowed CORS origins for auth endpoints
+# SECURITY: Allowed CORS origins for auth endpoints (exact match by default).
+# Wave 3: do not default to *.lemma.id suffix trust — opt in via
+# LEMMA_ALLOWED_ORIGIN_SUFFIXES only when a staging subdomain must share RP CORS.
 ALLOWED_AUTH_ORIGINS = set(
     o.strip().lower() for o in 
     os.getenv('LEMMA_ALLOWED_ORIGINS', 'https://lemma.id,https://www.lemma.id').split(',')
@@ -60,7 +62,7 @@ ALLOWED_AUTH_ORIGINS = set(
 )
 ALLOWED_ORIGIN_SUFFIXES = [
     s.strip().lower() for s in
-    os.getenv('LEMMA_ALLOWED_ORIGIN_SUFFIXES', '.lemma.id').split(',')
+    os.getenv('LEMMA_ALLOWED_ORIGIN_SUFFIXES', '').split(',')
     if s.strip()
 ]
 

@@ -27,6 +27,8 @@ class ModeDecision:
     effective_mode: str
     proof_present: bool
     bearer_present: bool
+    agent_proof_bypass: bool = False
+    risk_tier: str | None = None
 
 
 def _bool_env(name: str, default: bool = False) -> bool:
@@ -84,9 +86,11 @@ def evaluate_mode_policy(
     expected_mode: str,
     headers: Mapping[str, str],
     compat_sunset_utc: str | None = None,
+    risk_tier: str | None = None,
 ) -> ModeDecision:
     proof_present = _proof_present(headers)
     bearer_present = _bearer_present(headers)
+    tier = str(risk_tier or "").strip().lower() or None
     effective_mode = MODE_COMPAT_BEARER
     if proof_present and bearer_present:
         effective_mode = MODE_COMPAT_PROOF_WRAPPED
@@ -105,18 +109,34 @@ def evaluate_mode_policy(
             effective_mode=effective_mode,
             proof_present=proof_present,
             bearer_present=bearer_present,
+            risk_tier=tier,
         )
 
     if expected_mode == MODE_PROOF_REQUIRED and not proof_present:
         agent_token = (headers.get("X-Agent-Token") or "").strip()
-        if agent_token.startswith("lm_agent_") and not _bool_env("LEMMA_ENFORCE_PROOF_REQUIRED", default=False):
+        enforce_all = _bool_env("LEMMA_ENFORCE_PROOF_REQUIRED", default=False)
+        # Staged gate: critical routes can require proofs before global enforcement.
+        enforce_critical = _bool_env("LEMMA_ENFORCE_PROOF_REQUIRED_CRITICAL", default=False)
+        if agent_token.startswith("lm_agent_") and not enforce_all:
+            if enforce_critical and tier == "critical":
+                return ModeDecision(
+                    allowed=False,
+                    reason_code="AUTH_PROOF_REQUIRED",
+                    expected_mode=expected_mode,
+                    effective_mode=effective_mode,
+                    proof_present=proof_present,
+                    bearer_present=bearer_present,
+                    risk_tier=tier,
+                )
             return ModeDecision(
                 allowed=True,
-                reason_code=None,
+                reason_code="AUTH_PROOF_BYPASS_AGENT_COMPAT",
                 expected_mode=expected_mode,
                 effective_mode=MODE_CREDENTIAL_REQUIRED,
                 proof_present=proof_present,
                 bearer_present=bearer_present,
+                agent_proof_bypass=True,
+                risk_tier=tier,
             )
         return ModeDecision(
             allowed=False,
@@ -125,6 +145,7 @@ def evaluate_mode_policy(
             effective_mode=effective_mode,
             proof_present=proof_present,
             bearer_present=bearer_present,
+            risk_tier=tier,
         )
 
     if expected_mode == MODE_CREDENTIAL_REQUIRED and not _credential_or_agent_present(headers):

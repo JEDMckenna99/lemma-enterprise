@@ -35,11 +35,11 @@ function isLemmaTrustedOrigin(origin) {
     return origin === 'https://lemma.id' || origin === 'https://www.lemma.id';
 }
 
-/** Boundary-safe hostname check (mirrors server _lemma_origin_allowed). */
+/** Exact identity-platform hostname check (Wave 3: no *.lemma.id wildcard). */
 function isLemmaHostname(hostname) {
     const host = String(hostname || '').trim().toLowerCase().replace(/\.$/, '');
     if (!host) return false;
-    if (host === 'lemma.id' || host.endsWith('.lemma.id')) return true;
+    if (host === 'lemma.id' || host === 'www.lemma.id') return true;
     if (host === 'localhost' || host === '127.0.0.1') return true;
     return false;
 }
@@ -7133,7 +7133,9 @@ class LemmaWallet {
 
     _getRpIdForWebAuthn() {
         const host = (typeof window !== 'undefined' && window.location.hostname) || '';
-        if (host === 'lemma.id' || host === 'www.lemma.id' || host.endsWith('.lemma.id')) {
+        // Exact identity RP hosts only — a compromised *.lemma.id subdomain must
+        // not inherit the platform WebAuthn RP ID.
+        if (host === 'lemma.id' || host === 'www.lemma.id') {
             return 'lemma.id';
         }
         // Chrome WebAuthn allows http://localhost, not http://127.0.0.1 (IP ≠ domain).

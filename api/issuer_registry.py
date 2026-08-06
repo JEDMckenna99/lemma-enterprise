@@ -415,16 +415,18 @@ def get_verification_instructions(domain, token):
 
 
 def verify_well_known(domain, token):
-    """Verify domain via .well-known file"""
-    import requests
-    
+    """Verify domain via .well-known file (SSRF-safe, DNS-pinned outbound fetch)."""
+    from api.url_safety import fetch_safe_outbound_text
+
     try:
         url = f'https://{domain}/.well-known/lemma-verification.txt'
-        response = requests.get(url, timeout=10)
-        
-        if response.status_code == 200:
-            return token in response.text
-        return False
+        ok, reason, body = fetch_safe_outbound_text(url, timeout=10.0, max_bytes=8192)
+        if not ok:
+            logger.warning(
+                "Well-known verification blocked for %s: %s", domain, reason
+            )
+            return False
+        return token in (body or "")
     except Exception as e:
         logger.warning(f"Well-known verification failed for {domain}: {e}")
         return False
