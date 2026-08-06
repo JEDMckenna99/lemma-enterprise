@@ -3548,14 +3548,17 @@ def verify_presentation():
     What gets re-checked when this endpoint is called:
       1. The credential's browser-canonical Ed25519 signature was produced by a
          trusted issuer (against the live trust list)
-      2. The credential is bound to the expected site_id
-      3. The credential is not expired and not revoked (server-side Bloom check)
-      4. The site-bound session assertion is signed by the credential's site key
+      2. ``site_id`` is required and must match the credential's site binding
+         (missing request site, missing credential binding, or mismatch fail closed)
+      3. ``expiresAt`` must be present, a positive unix timestamp, and not elapsed
+      4. The credential is not revoked (server-side Bloom check; unavailable → 503)
+      5. The site-bound session assertion is signed by the credential's site key
+         when supplied
 
     Request body::
 
         {
-            "site_id": "tickets-demo.lemma.id",          # expected site binding
+            "site_id": "tickets-demo.lemma.id",          # required expected site binding
             "credential": { ... },                        # full VC with proof.signatureValueWeb
             "session_assertion": { ... },                 # optional
             "session_signature": "<base64url>",           # optional
@@ -3645,6 +3648,16 @@ def verify_presentation_payload(body: dict) -> tuple[dict, int]:
         return {"success": False, "error": "assurance_insufficient"}, 400
     from api.site_hostname import normalize_runtime_site_binding
 
+    # Match OSS VerificationContext: expected site is required, credential site
+    # binding must be present and equal, and expiresAt must be a positive unix
+    # timestamp that has not elapsed. Soft/optional checks here previously let
+    # unbound or never-expiring credentials pass the convenience endpoint.
+    if not expected_site_id:
+        return {"success": False, "error": "site_id_required"}, 400
+    expected_site = normalize_runtime_site_binding(expected_site_id)
+    if not expected_site:
+        return {"success": False, "error": "site_id_invalid"}, 400
+
     bound_site_raw = (
         claims.get("siteDomain")
         or claims.get("site_domain")
@@ -3654,16 +3667,24 @@ def verify_presentation_payload(body: dict) -> tuple[dict, int]:
         or ""
     )
     bound_site = normalize_runtime_site_binding(bound_site_raw)
-    expected_site = normalize_runtime_site_binding(expected_site_id) if expected_site_id else None
-    if expected_site and bound_site and bound_site != expected_site:
+    if not bound_site:
+        return {"success": False, "error": "credential_site_binding_missing"}, 400
+    if bound_site != expected_site:
         return {"success": False, "error": "site_id_mismatch", "bound_site": bound_site}, 400
 
+    raw_expires = claims.get("expiresAt")
+    if raw_expires is None or raw_expires == "":
+        raw_expires = credential.get("expiresAt")
+    if raw_expires is None or raw_expires == "":
+        return {"success": False, "error": "credential_expires_at_missing"}, 400
     try:
-        expires_at = int(claims.get("expiresAt") or 0)
-        if expires_at and expires_at < int(time.time()):
-            return {"success": False, "error": "expired"}, 400
+        expires_at = int(raw_expires)
     except (TypeError, ValueError):
-        pass
+        return {"success": False, "error": "expiresAt_malformed"}, 400
+    if expires_at <= 0:
+        return {"success": False, "error": "credential_expires_at_missing"}, 400
+    if expires_at < int(time.time()):
+        return {"success": False, "error": "expired"}, 400
 
     credential_id = credential.get("id") or ""
     from api.revocation_verifier import check_credential_revocation

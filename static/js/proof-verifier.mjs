@@ -53,6 +53,20 @@ const FRESH_PASSKEY_SCHEMA = "fresh_passkey_attestation.v1";
 const DEFAULT_FRESH_PASSKEY_MAX_AGE_S = 120;
 const NONCE_STORE_MODE_OPTIONAL = "optional";
 const NONCE_STORE_MODE_REQUIRED = "required";
+
+function defaultNonceStoreMode() {
+  const env = typeof process !== "undefined" ? process.env : undefined;
+  const explicit = String(env?.LEMMA_NONCE_STORE_MODE || "").trim().toLowerCase();
+  if (explicit === NONCE_STORE_MODE_OPTIONAL || explicit === NONCE_STORE_MODE_REQUIRED) {
+    return explicit;
+  }
+  for (const key of ["NODE_ENV", "ENVIRONMENT", "FLASK_ENV"]) {
+    if (String(env?.[key] || "").trim().toLowerCase() === "production") {
+      return NONCE_STORE_MODE_REQUIRED;
+    }
+  }
+  return NONCE_STORE_MODE_OPTIONAL;
+}
 const BLOOM_SNAPSHOT_PREFIX = "lemma:bloom-snapshot:v1";
 const TRUST_LIST_PREFIX = "lemma:issuer-trust-list:v1";
 const TIME_SKEW_SECONDS = 300;
@@ -916,13 +930,16 @@ export function createVerifier({
   requireSessionAssertion = false,
   requiredAssurance = "ishuman",
   maxActionAgeSeconds = DEFAULT_MAX_ACTION_AGE_S,
-  nonceStoreMode = NONCE_STORE_MODE_OPTIONAL,
+  nonceStoreMode = null,
   freshPasskeyMaxAgeSeconds = DEFAULT_FRESH_PASSKEY_MAX_AGE_S,
   networkRootPubkeys = null,
   fetch: fetchImpl,
 } = {}) {
   if (!siteId) throw new Error("siteId required");
   const canonicalSiteId = canonicalizeSiteHostname(siteId);
+  const resolvedNonceStoreMode = String(
+    nonceStoreMode || defaultNonceStoreMode(),
+  ).toLowerCase();
   let snapshot = null;
   let inflight = null;
 
@@ -1180,7 +1197,9 @@ export function createVerifier({
 
     const nonce = String(assertion.nonce || inner.nonce || "").trim();
     if (!nonce) return { ok: false, reason: "action_nonce_missing" };
-    const mode = String(actionNonceStoreMode || nonceStoreMode || NONCE_STORE_MODE_OPTIONAL).toLowerCase();
+    const mode = String(
+      actionNonceStoreMode || resolvedNonceStoreMode || defaultNonceStoreMode(),
+    ).toLowerCase();
     if (mode === NONCE_STORE_MODE_REQUIRED && !nonceStore) {
       return { ok: false, reason: "action_nonce_store_required" };
     }
@@ -1392,5 +1411,6 @@ if (typeof module !== "undefined" && typeof module.exports !== "undefined") {
     createLemmaCheckPolicyStore,
     canonicalizeSiteHostname,
     browserCanonicalMessage,
+    defaultNonceStoreMode,
   };
 }

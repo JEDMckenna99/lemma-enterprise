@@ -105,7 +105,7 @@ def test_brand_and_manager_creation_use_canonical_routes():
     assert "LemmaWalletWrap" in manager or "purgeAllDeviceData" in wallet_js
     assert "async listDevices(" in wallet_js
     assert "async revokeDevice(" in wallet_js
-    assert "static VERSION = '2.79.0'" in wallet_js
+    assert "static VERSION = '2.81.0'" in wallet_js
     assert "Never call instance.lock()" in wallet_js
     assert "Safari/iOS-safe" in wallet_js
     assert "_handleDeviceRevoked" in wallet_js

@@ -459,16 +459,48 @@ def _require_approved_didit_feature_array(
 
 
 def validate_didit_workflow_id(workflow_id: Optional[str]) -> None:
-    """Ensure the session used the configured proof-of-humanity Didit workflow."""
-    from api.config import get_didit_workflow_id
+    """Ensure the session used the configured proof-of-humanity Didit workflow.
+
+    Production fails closed when ``DIDIT_WORKFLOW_ID`` is unset so dashboard-only
+    pinning cannot be bypassed by an empty server config.
+    """
+    from api.config import get_didit_workflow_id, is_production
 
     expected = (get_didit_workflow_id() or "").strip().lower()
     if not expected:
+        if is_production():
+            raise IdentityRootMaterialError("didit_workflow_id_not_configured")
         return
     actual = (workflow_id or "").strip().lower()
     if actual != expected:
         raise IdentityRootMaterialError(
             f"didit workflow_id mismatch: expected {expected}, got {actual or '(missing)'}"
+        )
+
+
+def assert_ishuman_idv_document_policy(
+    *,
+    country: str,
+    document_type: str,
+) -> None:
+    """Fail closed unless country/document type are in the server allowlists.
+
+    Didit dashboard config is necessary but not sufficient — issuance must also
+    reject out-of-policy documents server-side (US/CA + DL/ID by default).
+    """
+    from api.config import get_ishuman_allowed_countries, get_ishuman_allowed_document_types
+
+    allowed_countries = get_ishuman_allowed_countries()
+    allowed_types = get_ishuman_allowed_document_types()
+    country_norm = (country or "").strip().upper()
+    doc_type_norm = (document_type or "").strip().lower()
+    if country_norm not in allowed_countries:
+        raise IdentityRootMaterialError(
+            f"issuing_country_not_allowed: {country_norm or '(missing)'}"
+        )
+    if doc_type_norm not in allowed_types:
+        raise IdentityRootMaterialError(
+            f"document_type_not_allowed: {doc_type_norm or '(missing)'}"
         )
 
 
@@ -496,6 +528,7 @@ def extract_root_material_from_didit_decision(decision: dict[str, Any]) -> Strip
 
     country = map_didit_country(idv.get("issuing_country") or idv.get("issuing_state") or "")
     document_type = map_didit_document_type(idv.get("document_type") or "")
+    assert_ishuman_idv_document_policy(country=country, document_type=document_type)
     from api.issuing_subdivision import extract_didit_issuing_subdivision
 
     issuing_subdivision = extract_didit_issuing_subdivision(idv, country)

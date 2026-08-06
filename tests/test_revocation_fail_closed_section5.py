@@ -483,3 +483,23 @@ def test_required_nonce_store_mode_without_store_rejected(py_sdk, monkeypatch):
     )
     assert result.ok is False
     assert result.reason == "action_nonce_store_required"
+
+
+def test_default_nonce_store_mode_required_in_production(py_sdk, monkeypatch):
+    monkeypatch.delenv("LEMMA_NONCE_STORE_MODE", raising=False)
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    assert py_sdk.default_nonce_store_mode() == "required"
+    ctx = py_sdk.VerificationContext(
+        site_id="demo.example.com",
+        required_assurance="ishuman",
+    )
+    assert ctx.nonce_store_mode == "required"
+
+
+def test_default_nonce_store_mode_optional_outside_production(py_sdk, monkeypatch):
+    monkeypatch.delenv("LEMMA_NONCE_STORE_MODE", raising=False)
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    monkeypatch.delenv("NODE_ENV", raising=False)
+    monkeypatch.delenv("FLASK_ENV", raising=False)
+    monkeypatch.setattr("api.config.is_production", lambda: False, raising=False)
+    assert py_sdk.default_nonce_store_mode() == "optional"

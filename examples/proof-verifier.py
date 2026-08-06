@@ -79,6 +79,31 @@ DEFAULT_FRESH_PASSKEY_MAX_AGE_SECONDS = 120
 NONCE_STORE_MODE_OPTIONAL = "optional"
 NONCE_STORE_MODE_REQUIRED = "required"
 BROWSER_CANONICAL_V2 = "browser_canonical_v2"
+
+
+def default_nonce_store_mode() -> str:
+    """Resolve the default action-stamp nonce store mode.
+
+    Production-shaped environments (``NODE_ENV`` / ``ENVIRONMENT`` / ``FLASK_ENV``
+    = ``production``, or ``api.config.is_production()``) default to ``required``
+    so replay protection cannot be silently skipped. Override with
+    ``LEMMA_NONCE_STORE_MODE=optional|required``. Non-production defaults to
+    ``optional`` for local/dev convenience.
+    """
+    explicit = (__import__("os").getenv("LEMMA_NONCE_STORE_MODE") or "").strip().lower()
+    if explicit in (NONCE_STORE_MODE_OPTIONAL, NONCE_STORE_MODE_REQUIRED):
+        return explicit
+    for key in ("NODE_ENV", "ENVIRONMENT", "FLASK_ENV"):
+        if (__import__("os").getenv(key) or "").strip().lower() == "production":
+            return NONCE_STORE_MODE_REQUIRED
+    try:
+        from api.config import is_production
+
+        if is_production():
+            return NONCE_STORE_MODE_REQUIRED
+    except ImportError:
+        pass
+    return NONCE_STORE_MODE_OPTIONAL
 DEFAULT_NETWORK_ROOT_PUBKEYS_HEX: list[str] = [
     "3782cf10beea1dcc9a88127a5dbb71c6cba30c1c8c63327a83b8f09867d6a6c2",
 ]
@@ -900,7 +925,7 @@ class VerificationContext:
         require_session_assertion: bool = False,
         required_assurance: str = "ishuman",
         max_action_age_seconds: int = DEFAULT_MAX_ACTION_AGE_SECONDS,
-        nonce_store_mode: str = NONCE_STORE_MODE_OPTIONAL,
+        nonce_store_mode: Optional[str] = None,
         fresh_passkey_max_age_seconds: int = DEFAULT_FRESH_PASSKEY_MAX_AGE_SECONDS,
         network_root_pubkeys: Optional[list[str]] = None,
     ) -> None:
@@ -911,7 +936,9 @@ class VerificationContext:
         self.require_session_assertion = require_session_assertion
         self.required_assurance = (required_assurance or "ishuman").strip().lower()
         self.max_action_age_seconds = max_action_age_seconds
-        self.nonce_store_mode = (nonce_store_mode or NONCE_STORE_MODE_OPTIONAL).strip().lower()
+        self.nonce_store_mode = (
+            nonce_store_mode or default_nonce_store_mode()
+        ).strip().lower()
         self.fresh_passkey_max_age_seconds = fresh_passkey_max_age_seconds
         self.network_root_pubkeys = network_root_pubkeys
         self._lock = threading.Lock()
@@ -1288,7 +1315,9 @@ class VerificationContext:
         if not nonce:
             return self.Result(False, "action_nonce_missing")
 
-        mode = (nonce_store_mode or self.nonce_store_mode or NONCE_STORE_MODE_OPTIONAL).strip().lower()
+        mode = (
+            nonce_store_mode or self.nonce_store_mode or default_nonce_store_mode()
+        ).strip().lower()
         if mode == NONCE_STORE_MODE_REQUIRED and nonce_store is None:
             return self.Result(False, "action_nonce_store_required")
 

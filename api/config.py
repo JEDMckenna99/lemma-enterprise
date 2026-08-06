@@ -384,6 +384,39 @@ def is_ishuman_pull_fallback_enabled() -> bool:
     return _env_truthy("LEMMA_ISHUMAN_PULL_FALLBACK", True)
 
 
+def get_ishuman_allowed_countries() -> frozenset[str]:
+    """Issuing countries accepted for isHuman IDV root derivation.
+
+    Defaults to US and CA. Override with comma-separated alpha-2 codes via
+    ``LEMMA_ISHUMAN_ALLOWED_COUNTRIES`` (e.g. ``US,CA,MX``).
+    """
+    raw = (os.environ.get("LEMMA_ISHUMAN_ALLOWED_COUNTRIES") or "US,CA").strip()
+    countries = {
+        part.strip().upper()
+        for part in raw.split(",")
+        if part.strip()
+    }
+    return frozenset(countries) if countries else frozenset({"US", "CA"})
+
+
+def get_ishuman_allowed_document_types() -> frozenset[str]:
+    """Document types accepted for isHuman IDV root derivation.
+
+    Defaults to driving_license and id_card (passports rejected). Override with
+    comma-separated canonical types via ``LEMMA_ISHUMAN_ALLOWED_DOCUMENT_TYPES``.
+    """
+    raw = (
+        os.environ.get("LEMMA_ISHUMAN_ALLOWED_DOCUMENT_TYPES")
+        or "driving_license,id_card"
+    ).strip()
+    types = {
+        part.strip().lower()
+        for part in raw.split(",")
+        if part.strip()
+    }
+    return frozenset(types) if types else frozenset({"driving_license", "id_card"})
+
+
 def is_ishuman_didit_purge_enabled() -> bool:
     """Whether to delete the upstream didit session after credential issuance.
 

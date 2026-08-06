@@ -103,6 +103,9 @@ def test_didit_document_root_canonicalization_is_stable(monkeypatch):
 
     monkeypatch.setattr(ir, "_get_identity_root_pepper", lambda *a, **k: FIXED_PEPPER)
 
+    # Byte-pin uses a Spanish sample document; widen the country allowlist for
+    # this invariant only (production defaults remain US/CA).
+    monkeypatch.setenv("LEMMA_ISHUMAN_ALLOWED_COUNTRIES", "US,CA,ES")
     decision = {
         "id_verifications": [
             {

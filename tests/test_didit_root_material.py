@@ -22,7 +22,8 @@ PROOF_OF_HUMANITY_WORKFLOW_ID = "668fbf42-cfb7-4774-9ecd-564c297d4a07"
 def _approved_poh_decision(**idv_overrides) -> dict:
     idv = {
         "status": "Approved",
-        "document_type": "Passport",
+        "document_type": "Driver's License",
+        "document_subtype": "CALIFORNIA_DRIVER_LICENSE_GENERIC",
         "document_number": "x 12-345 678",
         "date_of_birth": "1985-03-12",
         "issuing_state": "USA",
@@ -85,13 +86,51 @@ def test_extract_picks_approved_entry_and_normalizes():
     ]
     material = extract_root_material_from_didit_decision(decision)
     assert material.country == "US"
-    assert material.document_type == "passport"
+    assert material.document_type == "driving_license"
     # The extractor preserves the raw document number; normalization (strip
     # spaces/hyphens, uppercase) happens later in build_document_root_claims.
     assert material.document_number == "x 12-345 678"
     assert material.date_of_birth == "1985-03-12"
     assert material.document_expiration_date is None
     assert material.stripe_session_id is None
+
+
+@pytest.mark.unit
+def test_extract_rejects_passport_by_default():
+    decision = _approved_poh_decision(document_type="Passport")
+    with pytest.raises(IdentityRootMaterialError, match="document_type_not_allowed"):
+        extract_root_material_from_didit_decision(decision)
+
+
+@pytest.mark.unit
+def test_extract_rejects_non_us_ca_country_by_default():
+    decision = _approved_poh_decision(issuing_state="GBR")
+    with pytest.raises(IdentityRootMaterialError, match="issuing_country_not_allowed"):
+        extract_root_material_from_didit_decision(decision)
+
+
+@pytest.mark.unit
+def test_extract_allows_canada_id_card():
+    decision = _approved_poh_decision(
+        document_type="Identity Card",
+        issuing_state="CAN",
+    )
+    material = extract_root_material_from_didit_decision(decision)
+    assert material.country == "CA"
+    assert material.document_type == "id_card"
+
+
+@pytest.mark.unit
+def test_extract_allowlist_override(monkeypatch):
+    monkeypatch.setenv("LEMMA_ISHUMAN_ALLOWED_COUNTRIES", "US,GB")
+    monkeypatch.setenv("LEMMA_ISHUMAN_ALLOWED_DOCUMENT_TYPES", "passport")
+    decision = _approved_poh_decision(
+        document_type="Passport",
+        issuing_state="GBR",
+    )
+    material = extract_root_material_from_didit_decision(decision)
+    assert material.country == "GB"
+    assert material.document_type == "passport"
 
 
 @pytest.mark.unit
@@ -195,3 +234,11 @@ def test_validate_workflow_id_mismatch_fails_closed(monkeypatch):
     )
     with pytest.raises(IdentityRootMaterialError, match="workflow_id mismatch"):
         validate_didit_workflow_id("wrong-workflow-id")
+
+
+@pytest.mark.unit
+def test_validate_workflow_id_required_in_production(monkeypatch):
+    monkeypatch.setattr("api.config.get_didit_workflow_id", lambda: "")
+    monkeypatch.setattr("api.config.is_production", lambda: True)
+    with pytest.raises(IdentityRootMaterialError, match="didit_workflow_id_not_configured"):
+        validate_didit_workflow_id(PROOF_OF_HUMANITY_WORKFLOW_ID)

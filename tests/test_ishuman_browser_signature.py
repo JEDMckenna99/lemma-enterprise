@@ -304,3 +304,130 @@ def test_verify_presentation_endpoint_round_trip(monkeypatch):
     )
     assert bad.status_code == 400
     assert bad.get_json()["error"] == "invalid_signature"
+
+
+def test_verify_presentation_payload_fails_closed_on_site_and_expiry(monkeypatch):
+    """Platform verify-presentation matches OSS: require site binding + real expiry."""
+    pytest.importorskip("api.ishuman")
+
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    from api.ishuman import _sign_with_issuer_for_browser, verify_presentation_payload
+
+    seed = b"\x33" * 32
+    sk = Ed25519PrivateKey.from_private_bytes(seed)
+    pk_hex = sk.public_key().public_bytes_raw().hex()
+    issuer_did = f"did:lemma:{pk_hex}"
+
+    class _FakeIssuer:
+        def signing_key_bytes(self):
+            return seed
+
+        def get_did(self):
+            return issuer_did
+
+        def get_public_key_hex(self):
+            return pk_hex
+
+    def _signed_credential(*, site_id: str, expires_at: str | None) -> dict:
+        claims = {
+            "assurance": "ishuman",
+            "isHuman": True,
+            "siteId": site_id,
+            "issuedAt": "1700000000",
+            "packageType": "identity",
+            "verificationMethod": "stripe_identity",
+        }
+        if expires_at is not None:
+            claims["expiresAt"] = expires_at
+        unsigned = {
+            "id": "ishuman_site_strictness",
+            "issuer": issuer_did,
+            "subject": "did:lemma:ppid_strict",
+            "claims": claims,
+        }
+        return {
+            **unsigned,
+            "credentialSubject": dict(claims),
+            "issuerInfo": {"did": issuer_did, "publicKey": pk_hex},
+            "proof": {
+                "type": "Ed25519Signature2020",
+                "verificationMethod": issuer_did,
+                "signatureValueWeb": _sign_with_issuer_for_browser(unsigned, _FakeIssuer()),
+            },
+        }
+
+    monkeypatch.setattr(
+        "api.trusted_issuers.is_trusted_issuer",
+        lambda did: did == issuer_did,
+        raising=False,
+    )
+    import sys
+    import types
+
+    monkeypatch.setitem(
+        sys.modules,
+        "api.revocation_verifier",
+        types.SimpleNamespace(
+            is_credential_revoked=lambda _cid: False,
+            check_credential_revocation=lambda _cred: "ok",
+        ),
+    )
+
+    ok_cred = _signed_credential(site_id="tickets-demo.lemma.id", expires_at=str(2_000_000_000))
+    ok, status = verify_presentation_payload(
+        {"site_id": "tickets-demo.lemma.id", "credential": ok_cred}
+    )
+    assert status == 200 and ok["success"] is True
+
+    missing_site, status = verify_presentation_payload({"credential": ok_cred})
+    assert status == 400 and missing_site["error"] == "site_id_required"
+
+    mismatch_cred = _signed_credential(site_id="good.example.com", expires_at=str(2_000_000_000))
+    mismatch, status = verify_presentation_payload(
+        {"site_id": "other.example.com", "credential": mismatch_cred}
+    )
+    assert status == 400 and mismatch["error"] == "site_id_mismatch"
+
+    unbound_claims = dict(ok_cred["claims"])
+    del unbound_claims["siteId"]
+    unbound = json.loads(json.dumps(ok_cred))
+    unbound["claims"] = unbound_claims
+    unbound["credentialSubject"] = dict(unbound_claims)
+    unbound["proof"]["signatureValueWeb"] = _sign_with_issuer_for_browser(
+        {
+            "id": unbound["id"],
+            "issuer": issuer_did,
+            "subject": unbound["subject"],
+            "claims": unbound_claims,
+        },
+        _FakeIssuer(),
+    )
+    unbound_result, status = verify_presentation_payload(
+        {"site_id": "tickets-demo.lemma.id", "credential": unbound}
+    )
+    assert status == 400 and unbound_result["error"] == "credential_site_binding_missing"
+
+    no_expiry = _signed_credential(site_id="tickets-demo.lemma.id", expires_at=None)
+    missing_exp, status = verify_presentation_payload(
+        {"site_id": "tickets-demo.lemma.id", "credential": no_expiry}
+    )
+    assert status == 400 and missing_exp["error"] == "credential_expires_at_missing"
+
+    zero_expiry = _signed_credential(site_id="tickets-demo.lemma.id", expires_at="0")
+    zero_exp, status = verify_presentation_payload(
+        {"site_id": "tickets-demo.lemma.id", "credential": zero_expiry}
+    )
+    assert status == 400 and zero_exp["error"] == "credential_expires_at_missing"
+
+    bad_expiry = _signed_credential(site_id="tickets-demo.lemma.id", expires_at="not-a-unix")
+    malformed, status = verify_presentation_payload(
+        {"site_id": "tickets-demo.lemma.id", "credential": bad_expiry}
+    )
+    assert status == 400 and malformed["error"] == "expiresAt_malformed"
+
+    expired = _signed_credential(site_id="tickets-demo.lemma.id", expires_at="100")
+    expired_result, status = verify_presentation_payload(
+        {"site_id": "tickets-demo.lemma.id", "credential": expired}
+    )
+    assert status == 400 and expired_result["error"] == "expired"
