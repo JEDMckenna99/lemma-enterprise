@@ -31,8 +31,8 @@ def verifier_mod():
 def test_resolve_trust_bundle_urls_defaults_include_mirror(verifier_mod):
     urls = verifier_mod.resolve_trust_bundle_urls("https://lemma.id", None)
     assert urls[0] == "https://lemma.id/api/revocation/bloom-filter"
-    assert "github.io" in urls[1]
-    assert urls[1].endswith("bloom-filter.json")
+    assert "lemma-signing" in urls[1]
+    assert urls[1].endswith("/api/revocation/bloom-filter")
 
 
 @pytest.mark.unit
