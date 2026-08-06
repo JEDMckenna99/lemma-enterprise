@@ -77,7 +77,7 @@ any rotation that adds a new version.
 
 | Date | Operator | Versions backed up | Restore drill result | Notes |
 |------|----------|--------------------|----------------------|-------|
-| _(fill after first drill)_ | | V1 | | |
+| 2026-08-06 | platform operator (solo) | V1 (`LEMMA_IDENTITY_ROOT_PEPPER_V1`, `LEMMA_PERSON_ROOT_SALT_V1`) | `RESTORE_DRILL_OK` via `scripts/identity_root_backup_drill.py --verify` against Heroku `lemma-enterprise` config | Solo-operator custody acknowledged. Sample site PPID for drill claims/`app.example.com`: `did:lemma:ppid_0ca180c69709ba33dc4b056ee52487d89dc1c0a962b4ed1b968556b8b46edb0d`. Offline encrypted dual-place archive still recommended as a follow-up. |
 
 ---
 
