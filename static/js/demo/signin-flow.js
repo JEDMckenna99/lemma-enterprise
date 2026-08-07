@@ -119,7 +119,8 @@
       return new Promise(function (resolve) {
         setTimeout(function () {
           sessionStorage.setItem('sf-mock-created', '1');
-          resolve({ ok: true });
+          sessionStorage.setItem('sf-mock-session', '1');
+          resolve({ ok: true, signedIn: true, timeMs: 900 });
         }, 900);
       });
     },
@@ -199,12 +200,31 @@
         })
         .catch(function () { return false; });
     },
+    postSession: function (presentation, t0) {
+      return fetch('/api/auth/session', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: jsonHeaders(),
+        body: JSON.stringify({ presentation: presentation }),
+      }).then(function (resp) {
+        return resp.json().catch(function () { return {}; }).then(function (data) {
+          if (!resp.ok || !data.success) {
+            return { ok: false, reason: data.error || 'not_verified' };
+          }
+          var t1 = (window.performance && performance.now()) || Date.now();
+          return { ok: true, signedIn: true, timeMs: Math.round(t1 - (t0 || t1)) };
+        });
+      });
+    },
     create: function () {
-      // The /verify ceremony creates the lemma.id (passkey) when none exists
-      // and issues this site's proof — the same popup relying sites trigger.
+      // One ceremony: create lemma.id (if needed), issue this site's proof,
+      // then mint the platform session so the user lands signed in.
+      var t0 = (window.performance && performance.now()) || Date.now();
       return verifyWithSdk().then(function (result) {
-        if (result && result.ok) return { ok: true };
-        return { ok: false, reason: (result && result.reason) || 'unknown' };
+        if (!result || !result.ok || !result.presentation) {
+          return { ok: false, reason: (result && result.reason) || 'unknown' };
+        }
+        return realDriver.postSession(result.presentation, t0);
       });
     },
     signIn: function () {
@@ -213,20 +233,7 @@
         if (!result || !result.ok || !result.presentation) {
           return { ok: false, reason: (result && result.reason) || 'not_verified' };
         }
-        return fetch('/api/auth/session', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: jsonHeaders(),
-          body: JSON.stringify({ presentation: result.presentation }),
-        }).then(function (resp) {
-          return resp.json().catch(function () { return {}; }).then(function (data) {
-            if (!resp.ok || !data.success) {
-              return { ok: false, reason: data.error || 'not_verified' };
-            }
-            var t1 = (window.performance && performance.now()) || Date.now();
-            return { ok: true, timeMs: Math.round(t1 - t0) };
-          });
-        });
+        return realDriver.postSession(result.presentation, t0);
       });
     },
     signOut: function () {
@@ -259,12 +266,18 @@
       setStatus('sf-create-status', 'Follow your device prompt\u2026');
       driver.create().then(function (result) {
         setBusy(createBtn, false);
+        if (result && result.ok && result.signedIn) {
+          setStatus('sf-create-status', '');
+          driver.openManager();
+          return;
+        }
         if (result && result.ok) {
+          // Local credential exists but session mint failed — offer explicit sign-in.
           setStatus('sf-create-status', '');
           show('signin');
-        } else {
-          setStatus('sf-create-status', plain(result && result.reason), true);
+          return;
         }
+        setStatus('sf-create-status', plain(result && result.reason), true);
       }).catch(function () {
         setBusy(createBtn, false);
         setStatus('sf-create-status', plain('unknown'), true);

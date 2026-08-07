@@ -108,6 +108,10 @@ def test_signin_flow_js_uses_sdk_and_session_endpoint():
     assert "requiredAssurance: 'passkey'" in js
     assert "'/api/auth/session'" in js
     assert "X-Lemma-CSRF" in js
+    # Create continues into session mint so the user lands signed in.
+    assert "postSession" in js
+    assert "signedIn" in js
+    assert "openManager()" in js
     # The signed presentation is sent; a bare ppid never is.
-    assert "presentation: result.presentation" in js
+    assert "presentation: presentation" in js
     assert "JSON.stringify({ ppid" not in js
