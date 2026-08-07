@@ -494,8 +494,8 @@
                     ? copy.intro.freshPasskey(requestingSite, actionName || 'continue')
                     : '';
                 applyConsumerShell({
-                    eyebrow: 'Fresh human proof required',
-                    headline: copy.headlineFreshPasskey || 'Confirm presence',
+                    eyebrow: 'Confirm with your passkey',
+                    headline: copy.headlineFreshPasskey || 'Confirm this action',
                     documentTitle: copy.documentTitleFreshPasskey,
                     intro,
                     hideSteps: true,
@@ -507,7 +507,7 @@
                 ? copy.intro.actionSign(requestingSite, actionName || 'this action', requiredAssurance)
                 : '';
             applyConsumerShell({
-                eyebrow: 'Action proof required',
+                eyebrow: 'Confirm with your passkey',
                 headline: copy.headlineAction || 'Confirm this action',
                 documentTitle: copy.documentTitleAction,
                 intro,
@@ -809,18 +809,18 @@
                             ? copy.intro.freshPasskey(requestingSite, actionName || 'continue')
                             : '';
                         applyConsumerShell({
-                            eyebrow: 'Fresh human proof required',
-                            headline: copy.headlineFreshPasskey || 'Confirm presence',
+                            eyebrow: 'Confirm with your passkey',
+                            headline: copy.headlineFreshPasskey || 'Confirm this action',
                             documentTitle: copy.documentTitleFreshPasskey,
                             intro,
                             hideSteps: true,
                             hidePrivacy: true,
                         });
                     },
-                    ready: copy.status?.freshPasskeyReady || 'Use your passkey to confirm your presence.',
-                    working: copy.status?.freshPasskeyWorking || 'Confirming your presence\u2026',
-                    success: copy.status?.freshPasskeySuccess || 'Presence confirmed.',
-                    primary: copy.primary?.confirmPresence || 'Confirm presence',
+                    ready: copy.status?.freshPasskeyReady || 'Use Face ID, Touch ID, Windows Hello, or your passkey.',
+                    working: copy.status?.freshPasskeyWorking || 'Confirming with your passkey\u2026',
+                    success: copy.status?.freshPasskeySuccess || 'Confirmed.',
+                    primary: copy.primary?.confirmPresence || 'Confirm with passkey',
                 },
                 blocked: {
                     shell: applyBlockedShell,
@@ -829,8 +829,8 @@
                 },
                 action: {
                     shell: applyActionSignShell,
-                    ready: copy.status?.actionReady || 'Review the request, then confirm with your passkey.',
-                    working: copy.status?.actionSigning || 'Signing this action\u2026',
+                    ready: copy.status?.actionReady || 'Confirm this action with your passkey.',
+                    working: copy.status?.actionSigning || 'Confirming with your passkey\u2026',
                     success: copy.status?.actionSuccess || 'Action confirmed.',
                     primary: copy.primary?.confirmPasskey || 'Confirm with passkey',
                 },
@@ -2371,10 +2371,10 @@
             btn.textContent = requireFreshPasskey
                 ? (
                     isFreshHumanPasskey
-                        ? (consumerCopy().primary?.confirmPresence || 'Confirm presence')
+                        ? (consumerCopy().primary?.confirmPresence || 'Confirm with passkey')
                         : (consumerCopy().primary?.confirmPasskey || 'Confirm with passkey')
                 )
-                : (consumerCopy().primary?.signAction || 'Sign action');
+                : (consumerCopy().primary?.signAction || 'Confirm with passkey');
             btn.disabled = false;
             btn.classList.remove('hidden');
             setStatus(

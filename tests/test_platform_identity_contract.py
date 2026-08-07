@@ -111,9 +111,10 @@ def test_idv_fresh_passkey_confirms_holder_presence():
 
     assert "requireFreshPasskey && requiredAssurance === 'ishuman'" in idv
     assert "headlineFreshPasskey" in idv
-    assert "headlineFreshPasskey: 'Confirm presence'" in copy
-    assert "confirmPresence: 'Confirm presence'" in copy
-    assert "freshPasskeySuccess: 'Presence confirmed.'" in copy
+    assert "headlineFreshPasskey: 'Confirm this action'" in copy
+    assert "confirmPresence: 'Confirm with passkey'" in copy
+    assert "freshPasskeySuccess: 'Confirmed.'" in copy
+    assert "actionSign(site, action)" in copy
     assert "Prove I'm human" not in copy
     assert "\\u2014" not in copy
     assert "—" not in copy

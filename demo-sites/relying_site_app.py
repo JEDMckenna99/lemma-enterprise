@@ -522,10 +522,10 @@ def _presale_content():
     return {
         "eyebrow": "Unique presale code distributor",
         "headline": "Passkey proves who you are",
-        "subhead": "Join the drop with a passkey register — no email or password. Unlock your one-time code with verified human proof at claim time. Contact info is optional delivery after you claim. No SMS OTP.",
+        "subhead": "Join the drop with a passkey register — no email or password. Reveal your one-time code with verified-human confirmation and a fresh passkey. Contact info is optional delivery after you claim. No SMS OTP.",
         "register": "Step 1, Passkey register for drop",
-        "claim": "Step 2, Verified human unlocks unique code",
-        "retry": "Try again with same lemma.id",
+        "claim": "Confirm and reveal code",
+        "retry": "Request another code",
         "flag": "Simulate site risk flag",
         "clear_flag": "Clear risk flag",
         "success_register": "Registered for presale",
@@ -2034,7 +2034,7 @@ def _welcome_content():
         "headline": "Tickets for fans, not bots.",
         "subhead": "Sign in to browse member presales and unlock one verified-fan code for the Midnight Atlas tour.",
         "register": "Join the Midnight Atlas presale",
-        "claim": "Verify I’m human and reveal my code",
+        "claim": "Confirm and reveal code",
         "retry": "Request another code",
     })
     return base
@@ -2063,7 +2063,7 @@ def _presale_index(welcome_mode=False):
           <summary>Fan-visible flow</summary>
           <ol class="how">
             <li>Passkey register binds a site-private ID (Step 1).</li>
-            <li>Verified human proof at claim (Step 2).</li>
+            <li>Claim confirms with verified human + fresh passkey (Step 2).</li>
             <li>One code per person per drop.</li>
           </ol>
         </details>
@@ -2087,7 +2087,7 @@ def _presale_index(welcome_mode=False):
           </thead>
           <tbody>
             <tr><td>Identity</td><td>Phone or email uniqueness</td><td>Site-scoped ID from passkey</td></tr>
-            <tr><td>Claim presence</td><td>SMS OTP or none</td><td>Verified human proof at unlock</td></tr>
+            <tr><td>Claim confirmation</td><td>SMS OTP or none</td><td>Verified human + fresh passkey</td></tr>
             <tr><td>Contact data</td><td>Auth + CRM</td><td>Site-local delivery only</td></tr>
           </tbody>
         </table>
@@ -2483,11 +2483,48 @@ def _presale_index(welcome_mode=False):
     .event-meta span {{ padding: 6px 9px; border-radius: 999px; background: #f8fafc; border: 1px solid var(--line); color: #475569; font-size: 12px; }}
     .human-gate-copy {{ margin: 18px 0 10px; padding: 14px; border-radius: 12px; background: #fffbeb; border: 1px solid #fde68a; }}
     .human-gate-copy strong {{ display: block; margin-bottom: 4px; }}
+    .code-locked {{
+      margin-top: 18px;
+      padding: 16px;
+      border-radius: 14px;
+      border: 1px dashed #f59e0b;
+      background: #fffbeb;
+    }}
+    .code-locked strong {{ display: block; margin-bottom: 6px; color: #92400e; }}
+    .code-locked .muted {{ font-size: 13px; }}
+    .code-display.is-locked {{
+      margin-top: 12px;
+      letter-spacing: 6px;
+      color: #92400e;
+      background: #fff7ed;
+      border-color: #fde68a;
+    }}
+    .confirm-chips {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 14px 0 4px;
+    }}
+    .confirm-chip {{
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid #86efac;
+      background: #dcfce7;
+      color: var(--ok);
+      font-size: 12px;
+      font-weight: 800;
+    }}
     .developer-tools {{ margin-top: 22px; border: 1px solid var(--line); border-radius: 12px; padding: 0 16px 16px; background: #fff; }}
     .developer-tools > summary {{ padding: 15px 0; list-style: none; display: flex; justify-content: space-between; }}
     .developer-tools > summary::after {{ content: "＋"; color: var(--muted); }}
     .developer-tools[open] > summary::after {{ content: "−"; }}
     body.welcome-mode .verdict {{ display: none; }}
+    body.welcome-mode .steps,
+    body.welcome-mode .drop-meta {{
+      display: none;
+    }}
     .welcome-progress {{
       display: flex;
       flex-wrap: wrap;
@@ -2548,12 +2585,12 @@ def _presale_index(welcome_mode=False):
       <strong>Guided presale demo</strong>
       <ol class="tour-checklist" id="tour-checklist">
         <li data-tour-step="register" id="tour-step-register">Register with passkey, phone is delivery only</li>
-        <li data-tour-step="claim" id="tour-step-claim">Unlock code — verified human proof at claim time</li>
+        <li data-tour-step="claim" id="tour-step-claim">Confirm and reveal code — verified human + fresh passkey</li>
         <li data-tour-step="retry" id="tour-step-retry">Retry with the same lemma.id, denied, one code per fan</li>
         <li data-tour-step="flag" id="tour-step-flag">Simulate risk flag, IDV penalty, then code at isHuman</li>
         <li data-tour-step="attack" id="tour-step-attack">Attack lab, replay stamp or skip Step 1</li>
       </ol>
-      <p class="tour-impact" id="tour-impact">Sign in with a passkey first. Register for the drop, then unlock your code with verified human proof.</p>
+      <p class="tour-impact" id="tour-impact">Sign in with a passkey first. Join the drop, then confirm and reveal your code with verified-human + fresh passkey proof.</p>
     </div>
     <div class="{layout_class}">
       <section class="card">
@@ -2583,7 +2620,7 @@ def _presale_index(welcome_mode=False):
             <h2 style="margin:0;font-size:28px;">Brooklyn · October 18</h2>
             <div class="event-meta"><span>8:00 PM</span><span>Harbor Arena</span><span>From $48</span></div>
             <p class="muted">Join the member list with your passkey. Revealing a code is limited to one verified human per account.</p>
-            <div class="human-gate-copy"><strong>Verified-fan access</strong><span class="muted">Human assurance is requested only when you reveal the presale code.</span></div>
+            <div class="human-gate-copy"><strong>Verified-fan code requires confirmation</strong><span class="muted">Confirm with verified-human assurance and a fresh passkey to reveal your one-time code.</span></div>
         </div>
         </div>
         <div class="defense-strip" id="defense-strip">
@@ -2595,10 +2632,15 @@ def _presale_index(welcome_mode=False):
         </div>
         <div class="steps">
           <div class="step active" id="step-register">1 · Passkey register</div>
-          <div class="step" id="step-claim">2 · Verified human claim</div>
+          <div class="step" id="step-claim">2 · Confirm &amp; reveal</div>
         </div>
-        <p class="muted" style="margin-top:12px;font-size:13px;">Drop: <code id="drop-id">{PRESALE_DROP_ID}</code></p>
+        <p class="muted drop-meta" style="margin-top:12px;font-size:13px;">Drop: <code id="drop-id">{PRESALE_DROP_ID}</code></p>
         <button id="register-btn" disabled>{copy["register"]}</button>
+        <div class="code-locked" id="code-locked" hidden>
+          <strong>Verified-fan code requires confirmation</strong>
+          <p class="muted">One code per person. Confirm with a verified-human passkey to reveal yours.</p>
+          <div class="code-display is-locked" aria-hidden="true">••••••••</div>
+        </div>
         <button type="button" class="btn-secondary site-cta" id="claim-btn" disabled>{copy["claim"]}</button>
         <button type="button" class="btn-secondary" id="retry-btn" disabled>{copy["retry"]}</button>
         <button type="button" class="btn-secondary btn-ghost" id="flag-btn">{copy["flag"]}</button>
@@ -2612,6 +2654,10 @@ def _presale_index(welcome_mode=False):
             <button type="button" class="btn-secondary btn-ghost" id="skip-step-btn">Skip Step 1 (claim without register)</button>
           </div>
         </details>
+        <div class="confirm-chips" id="confirm-chips" hidden>
+          <span class="confirm-chip">One-person limit verified</span>
+          <span class="confirm-chip">Passkey confirmed just now</span>
+        </div>
         <div class="code-display" id="code-display" hidden>--------</div>
         <div id="delivery-panel" hidden style="margin-top:18px;padding-top:18px;border-top:1px solid var(--line);">
           <p class="eyebrow" style="margin-bottom:6px;">Optional delivery</p>
@@ -2627,7 +2673,7 @@ def _presale_index(welcome_mode=False):
         </div>
         <div class="verdict" id="decision-card">
           <strong>Protected presale flow</strong>
-          <p class="tiny">Step 1: passkey register binds your site-private ID. Step 2: verified human proof unlocks your unique code — one account per person. Contact info is optional delivery after you claim.</p>
+          <p class="tiny">Step 1: passkey register binds your site-private ID. Step 2: confirm and reveal with verified-human assurance plus a fresh passkey — one code per person. Contact info is optional delivery after you claim.</p>
         </div>
       </section>
       {aside_block}
@@ -2650,7 +2696,7 @@ def _presale_index(welcome_mode=False):
     const WELCOME_SEQUENCE = ['contrast', 'signin', 'claim', 'deny', 'return'];
     const TOUR_IMPACTS = {{
       register: 'Passkey binds a site-private ID — no email or password required.',
-      claim: 'Verified human proof at unlock — one account per person, bots cannot replay cached sessions for codes.',
+      claim: 'Confirm and reveal: verified human + fresh passkey — one account per person, bots cannot replay cached sessions for codes.',
       retry: 'Ledger enforces one code per verified person. Same lemma.id cannot farm multiple codes.',
       flag: 'Site doubt escalates to fresh IDV, policy-driven penalty before code issuance.',
       attack: 'Attack lab shows replay and skip-step denies that bots hit in production.',
@@ -2971,9 +3017,27 @@ def _presale_index(welcome_mode=False):
       if (stepClaim) stepClaim.className = 'step ' + (registered ? 'active' : '');
       const claimBtn = document.getElementById('claim-btn');
       const retryBtn = document.getElementById('retry-btn');
+      const codeLocked = document.getElementById('code-locked');
+      const confirmChips = document.getElementById('confirm-chips');
       if (claimBtn) claimBtn.disabled = !registered;
       if (retryBtn) retryBtn.disabled = !registered;
+      if (codeLocked) {{
+        const codeShown = codeDisplay && !codeDisplay.hidden;
+        codeLocked.hidden = !registered || !!codeShown;
+      }}
+      if (confirmChips && !registered) confirmChips.hidden = true;
       savePresaleSession({{ registered: presaleRegistered, ppid: lastPpid || null }});
+    }}
+
+    function showClaimSuccess(code) {{
+      const codeLocked = document.getElementById('code-locked');
+      const confirmChips = document.getElementById('confirm-chips');
+      if (codeLocked) codeLocked.hidden = true;
+      if (confirmChips) confirmChips.hidden = false;
+      if (codeDisplay) {{
+        codeDisplay.hidden = false;
+        codeDisplay.textContent = code;
+      }}
     }}
 
     const restoredSession = loadPresaleSession();
@@ -3210,9 +3274,9 @@ def _presale_index(welcome_mode=False):
           pill.textContent = 'REGISTERED';
           pill.className = 'pill ok';
           assurancePill.textContent = 'register: passkey';
-          decisionCopy.textContent = 'Joined drop ' + (serverEntry.drop_id || DROP_ID) + '. Use Step 2 for verified human code unlock.';
+          decisionCopy.textContent = 'Joined drop ' + (serverEntry.drop_id || DROP_ID) + '. Confirm and reveal your code next.';
           decisionCard.innerHTML = '<strong>{copy["success_register"]}</strong><p class="tiny">PPID '
-            + (serverEntry.ppid || '').slice(0, 24) + '… registered. Step 2 requires verified human proof to issue your unique code.</p>';
+            + (serverEntry.ppid || '').slice(0, 24) + '… registered. Next: confirm with verified-human assurance and a fresh passkey to reveal your unique code.</p>';
           advanceTour('register');
         }} else {{
           pill.textContent = 'DENY';
@@ -3253,8 +3317,8 @@ def _presale_index(welcome_mode=False):
         setTourHighlight(isRetry ? 'retry' : 'claim');
         const idvNote = claimAssurance === ESCALATED_ASSURANCE
           ? 'Fresh IDV-backed proof required after site risk flag.'
-          : 'Verified human proof required at unlock — one account per person. Server verifies fresh_passkey_attestation bound to this action.';
-        decisionCard.innerHTML = '<strong>Step 2, Verified human unlock</strong><p class="tiny">' + idvNote + '</p>';
+          : 'Confirm with verified-human assurance and a fresh passkey — one account per person. Server verifies fresh_passkey_attestation bound to this action.';
+        decisionCard.innerHTML = '<strong>Confirm and reveal code</strong><p class="tiny">' + idvNote + '</p>';
       try {{
         const verifier = makeVerifier(claimAssurance);
         const payload = stampBody(contactPayload());
@@ -3338,12 +3402,9 @@ def _presale_index(welcome_mode=False):
           savePresaleSession({{ pendingAction: null }});
           pill.textContent = 'CODE ISSUED';
           pill.className = 'pill ok';
-          if (codeDisplay) {{
-            codeDisplay.hidden = false;
-            codeDisplay.textContent = serverEntry.code;
-          }}
+          showClaimSuccess(serverEntry.code);
           decisionCopy.textContent = 'Code ' + serverEntry.code + ' bound to PPID ' + (serverEntry.ppid || '').slice(0, 24) + '…';
-          decisionCard.innerHTML = '<strong>{copy["success"]}</strong><p class="tiny">One code per person for this drop. This site never saw your ID documents.</p>';
+          decisionCard.innerHTML = '<strong>{copy["success"]}</strong><p class="tiny">One-person limit verified. Passkey confirmed just now. This site never saw your ID documents.</p>';
           showDeliveryPanel();
           if (WELCOME_MODE) {{
             setWelcomeStep('deny');
@@ -3357,8 +3418,7 @@ def _presale_index(welcome_mode=False):
           decisionCopy.textContent = formatDenyReason(reason);
           decisionCard.innerHTML = '<strong>Claim denied</strong><p class="tiny">' + formatDenyReason(reason) + '</p>';
           if (codeDisplay && serverEntry.existing_code) {{
-            codeDisplay.hidden = false;
-            codeDisplay.textContent = serverEntry.existing_code;
+            showClaimSuccess(serverEntry.existing_code);
           }}
           if (isRetry && reason === 'allocation_already_claimed') {{
             if (WELCOME_MODE) {{
@@ -3520,10 +3580,7 @@ def _presale_index(welcome_mode=False):
             savePresaleSession({{ pendingAction: null, pendingChallenge: null }});
             pill.textContent = 'CODE ISSUED';
             pill.className = 'pill ok';
-            if (codeDisplay) {{
-              codeDisplay.hidden = false;
-              codeDisplay.textContent = serverEntry.code;
-            }}
+            showClaimSuccess(serverEntry.code);
             decisionCopy.textContent = 'Code ' + serverEntry.code + ' issued after redirect return.';
             setStepState(true);
             return;

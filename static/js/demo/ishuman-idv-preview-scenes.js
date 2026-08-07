@@ -14,12 +14,14 @@
     headlinePasskeySetup: 'Create your lemma.id',
     headlineUnlock: 'Unlock your lemma.id',
     headlineSiteContinuity: 'Sign in to continue',
-    headlineFreshPasskey: 'Confirm presence',
+    headlineFreshPasskey: 'Confirm this action',
+    headlineAction: 'Confirm this action',
     headlineBlocked: 'Access banned',
     documentTitlePasskeySetup: 'Create your lemma.id | Lemma.id',
     documentTitleUnlock: 'Unlock | Lemma.id',
     documentTitleSiteContinuity: 'Sign in to continue | Lemma.id',
-    documentTitleFreshPasskey: 'Confirm presence | Lemma.id',
+    documentTitleFreshPasskey: 'Confirm this action | Lemma.id',
+    documentTitleAction: 'Confirm this action | Lemma.id',
     documentTitleBlocked: 'Access banned | Lemma.id',
     privacy:
       'Your documents stay private and are deleted after verification. This site receives only your human proof.',
@@ -31,7 +33,7 @@
       unlock: 'Unlock my lemma.id',
       claim: 'Claim my lemma.id',
       verifyIdentity: 'Verify identity',
-      confirmPresence: 'Confirm presence',
+      confirmPresence: 'Confirm with passkey',
       tryAgain: 'Try again',
       unlockFinish: 'Unlock & finish',
       closeTab: 'Close',
@@ -66,7 +68,12 @@
       freshPasskey(site, action) {
         const s = formatSiteLabel(site);
         const requestedAction = String(action || 'continue').trim();
-        return `${s} requires fresh holder presence before you ${requestedAction}. Confirm with your passkey.`;
+        return `${s} needs a verified-human confirmation before you ${requestedAction}. Confirm with your passkey.`;
+      },
+      actionSign(site, action) {
+        const s = formatSiteLabel(site);
+        const requestedAction = String(action || 'this action').trim();
+        return `${s} needs you to confirm ${requestedAction} with your passkey.`;
       },
       blocked(site) {
         const s = formatSiteLabel(site);
@@ -89,9 +96,10 @@
       freshStarting: 'Starting a fresh verification\u2026',
       freshRetry: 'That didn\u2019t finish. Let\u2019s try again.',
       freshSuccess: 'You\u2019re a human',
-      freshPasskeyReady: 'Use Face ID, Touch ID, Windows Hello, or your passkey to confirm your presence.',
-      freshPasskeyWorking: 'Confirming your presence\u2026',
-      freshPasskeySuccess: 'Presence confirmed.',
+      freshPasskeyReady: 'Use Face ID, Touch ID, Windows Hello, or your passkey.',
+      freshPasskeyWorking: 'Confirming with your passkey\u2026',
+      freshPasskeySuccess: 'Confirmed.',
+      actionSigning: 'Confirming with your passkey\u2026',
       blocked: 'This PPID is banned on this site.',
       stored: 'You\u2019re all set.',
       alreadyVerified: 'You\u2019re already verified.',

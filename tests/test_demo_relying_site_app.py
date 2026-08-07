@@ -396,7 +396,7 @@ def test_relying_site_index_exposes_server_receipt_and_hub_return(relying_site_c
     assert "/api/demo/policy/check" in body
     assert "registration_required" in body
     assert "doubt_required" in body
-    assert "Try again with same lemma.id" in body
+    assert "Request another code" in body
     assert "/api/presale/claim-code" in body
 
 
@@ -542,7 +542,13 @@ def test_welcome_index_renders_real_ticket_site_and_collapsed_dev_tools(relying_
     assert "Sign in to Encore" in body
     assert "Midnight Atlas" in body
     assert "Member presales" in body
-    assert "Verified-fan access" in body
+    assert "Verified-fan code requires confirmation" in body
+    assert "Confirm and reveal code" in body
+    assert "One-person limit verified" in body
+    assert "Passkey confirmed just now" in body
+    assert 'id="code-locked"' in body
+    assert 'id="confirm-chips"' in body
+    assert "requireFreshPasskey: true" in body
     assert '<details class="developer-tools">' in body
     assert "What signing up usually feels like" not in body
     assert "document.body.classList.toggle('signed-in'" in body
