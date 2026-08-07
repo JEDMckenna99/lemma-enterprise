@@ -77,8 +77,13 @@ def test_brand_and_manager_creation_use_canonical_routes():
     assert "globalLemmaWallet" in manager
     assert "deferUnlockedProofCheck" in manager
     assert "Identity check not anchored yet" in manager
+    assert 'id="anchor-identity-card"' in manager
     assert 'id="anchor-wallet-btn"' in manager
     assert "Anchor this lemma.id" in manager
+    assert "Anchor with your identity" in manager
+    assert "No ID documents, selfies, or legal name are stored after verification." in manager
+    assert "Sites only see a proof that you're human" in manager
+    assert "updateAnchorIdentityCard" in manager
     assert "anchorWalletIdentity" in manager
     assert "showIncompleteLemmaIdState();\n            return;" not in manager
     assert 'rel="preload"' in manager and "lemma-wallet.js" in manager

@@ -11,7 +11,7 @@
 {% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=13">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=14">
 <link rel="stylesheet" href="/static/css/demo/signin-flow.css?v=4">
 <style nonce="{{ csp_nonce }}">
 /* Manager logos stay jewel violet; never green when unlocked */
@@ -91,6 +91,27 @@
             <div id="proofs-summary" class="proofs-summary">
                 <p class="proofs-loading">Loading...</p>
             </div>
+        </div>
+
+        <!-- OPTIONAL IDENTITY ANCHOR (shown only when no human proof yet) -->
+        <div class="card card-elevated hidden" id="anchor-identity-card">
+            <h2>Anchor with your identity</h2>
+            <p class="card-intro">
+                Optionally link this lemma.id to a one-time identity check.
+                That adds a human proof some sites may require. You can keep using
+                lemma.id without doing this.
+            </p>
+            <button id="anchor-wallet-btn" class="btn btn-primary btn-full" type="button">
+                Anchor this lemma.id
+            </button>
+            <aside class="anchor-disclaimer" aria-label="Privacy disclaimer">
+                <p><strong>What happens:</strong> you'll complete a private identity check. When it finishes, a human proof is stored on this device with your lemma.id.</p>
+                <ul>
+                    <li>No ID documents, selfies, or legal name are stored after verification.</li>
+                    <li>Sites only see a proof that you're human — nothing that reveals who you are.</li>
+                    <li>Each site gets its own private ID; they can't compare notes about you.</li>
+                </ul>
+            </aside>
         </div>
 
         <!-- LOCK -->
@@ -939,6 +960,21 @@ function anchorWalletIdentity(event) {
     createWallet(event?.currentTarget || document.getElementById('anchor-wallet-btn'));
 }
 
+function updateAnchorIdentityCard(hasMaster) {
+    const card = document.getElementById('anchor-identity-card');
+    const btn = document.getElementById('anchor-wallet-btn');
+    if (!card) return;
+    if (hasMaster) {
+        card.classList.add('hidden');
+        return;
+    }
+    card.classList.remove('hidden');
+    if (btn && !btn.dataset.bound) {
+        btn.addEventListener('click', anchorWalletIdentity);
+        btn.dataset.bound = '1';
+    }
+}
+
 // Clear all lemma.id data from this device (Safari/iOS-safe: never abort on IDB blocked)
 async function clearWallet(event) {
     if (!confirm('Remove lemma.id from this device? This clears your lemma.id, human proof, passkey binding, and all local lemma.id data. You can verify again later from another device.')) {
@@ -1263,12 +1299,8 @@ async function loadProofSummary() {
             master ? 'Done' : 'Not yet',
             master
                 ? (masterIssued ? `Completed ${masterIssued}` : 'Stored on this device')
-                : 'Anchor this lemma.id with an identity check when you are ready'
+                : 'Optional — use Anchor with your identity below when you are ready'
         );
-        if (!master) {
-            html += '<button id="anchor-wallet-btn" class="btn btn-primary btn-full" type="button" style="margin: 12px 0 4px;">Anchor this lemma.id</button>';
-            html += '<p class="proofs-privacy-note" style="margin-top: 0;">You can keep managing this lemma.id without anchoring. Anchoring only adds the optional human proof some sites may require.</p>';
-        }
         html += renderProofRow(
             'Sites you\'ve used',
             String(siteSet.size),
@@ -1289,7 +1321,7 @@ async function loadProofSummary() {
 
         html += '<p class="proofs-privacy-note">Each site sees a different private ID. We never show those IDs here; that\'s how your activity stays separate.</p>';
         container.innerHTML = html;
-        document.getElementById('anchor-wallet-btn')?.addEventListener('click', anchorWalletIdentity);
+        updateAnchorIdentityCard(!!master);
     } catch (e) {
         console.warn('[Proofs] summary failed:', e.message);
         container.innerHTML = '<p class="proofs-error">Could not load your saved info.</p>';

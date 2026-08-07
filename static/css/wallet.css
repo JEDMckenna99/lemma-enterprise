@@ -311,6 +311,38 @@ a.wallet-container .btn,
     padding-top: 14px;
     border-top: 1px solid #f1f5f9;
 }
+
+/* Optional identity-anchor section */
+#anchor-identity-card .card-intro {
+    margin-bottom: 14px;
+}
+.anchor-disclaimer {
+    margin-top: 16px;
+    padding: 14px 14px 12px;
+    border-radius: 14px;
+    background: var(--wallet-brand-soft);
+    border: 1px solid #E4E0F0;
+    color: var(--wallet-muted);
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+.anchor-disclaimer p {
+    margin: 0 0 8px;
+    color: var(--wallet-ink);
+}
+.anchor-disclaimer p strong {
+    font-weight: 700;
+}
+.anchor-disclaimer ul {
+    margin: 0;
+    padding-left: 1.15rem;
+}
+.anchor-disclaimer li {
+    margin: 0 0 4px;
+}
+.anchor-disclaimer li:last-child {
+    margin-bottom: 0;
+}
 .proof-row {
     padding: 14px 0;
     border-bottom: 1px solid #f1f5f9;
