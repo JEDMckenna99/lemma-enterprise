@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v5
         with:
@@ -34,7 +34,7 @@ jobs:
       LEMMA_ISHUMAN_PROD_TEST_WALLET_ID: ${{ secrets.LEMMA_ISHUMAN_PROD_TEST_WALLET_ID }}
       LEMMA_ISHUMAN_PROD_TEST_WALLET_SECRET: ${{ secrets.LEMMA_ISHUMAN_PROD_TEST_WALLET_SECRET }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v5
         with:

@@ -17,7 +17,7 @@ jobs:
       LEMMA_PLATFORM_API_KEY: ${{ secrets.LEMMA_PLATFORM_API_KEY || secrets.LEMMA_API_KEY }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Verify required secret
         run: |
