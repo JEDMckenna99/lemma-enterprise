@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lemma-proof-verifier"
-version = "1.4.0"
+version = "1.4.2"
 description = "Local-first Lemma proof verifier for relying-site backends. Verifies signed presentations, stamps, and site-bound session proofs with no per-request calls to lemma.id."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -35,7 +35,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://lemma.id/docs"
 Documentation = "https://lemma.id/docs"
-Repository = "https://github.com/JEDMckenna99/lemma-enterprise"
+Repository = "https://github.com/JEDMckenna99/lemma-proof"
 
 [tool.setuptools]
 py-modules = [

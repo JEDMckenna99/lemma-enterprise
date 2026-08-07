@@ -3,7 +3,7 @@
 Local-first verifier for [Lemma proofs](https://lemma.id).
 
 ```sh
-npm install "@lemma.id/proof-verifier@1.4.0"
+npm install "@lemma.id/proof-verifier@1.4.2"
 ```
 
 On PowerShell, keep the quotes — `@lemma.id` is parsed incorrectly otherwise.

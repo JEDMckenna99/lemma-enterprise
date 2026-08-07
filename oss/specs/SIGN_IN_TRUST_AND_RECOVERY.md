@@ -156,7 +156,9 @@ cross-site user lists.
 **What you should tell users:** their account id on your site cannot be linked
 to their account id on another site by you or by other sites. That property is
 cryptographic. Operator non-linkage is a policy commitment today, with
-architectural hardening on the roadmap.
+architectural hardening on the roadmap (see
+[ISSUER_KEY_CUSTODY.md](../security/ISSUER_KEY_CUSTODY.md) and
+[OPERATIONAL_HARDENING.md](../architecture/OPERATIONAL_HARDENING.md)).
 
 ---
 
