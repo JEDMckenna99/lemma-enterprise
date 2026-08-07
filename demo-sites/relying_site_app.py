@@ -25,15 +25,18 @@ from presale_allocation import create_presale_stores
 
 app = Flask(__name__)
 
-SITE_ID = os.getenv("LEMMA_DEMO_SITE_ID", "tickets-demo.lemma.id")
+SITE_ID = os.getenv(
+    "LEMMA_DEMO_SITE_ID",
+    "lemma-demo-tickets-1d3d7411af33.herokuapp.com",
+)
 SITE_NAME = os.getenv("LEMMA_DEMO_SITE_NAME", "Lemma Demo Site")
 SITE_KIND = os.getenv("LEMMA_DEMO_SITE_KIND", "ticketing")
 LEMMA_ORIGIN = os.getenv("LEMMA_ORIGIN", "https://lemma.id")
 DEMO_HUB_URL = os.getenv("LEMMA_DEMO_HUB_URL", f"{LEMMA_ORIGIN}/demo")
-TRIALS_DEMO_URL = os.getenv("LEMMA_DEMO_TRIALS_URL", "https://trials-demo.lemma.id")
-# When set (e.g. tickets-demo.lemma.id), redirect the Heroku hostname to the
-# integrator-facing host so browser Origin matches siteId.
-CANONICAL_HOST = os.getenv("LEMMA_DEMO_CANONICAL_HOST", "").strip().lower()
+TRIALS_DEMO_URL = os.getenv(
+    "LEMMA_DEMO_TRIALS_URL",
+    "https://lemma-demo-trials-7090f46cae0d.herokuapp.com",
+)
 
 _PLAIN_LANGUAGE_JS = """
 function formatDenyReason(reason) {
@@ -170,12 +173,16 @@ def _theme_css_root() -> str:
     }}"""
 
 
+def _site_display_name() -> str:
+    return "Northstar" if "trial" in SITE_KIND.lower() else "Encore"
+
+
 def _site_header(links_html: str) -> str:
     theme = _site_theme()
     return f"""  <header>
     <div class="site-brand">
       <span class="site-icon">{theme["icon_svg"]}</span>
-      <strong>{SITE_NAME}</strong>
+      <strong>{_site_display_name()}</strong>
     </div>
     {links_html}
   </header>"""
@@ -315,20 +322,6 @@ def _authorize_policy_mutation(target_ppid: str, body: dict | None = None) -> Op
 @app.before_request
 def load_demo_session():
     g.demo_session = _session_from_request()
-
-
-@app.before_request
-def redirect_to_canonical_host():
-    """Prefer the logical site hostname so Origin == siteId like a real integrator."""
-    if not CANONICAL_HOST:
-        return None
-    host = (request.host or "").split(":")[0].strip().lower()
-    if not host.endswith(".herokuapp.com") or host == CANONICAL_HOST:
-        return None
-    target = f"https://{CANONICAL_HOST}{request.full_path}"
-    if target.endswith("?"):
-        target = target[:-1]
-    return redirect(target, code=302)
 
 
 def _client_ip() -> str:
@@ -501,15 +494,15 @@ def _presale_gate_report(
 def _signin_content():
     if "trial" in SITE_KIND.lower():
         return {
-            "eyebrow": "Sign in with lemma.id",
-            "headline": "Passwordless login for your app",
-            "subhead": "Sign in with a passkey-backed lemma.id. Your backend verifies a signed presentation and stores a site-private account ID — no passwords or emails required for login.",
-            "primary": "Start free trial",
-            "trial_eyebrow": "Trial access",
-            "trial_subhead": "Starting a trial requires verified human proof — one account per person. Sign in with a passkey first, then step up when you claim access.",
-            "success": "Trial workspace created",
-            "form": "Work email (optional profile field)",
-            "placeholder": "founder@example.com",
+            "eyebrow": "Northstar workspace",
+            "headline": "Your work, moving forward.",
+            "subhead": "Plan projects, share updates, and keep your team in sync.",
+            "primary": "Activate free workspace",
+            "trial_eyebrow": "Founding team offer",
+            "trial_subhead": "Free workspaces are limited to one per person. Verify you are human to activate yours — Northstar never receives your identity documents.",
+            "success": "Workspace activated",
+            "form": "Workspace name",
+            "placeholder": "Acme Studio",
             "action": TRIAL_ACTION,
         }
     return {
@@ -1281,7 +1274,7 @@ def _generic_index():
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{SITE_NAME}</title>
+  <title>{_site_display_name()}</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <style>
     {_theme_css_root()}
@@ -1295,14 +1288,14 @@ def _generic_index():
     header {{
       background: #fff;
       border-bottom: 1px solid var(--line);
-      padding: 14px 24px;
+      padding: 14px max(24px, calc((100vw - 1120px) / 2));
       display: flex;
       justify-content: space-between;
       align-items: center;
     }}
-    header strong {{ font-size: 17px; }}
+    header strong {{ font-size: 19px; letter-spacing: -0.3px; }}
     header a {{ color: var(--muted); font-size: 13px; text-decoration: none; }}
-    main {{ max-width: 920px; margin: 0 auto; padding: 28px 18px 48px; }}
+    main {{ max-width: 1120px; margin: 0 auto; padding: 48px 22px 72px; }}
     .layout {{ display: grid; grid-template-columns: 1.1fr .9fr; gap: 18px; }}
     .card {{
       background: #fff;
@@ -1398,42 +1391,97 @@ def _generic_index():
       overflow: auto;
       font-size: 12px;
     }}
-    @media (max-width: 820px) {{ .layout {{ grid-template-columns: 1fr; }} }}
+    .auth-shell {{
+      min-height: calc(100vh - 190px);
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(340px, .85fr);
+      gap: clamp(40px, 8vw, 100px);
+      align-items: center;
+    }}
+    .auth-copy h1 {{ max-width: 680px; font-size: clamp(46px, 7vw, 72px); }}
+    .auth-copy .muted {{ max-width: 560px; font-size: 18px; }}
+    .auth-card {{ padding: 30px; }}
+    .auth-card h2 {{ margin: 0 0 8px; font-size: 24px; }}
+    .auth-note {{ margin-top: 14px; font-size: 12px; text-align: center; color: var(--muted); }}
+    .app-shell[hidden], .auth-shell[hidden] {{ display: none; }}
+    .app-topline {{ display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 28px; }}
+    .app-topline h1 {{ font-size: clamp(34px, 5vw, 48px); }}
+    .account-chip {{ padding: 8px 12px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-size: 12px; color: var(--muted); }}
+    .dashboard-grid {{ display: grid; grid-template-columns: 1.35fr .65fr; gap: 18px; }}
+    .project-list {{ display: grid; gap: 12px; margin-top: 20px; }}
+    .project-row {{ display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; }}
+    .project-row strong {{ display: block; margin-bottom: 4px; }}
+    .progress {{ width: 120px; height: 7px; overflow: hidden; background: #e2e8f0; border-radius: 999px; }}
+    .progress span {{ display: block; height: 100%; background: var(--brand); border-radius: inherit; }}
+    .offer-card {{ background: #052e16; color: #dcfce7; border: 0; }}
+    .offer-card .eyebrow {{ color: #86efac; }}
+    .offer-card .muted {{ color: #bbf7d0; }}
+    .offer-card label {{ color: #fff; }}
+    .offer-card input {{ background: rgba(255,255,255,.96); }}
+    .dev-tools {{ margin-top: 20px; border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 0 16px 16px; }}
+    .dev-tools > summary {{ padding: 15px 0; list-style: none; display: flex; justify-content: space-between; }}
+    .dev-tools > summary::after {{ content: "＋"; color: var(--muted); }}
+    .dev-tools[open] > summary::after {{ content: "−"; }}
+    .dev-tools .verdict {{ min-height: 0; }}
+    .logout-btn {{ width: auto; margin: 0; padding: 9px 13px; color: #475569; background: #fff; border: 1px solid var(--line); font-size: 12px; }}
+    @media (max-width: 820px) {{
+      .layout, .auth-shell, .dashboard-grid {{ grid-template-columns: 1fr; }}
+      .auth-shell {{ min-height: auto; gap: 28px; }}
+      main {{ padding-top: 32px; }}
+      .app-topline {{ flex-direction: column; }}
+    }}
   </style>
 </head>
 <body>
-  {_site_header(f'<a href="{DEMO_HUB_URL}?from=demo" target="_blank" rel="noopener">Return to demo hub</a>')}
+  {_site_header('<button class="logout-btn" id="logout-btn" hidden>Sign out</button>')}
   <main>
-    <div class="layout">
-      <section class="card">
+    <section class="auth-shell" id="auth-view">
+      <div class="auth-copy">
         <p class="eyebrow">{copy["eyebrow"]}</p>
         <h1>{copy["headline"]}</h1>
         <p class="muted">{copy["subhead"]}</p>
+      </div>
+      <div class="card auth-card">
+        <h2>Sign in to Northstar</h2>
+        <p class="muted">Use your passkey-backed lemma.id to continue.</p>
         {_lemma_signin_element()}
-        <p class="muted" id="session-copy" style="margin-top:12px;font-size:13px;">Sign in once with a passkey. This site keeps a session until a fresh passkey is required.</p>
-        {trial_gated_block}
-        <div class="verdict" id="decision-card">
-          <strong>What happens when you click</strong>
-          <p class="tiny">Passkey unlock + continuity proof for sign-in (<code>assurance: passkey</code>). {"Trial access requires a separate verified human step-up (<code>assurance: ishuman</code>)." if is_trial else "Protected actions reuse the site session until policy requires fresh passkey."}</p>
+        <p class="auth-note">No password or email required. Northstar receives only a private account ID.</p>
+      </div>
+    </section>
+    <section class="app-shell" id="app-view" hidden>
+      <div class="app-topline">
+        <div>
+          <p class="eyebrow">Workspace overview</p>
+          <h1>Good evening.</h1>
+          <p class="muted" id="session-copy">Loading your workspace…</p>
         </div>
-      </section>
-      <aside class="card">
-        <p class="eyebrow">Customer site view</p>
+        <span class="account-chip">Personal workspace</span>
+      </div>
+      <div class="dashboard-grid">
+        <section class="card">
+          <p class="eyebrow">Recent projects</p>
+          <h2 style="margin:0;">Everything is on track</h2>
+          <div class="project-list">
+            <div class="project-row"><div><strong>Website launch</strong><span class="muted">8 of 12 tasks complete</span></div><div class="progress"><span style="width:67%"></span></div></div>
+            <div class="project-row"><div><strong>Q3 planning</strong><span class="muted">4 of 10 tasks complete</span></div><div class="progress"><span style="width:40%"></span></div></div>
+            <div class="project-row"><div><strong>Customer research</strong><span class="muted">11 of 14 tasks complete</span></div><div class="progress"><span style="width:79%"></span></div></div>
+          </div>
+        </section>
+        <aside class="card offer-card">
+          {trial_gated_block}
+        </aside>
+      </div>
+      <details class="dev-tools">
+        <summary>Developer details</summary>
         <p class="muted">Site binding: <code id="site-id">{SITE_ID}</code></p>
         <p style="margin:12px 0 6px">Decision <span class="pill" id="status-pill">WAITING</span>
           <span class="pill" id="assurance-pill">policy: {DEMO_REQUIRED_ASSURANCE}</span></p>
-        <p class="muted" id="decision-copy">Click the protected action to run the SDK.</p>
+        <p class="muted" id="decision-copy">Sign in to inspect server verification.</p>
         <div class="server-receipt" id="server-receipt" hidden>
           <strong>Server verification receipt</strong>
           <dl id="server-receipt-fields"></dl>
         </div>
-        <ol class="how">
-          <li>Sign in with lemma.id once — passkey assurance, server sets a session cookie.</li>
-          <li>{"Start trial requires verified human proof — same PPID, higher assurance tier." if is_trial else "Protected actions reuse the site session until policy requires fresh passkey."}</li>
-          <li>Site policy may require human proof assurance → IDV step-up, same PPID.</li>
-          <li>Server verifies locally with offline revocation checks.</li>
-          <li>Business never sees passport, selfie, or cross-site ID.</li>
-        </ol>
+        <div class="verdict" id="decision-card"><strong>Server session ready</strong><p class="tiny">Passkey sign-in creates a normal HttpOnly site session. The founding-team offer requires a separate human-assurance presentation.</p></div>
         <details>
           <summary>Signed presentation JSON</summary>
           <pre id="presentation-json">{{}}</pre>
@@ -1442,9 +1490,9 @@ def _generic_index():
           <summary>Server-verified action log</summary>
           <pre id="action-log">[]</pre>
         </details>
-        <p class="hub-return">Continue the walkthrough on the <a href="{DEMO_HUB_URL}?from=demo" target="_blank" rel="noopener">lemma.id demo hub</a>, stages 3–5 cover presentations, escalation, and doubt/revocation.</p>
-      </aside>
-    </div>
+        <p class="hub-return"><a href="{DEMO_HUB_URL}?from=demo" target="_blank" rel="noopener">Open lemma.id integration guide →</a></p>
+      </details>
+    </section>
   </main>
   {_sdk_script_tags()}
   <script>
@@ -1467,6 +1515,9 @@ def _generic_index():
     const signInEl = document.getElementById('lemma-signin-btn');
     const actionBtn = document.getElementById('verify-btn');
     const trialGated = document.getElementById('trial-gated');
+    const authView = document.getElementById('auth-view');
+    const appView = document.getElementById('app-view');
+    const logoutBtn = document.getElementById('logout-btn');
     const SITE_POLICY = '{DEMO_REQUIRED_ASSURANCE}';
     const TRIAL_ASSURANCE = '{TRIAL_REQUIRED_ASSURANCE}';
     const IS_TRIAL_SITE = {'true' if is_trial else 'false'};
@@ -1505,6 +1556,13 @@ def _generic_index():
     function updateGatedVisibility(signedIn) {{
       if (!IS_TRIAL_SITE || !trialGated) return;
       trialGated.hidden = !signedIn;
+    }}
+
+    function renderSiteSession(signedIn) {{
+      if (authView) authView.hidden = signedIn;
+      if (appView) appView.hidden = !signedIn;
+      if (logoutBtn) logoutBtn.hidden = !signedIn;
+      document.body.classList.toggle('signed-in', !!signedIn);
     }}
 
     function setAssurancePill(assurance) {{
@@ -1633,6 +1691,7 @@ def _generic_index():
           if (actionBtn) actionBtn.disabled = false;
           setSignInDisabled(true);
           updateGatedVisibility(true);
+          renderSiteSession(true);
           pill.textContent = 'SIGNED IN';
           pill.className = 'pill ok';
           setAssurancePill(data.assurance || SITE_POLICY);
@@ -1644,6 +1703,7 @@ def _generic_index():
       if (actionBtn) actionBtn.disabled = true;
       setSignInDisabled(false);
       updateGatedVisibility(false);
+      renderSiteSession(false);
       return false;
     }}
 
@@ -1759,6 +1819,10 @@ def _generic_index():
       setSignInDisabled(false);
     }});
     actionBtn?.addEventListener('click', () => runProtectedAction());
+    logoutBtn?.addEventListener('click', async () => {{
+      await fetch('/api/logout', {{ method: 'POST', credentials: 'include' }});
+      window.location.reload();
+    }});
 
     if (new URLSearchParams(window.location.search).get('lemma_ishuman_return') === '1') {{
       signInEl?.signIn()?.then((result) => {{
@@ -1780,7 +1844,7 @@ def _ticketing_signin_index():
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{SITE_NAME}</title>
+  <title>{_site_display_name()}</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <style>
     {_theme_css_root()}
@@ -1966,9 +2030,12 @@ def _ticketing_signin_index():
 def _welcome_content():
     base = _presale_content()
     base.update({
-        "eyebrow": "Try Sign in with lemma.id",
-        "headline": "Sign in with a passkey — no email, no password",
-        "subhead": "Follow the steps below. Each one shows something different about signing in with lemma.id.",
+        "eyebrow": "Encore member access",
+        "headline": "Tickets for fans, not bots.",
+        "subhead": "Sign in to browse member presales and unlock one verified-fan code for the Midnight Atlas tour.",
+        "register": "Join the Midnight Atlas presale",
+        "claim": "Verify I’m human and reveal my code",
+        "retry": "Request another code",
     })
     return base
 
@@ -1979,7 +2046,7 @@ def _ticketing_welcome_index():
 
 def _presale_index(welcome_mode=False):
     copy = _welcome_content() if welcome_mode else _presale_content()
-    body_class = "welcome-mode tour-mode" if welcome_mode else ""
+    body_class = "welcome-mode" if welcome_mode else ""
     layout_class = "layout layout-welcome" if welcome_mode else "layout"
     aside_block = "" if welcome_mode else f"""
       <aside class="card">
@@ -2029,50 +2096,42 @@ def _presale_index(welcome_mode=False):
           <pre id="action-log">[]</pre>
         </details>
       </aside>"""
-    welcome_contrast = """
-    <section class="card welcome-contrast" id="welcome-contrast">
-      <p class="eyebrow">What signing up usually feels like</p>
-      <h2 style="margin:0 0 10px;font-size:22px;">Email, password, verify your inbox…</h2>
-      <p class="muted" style="font-size:14px;margin-bottom:14px;">This is a mock — it does not submit anything. Typical signup takes minutes and creates data to breach.</p>
-      <label>Email<input disabled value="you@example.com" style="opacity:0.7"></label>
-      <label>Password<input disabled type="password" value="••••••••" style="opacity:0.7"></label>
-      <button type="button" disabled style="opacity:0.5">Create account</button>
-      <button type="button" class="btn-secondary" id="welcome-contrast-next" style="margin-top:12px">Now try the lemma.id way →</button>
-    </section>""" if welcome_mode else ""
-    welcome_progress = """
-    <div class="welcome-progress" id="welcome-progress">
-      <span class="welcome-step is-active" data-welcome-step="contrast">1 · Contrast</span>
-      <span class="welcome-step" data-welcome-step="signin">2 · Sign in</span>
-      <span class="welcome-step" data-welcome-step="claim">3 · Claim code</span>
-      <span class="welcome-step" data-welcome-step="deny">4 · One per person</span>
-      <span class="welcome-step" data-welcome-step="return">5 · Come back</span>
-    </div>""" if welcome_mode else ""
+    welcome_contrast = ""
+    welcome_progress = ""
     privacy_cta = f"""
     <section class="card welcome-privacy" id="welcome-privacy" hidden>
-      <p class="eyebrow">Privacy reveal</p>
-      <h2 style="margin:0 0 8px;font-size:22px;">Now try the other site</h2>
-      <p class="muted" style="font-size:14px;">Sign in on the trials demo with the same lemma.id. Each site gets a different private ID — they cannot compare notes about you.</p>
-      <a class="presale-link" href="{TRIALS_DEMO_URL}/?from=welcome" target="_blank" rel="noopener">Open trials demo site →</a>
-      <a class="presale-link" href="{DEMO_HUB_URL}?lane=builder&from=welcome" style="margin-left:12px;">See what the backend saw →</a>
+      <p class="eyebrow">Recommended for you</p>
+      <h2 style="margin:0 0 8px;font-size:22px;">More member presales</h2>
+      <p class="muted" style="font-size:14px;">Your Encore account is active. New verified-fan drops will appear here.</p>
+      <a class="presale-link" href="{TRIALS_DEMO_URL}/?from=welcome" target="_blank" rel="noopener">Explore Northstar →</a>
+      <a class="presale-link" href="{DEMO_HUB_URL}?lane=builder&from=welcome" style="margin-left:12px;">lemma.id developer guide →</a>
     </section>""" if welcome_mode else ""
-    welcome_status = """
-        <p style="margin:12px 0 6px"><span class="pill" id="status-pill">WAITING</span>
-          <span class="pill" id="assurance-pill">Ready</span></p>
-        <p class="muted" id="decision-copy">Sign in to start.</p>""" if welcome_mode else ""
+    welcome_status = "" if welcome_mode else ""
     welcome_engineer_stubs = """
-        <div hidden aria-hidden="true">
+        <details class="developer-tools">
+          <summary>Developer details</summary>
+          <p style="margin:4px 0 6px"><span class="pill" id="status-pill">SIGNED IN</span>
+            <span class="pill" id="assurance-pill">passkey session</span></p>
+          <p class="muted" id="decision-copy">Server session active.</p>
+          <label class="dev-toggle">
+            <input type="checkbox" id="backend-gates-toggle">
+            Show verification gates
+          </label>
+          <div class="server-receipt" id="server-receipt" hidden>
+            <div id="gate-chips" class="gate-chips"></div>
+            <dl id="server-receipt-fields"></dl>
+          </div>
+          <details class="engineer-only"><summary>Cryptographic envelope</summary>
           <pre id="stamp-json">{{}}</pre>
           <pre id="fresh-attestation-json">{{}}</pre>
+          </details>
+          <details class="engineer-only"><summary>Server action log</summary>
           <pre id="action-log">[]</pre>
-          <div id="server-receipt"></div>
-          <dl id="server-receipt-fields"></dl>
-          <div id="gate-chips"></div>
+          </details>
           <p id="receipt-placeholder"></p>
-          <input type="checkbox" id="backend-gates-toggle" hidden>
-        </div>""" if welcome_mode else ""
+        </details>""" if welcome_mode else ""
     header_links = f"""
-    <a href="{DEMO_HUB_URL}?from=welcome" target="_blank" rel="noopener">Demo hub</a>
-    <a href="/?tour=presale" style="margin-left:12px;">Builder presale tour →</a>""" if welcome_mode else f"""
+    <nav class="site-nav"><a href="#events">Events</a><a href="#presale">Presales</a><button class="nav-account" id="logout-btn" hidden>Sign out</button></nav>""" if welcome_mode else f"""
     <a href="{DEMO_HUB_URL}?from=demo" target="_blank" rel="noopener">Return to demo hub</a>
     <a href="/" style="margin-left:12px;">← Sign-in demo</a>"""
     html = f"""<!doctype html>
@@ -2080,7 +2139,7 @@ def _presale_index(welcome_mode=False):
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{SITE_NAME}</title>
+  <title>{_site_display_name()}</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <style>
     {_theme_css_root()}
@@ -2094,7 +2153,7 @@ def _presale_index(welcome_mode=False):
     header {{
       background: #fff;
       border-bottom: 1px solid var(--line);
-      padding: 14px 24px;
+      padding: 14px max(24px, calc((100vw - 1120px) / 2));
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -2112,9 +2171,9 @@ def _presale_index(welcome_mode=False):
       background: var(--icon-bg);
     }}
     .site-icon svg {{ width: 28px; height: 28px; }}
-    header strong {{ font-size: 17px; }}
+    header strong {{ font-size: 19px; letter-spacing: -0.3px; }}
     header a {{ color: var(--muted); font-size: 13px; text-decoration: none; }}
-    main {{ max-width: 920px; margin: 0 auto; padding: 28px 18px 48px; }}
+    main {{ max-width: 1120px; margin: 0 auto; padding: 48px 22px 72px; }}
     .layout {{ display: grid; grid-template-columns: 1.1fr .9fr; gap: 18px; }}
     .card {{
       background: #fff;
@@ -2378,9 +2437,57 @@ def _presale_index(welcome_mode=False):
     }}
     body.welcome-mode .layout-welcome {{
       grid-template-columns: 1fr;
-      max-width: 640px;
+      max-width: 1120px;
       margin: 0 auto;
     }}
+    .site-nav {{ display: flex; align-items: center; gap: 22px; }}
+    .nav-account {{
+      width: auto;
+      margin: 0;
+      padding: 8px 12px;
+      color: #475569;
+      background: #fff;
+      border: 1px solid var(--line);
+      font-size: 12px;
+    }}
+    body.welcome-mode main {{ min-height: calc(100vh - 72px); }}
+    body.welcome-mode .layout-welcome > .card {{
+      padding: clamp(28px, 5vw, 56px);
+      background:
+        radial-gradient(circle at 92% 8%, rgba(217,119,6,.12), transparent 32%),
+        #fff;
+    }}
+    body.welcome-mode .auth-intro {{
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(320px, .8fr);
+      gap: clamp(36px, 7vw, 88px);
+      align-items: center;
+      min-height: 520px;
+    }}
+    .auth-message h1 {{ font-size: clamp(46px, 7vw, 72px); max-width: 680px; }}
+    .auth-message .muted {{ font-size: 18px; max-width: 600px; }}
+    .signin-panel {{ padding: 26px; border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,.94); box-shadow: 0 18px 45px rgba(15,23,42,.08); }}
+    .signin-panel h2 {{ margin: 0 0 8px; font-size: 23px; }}
+    .signin-panel .contact-note {{ text-align: center; margin-top: 12px; }}
+    body.welcome-mode.signed-in .auth-intro {{ display: none; }}
+    .member-home {{ display: none; }}
+    body.welcome-mode.signed-in .member-home {{ display: block; }}
+    .member-hero {{ display: flex; justify-content: space-between; gap: 24px; align-items: flex-end; margin-bottom: 26px; }}
+    .member-hero h1 {{ font-size: clamp(36px, 5vw, 52px); }}
+    .event-card {{ display: grid; grid-template-columns: minmax(220px, .75fr) minmax(0, 1.25fr); overflow: hidden; border: 1px solid var(--line); border-radius: 18px; }}
+    .event-art {{ min-height: 290px; padding: 28px; display: flex; flex-direction: column; justify-content: flex-end; color: #fff; background: linear-gradient(145deg,#111827,#4c1d95 60%,#d97706); }}
+    .event-art strong {{ font-size: 31px; line-height: 1; }}
+    .event-art span {{ margin-top: 8px; color: #fde68a; }}
+    .event-info {{ padding: 30px; background: #fff; }}
+    .event-meta {{ display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 18px; }}
+    .event-meta span {{ padding: 6px 9px; border-radius: 999px; background: #f8fafc; border: 1px solid var(--line); color: #475569; font-size: 12px; }}
+    .human-gate-copy {{ margin: 18px 0 10px; padding: 14px; border-radius: 12px; background: #fffbeb; border: 1px solid #fde68a; }}
+    .human-gate-copy strong {{ display: block; margin-bottom: 4px; }}
+    .developer-tools {{ margin-top: 22px; border: 1px solid var(--line); border-radius: 12px; padding: 0 16px 16px; background: #fff; }}
+    .developer-tools > summary {{ padding: 15px 0; list-style: none; display: flex; justify-content: space-between; }}
+    .developer-tools > summary::after {{ content: "＋"; color: var(--muted); }}
+    .developer-tools[open] > summary::after {{ content: "−"; }}
+    body.welcome-mode .verdict {{ display: none; }}
     .welcome-progress {{
       display: flex;
       flex-wrap: wrap;
@@ -2424,8 +2531,11 @@ def _presale_index(welcome_mode=False):
     {SITE_CTA_CSS}
     {LEMMA_SIGNIN_CSS}
     @media (max-width: 820px) {{
-      .layout {{ grid-template-columns: 1fr; }}
+      .layout, body.welcome-mode .auth-intro, .event-card {{ grid-template-columns: 1fr; }}
       .defense-strip {{ grid-template-columns: 1fr 1fr; }}
+      main {{ padding-top: 28px; }}
+      .site-nav a {{ display: none; }}
+      .member-hero {{ align-items: flex-start; flex-direction: column; }}
     }}
   </style>
 </head>
@@ -2447,12 +2557,35 @@ def _presale_index(welcome_mode=False):
     </div>
     <div class="{layout_class}">
       <section class="card">
-        <p class="eyebrow">{copy["eyebrow"]}</p>
-        <h1>{copy["headline"]}</h1>
-        <p class="muted">{copy["subhead"]}</p>
-        {_lemma_signin_element()}
-        <p class="contact-note" id="session-copy">Sign in once with a passkey. Presale steps unlock after you have a site session.</p>
+        <div class="auth-intro">
+          <div class="auth-message">
+            <p class="eyebrow">{copy["eyebrow"]}</p>
+            <h1>{copy["headline"]}</h1>
+            <p class="muted">{copy["subhead"]}</p>
+          </div>
+          <div class="signin-panel">
+            <h2>Sign in to Encore</h2>
+            <p class="muted">Use your lemma.id passkey to access member presales.</p>
+            {_lemma_signin_element()}
+            <p class="contact-note" id="session-copy">No email or password required.</p>
+          </div>
+        </div>
         <div class="gated-section" id="presale-gated" hidden>
+        <div class="member-home">
+        <div class="member-hero">
+          <div><p class="eyebrow">Member presales</p><h1 style="margin-bottom:8px;">Welcome back.</h1><p class="muted">Your saved events and verified-fan offers.</p></div>
+          <span class="pill ok">Member signed in</span>
+        </div>
+        <div class="event-card" id="presale">
+          <div class="event-art"><strong>Midnight<br>Atlas</strong><span>Afterglow World Tour</span></div>
+          <div class="event-info">
+            <p class="eyebrow">Presale opens today</p>
+            <h2 style="margin:0;font-size:28px;">Brooklyn · October 18</h2>
+            <div class="event-meta"><span>8:00 PM</span><span>Harbor Arena</span><span>From $48</span></div>
+            <p class="muted">Join the member list with your passkey. Revealing a code is limited to one verified human per account.</p>
+            <div class="human-gate-copy"><strong>Verified-fan access</strong><span class="muted">Human assurance is requested only when you reveal the presale code.</span></div>
+        </div>
+        </div>
         <div class="defense-strip" id="defense-strip">
           <div class="defense-item">Site PPID<small>passkey proof</small></div>
           <div class="defense-item">Action stamp<small>bound mutation</small></div>
@@ -2489,6 +2622,7 @@ def _presale_index(welcome_mode=False):
           <input id="phone" value="" placeholder="{copy["placeholder_phone"]}" aria-label="{copy["form_phone"]}">
           <button type="button" class="btn-secondary" id="save-delivery-btn">Save delivery info</button>
           <button type="button" class="btn-secondary btn-ghost" id="skip-delivery-btn">Skip for now</button>
+        </div>
         </div>
         </div>
         <div class="verdict" id="decision-card">
@@ -2540,6 +2674,7 @@ def _presale_index(welcome_mode=False):
     const tourImpact = document.getElementById('tour-impact');
     const signInEl = document.getElementById('lemma-signin-btn');
     const presaleGated = document.getElementById('presale-gated');
+    const logoutBtn = document.getElementById('logout-btn');
     let sharedVerifier = null;
     let lastPpid = null;
     let siteSessionPpid = null;
@@ -2738,6 +2873,8 @@ def _presale_index(welcome_mode=False):
 
     function updatePresaleGatedVisibility(signedIn) {{
       if (presaleGated) presaleGated.hidden = !signedIn;
+      document.body.classList.toggle('signed-in', !!signedIn);
+      if (logoutBtn) logoutBtn.hidden = !signedIn;
     }}
 
     async function refreshSessionState() {{
@@ -3343,6 +3480,11 @@ def _presale_index(welcome_mode=False):
     document.getElementById('skip-step-btn')?.addEventListener('click', () => runSkipStepAttack());
     document.getElementById('save-delivery-btn')?.addEventListener('click', () => saveDelivery(false));
     document.getElementById('skip-delivery-btn')?.addEventListener('click', () => saveDelivery(true));
+    logoutBtn?.addEventListener('click', async () => {{
+      await fetch('/api/logout', {{ method: 'POST', credentials: 'include' }});
+      try {{ sessionStorage.removeItem(PRESALE_SESSION_KEY); }} catch (e) {{}}
+      window.location.reload();
+    }});
 
     async function resumeAfterLemmaRedirect() {{
       const params = new URLSearchParams(window.location.search);

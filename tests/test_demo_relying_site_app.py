@@ -88,11 +88,24 @@ def test_trials_start_trial_uses_verify_for_backend_not_fresh_idv(trials_site_cl
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
-    assert "Start free trial" in body
+    assert "Activate free workspace" in body
     assert "await verifier.verifyForBackend({" in body
     assert "requiredAssurance: TRIAL_ASSURANCE" in body
     # Site-doubt API must not be invoked from the trial start path.
     assert "await verifier.verifyFreshForBackend" not in body
+
+
+def test_trials_index_renders_login_then_workspace_with_collapsed_dev_tools(trials_site_client):
+    client, _mod = trials_site_client
+    body = client.get("/").get_data(as_text=True)
+
+    assert 'id="auth-view"' in body
+    assert 'id="app-view" hidden' in body
+    assert "Sign in to Northstar" in body
+    assert "Recent projects" in body
+    assert "Founding team offer" in body
+    assert '<details class="dev-tools">' in body
+    assert "renderSiteSession(true)" in body
 
 
 def test_trials_start_trial_accepts_ishuman_presentation(trials_site_client, monkeypatch):
@@ -304,7 +317,7 @@ def test_relying_site_index_loads_verifier_script(relying_site_client):
     assert 'stroke="#d97706"' in body
     assert "IsHumanVerifier" in body
     assert "Sign in with lemma.id" in body
-    assert "Try Sign in with lemma.id" in body
+    assert "Encore member access" in body
     assert "WELCOME_MODE" in body
     assert "plain-language.js" in body
     assert "tickets-demo.lemma.id" in body
@@ -520,6 +533,19 @@ def test_welcome_index_hides_contact_until_after_claim(relying_site_client):
     assert "delivery-panel" in body
     assert "WELCOME_MODE" in body
     assert "Optional delivery" in body
+
+
+def test_welcome_index_renders_real_ticket_site_and_collapsed_dev_tools(relying_site_client):
+    client, _mod = relying_site_client
+    body = client.get("/").get_data(as_text=True)
+
+    assert "Sign in to Encore" in body
+    assert "Midnight Atlas" in body
+    assert "Member presales" in body
+    assert "Verified-fan access" in body
+    assert '<details class="developer-tools">' in body
+    assert "What signing up usually feels like" not in body
+    assert "document.body.classList.toggle('signed-in'" in body
 
 
 def test_presale_claim_requires_registration(relying_site_client, monkeypatch):
