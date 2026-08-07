@@ -1,4 +1,9 @@
-"""Public marketing pages lead with Sign in with lemma.id; human proofs are the step-up."""
+"""Public marketing pages lead with enforcement (one account per verified human).
+
+Free Sign in with lemma.id is the on-ramp; human proofs are the headline claim.
+Honest-copy invariants (passkey tier is not Sybil resistance, no revocation
+overclaims) must survive any repositioning.
+"""
 
 from __future__ import annotations
 
@@ -22,10 +27,14 @@ def fixture_public_client(monkeypatch):
 
 
 @pytest.mark.integration
-def test_homepage_leads_with_sign_in(public_client):
+def test_homepage_leads_with_enforcement(public_client):
     resp = public_client.get("/home")
     body = resp.get_data(as_text=True)
     assert resp.status_code == 200
+    # Enforcement is the headline; hero leads with the consequence claim.
+    assert "they stay banned" in body
+    assert "One account per verified human" in body
+    # Free sign-in remains the on-ramp, present and named.
     assert "Sign in with lemma.id" in body
     assert "Passwordless login" in body
     assert "No user data to store" in body
@@ -55,8 +64,30 @@ def test_pricing_page_leads_with_free_sign_in(public_client):
     assert resp.status_code == 200
     assert "Sign-in is free" in body
     assert "no card required" in body
+    assert "Free forever, not a trial" in body
     assert "human proof" in body.lower()
     assert "identity check is included" in body or "no separate IDV charge" in body
+
+
+@pytest.mark.integration
+def test_trust_page_answers_objections_with_evidence(public_client):
+    resp = public_client.get("/trust")
+    body = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert "The objections, answered directly" in body
+    assert "Is this a biometric database?" in body
+    assert "status.lemma.id" in body
+    # Pending assurance work is disclosed, never implied complete.
+    assert "not yet complete" in body
+
+
+@pytest.mark.integration
+def test_ticketing_page_links_live_presale_demo(public_client):
+    resp = public_client.get("/ticketing")
+    body = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert "?tour=presale" in body
+    assert "/docs/demo/PRESALE_DEMO_SCRIPT.md" in body
 
 
 @pytest.mark.integration

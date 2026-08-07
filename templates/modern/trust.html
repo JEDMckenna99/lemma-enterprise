@@ -307,6 +307,53 @@
     </div>
 </section>
 
+<!-- Objections -->
+<section class="section" id="objections" style="background: var(--gray-50);">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 48px;">
+            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Fair questions</p>
+            <h2>The objections, answered directly</h2>
+            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">Identity systems have earned the skepticism. Here is where this one differs, stated plainly enough to be checked.</p>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; max-width: 1000px; margin: 0 auto;">
+            <div class="card">
+                <h3 class="card-title">"Is this a biometric database?"</h3>
+                <p>No. There are no iris scans, no face templates at rest, no document images retained. The IDV provider processes the document and liveness during the check itself; lemma.id derives keyed hashes from the document number and date of birth, and the session artifacts are purged after issuance. A breach of lemma.id cannot reconstitute anyone's biometrics, because they aren't there.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">"Can lemma.id track me across sites?"</h3>
+                <p>Each site gets a different PPID for the same person, and those PPIDs are designed so sites can't be linked to each other. Day-to-day checks verify locally on the site's own servers, so lemma.id doesn't observe routine logins. There is no login graph to sell and no cross-site profile to leak.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">"Is this passkey lock-in?"</h3>
+                <p>Passkeys secure the lemma.id, but the account root is the verified person, not a device or a platform vault. Lose every device and recovery means re-verifying as the same human, which restores the same site-private IDs. You can export what your lemma.id holds, and you can ask us to erase what we hold.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">"What if lemma.id disappears?"</h3>
+                <p>Verification is local: issued credentials keep verifying on your servers against pinned keys until they expire, and your account table and sessions are yours throughout. The honest limit: issuance, renewal, and recovery are services we run. What a shutdown can't do is take your user records or your ability to check existing proofs with you.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Evidence -->
+<section class="section" id="evidence">
+    <div class="container">
+        <div style="max-width: 820px; margin: 0 auto;">
+            <div style="text-align: center; margin-bottom: 40px;">
+                <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Evidence, not adjectives</p>
+                <h2>What we can show, and what's still pending</h2>
+            </div>
+            <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; padding: 32px;">
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>Fail-closed by construction.</strong> If revocation data can't be read, verification refuses rather than asserting "nothing revoked." Replay nonces are consumed atomically, an action can succeed once and only once, and these behaviors are enforced by adversarial tests, not convention.</p>
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>One protocol, three verifiers.</strong> The browser, Python, and Node verifiers are tested against shared protocol fixtures: identical decisions on identical inputs, including tampered credentials, forged trust lists, and modified site bindings. Wire-format drift fails CI before it ships.</p>
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>Operational evidence.</strong> Database restore drills are performed and measured against documented recovery objectives, dependency-outage behavior is exercised deliberately, and current availability is public at <a href="https://status.lemma.id">status.lemma.id</a>.</p>
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin: 0;"><strong>Pending, stated honestly:</strong> independent cryptographic review, external penetration testing, and SOC 2 attestation are on the launch gate and not yet complete. We publish that rather than imply otherwise. Pilot customers get the current evidence bundle and threat model on request: <a href="mailto:hello@lemma.id?subject=Security%20evidence%20request">hello@lemma.id</a>.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
 <!-- CTA -->
 <section class="section" style="background: var(--gray-900); color: var(--white); padding: 80px 0;">
     <div class="container" style="text-align: center;">
