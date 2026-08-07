@@ -1,9 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
-  <!-- Heavier stroke than the in-page logo so the mark stays legible in a ~16px tab -->
-  <g stroke="#4E3D8F" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round">
-    <ellipse cx="60" cy="60" rx="36" ry="13"/>
-    <ellipse cx="60" cy="60" rx="36" ry="13" transform="rotate(90 60 60)"/>
-    <ellipse cx="60" cy="60" rx="36" ry="13" transform="rotate(45 60 60)"/>
-    <ellipse cx="60" cy="60" rx="36" ry="13" transform="rotate(-45 60 60)"/>
+  <g stroke="#4E3D8F" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="60" cy="60" rx="38" ry="14"/>
+    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(90 60 60)"/>
+    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(45 60 60)"/>
+    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(-45 60 60)"/>
   </g>
 </svg>
