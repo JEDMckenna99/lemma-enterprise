@@ -228,6 +228,18 @@ def test_trials_index_renders_demo_walkthrough_and_reset(trials_site_client):
     assert "trial_already_used" in body
 
 
+def test_trials_redirect_resume_strips_params_after_signin(trials_site_client):
+    """Mobile redirect sign-in: the SDK claims the deposited proof from the URL
+    params inside signIn(), so the page must not strip them beforehand."""
+    client, _mod = trials_site_client
+    body = client.get("/").get_data(as_text=True)
+
+    resume_start = body.index("lemma_ishuman_return') === '1'")
+    signin_call = body.index("signInEl?.signIn()?.then", resume_start)
+    strip_call = body.index("searchParams.delete", resume_start)
+    assert signin_call < strip_call, "URL params must be stripped only after signIn() runs"
+
+
 def test_relying_site_health(relying_site_client):
     client, mod = relying_site_client
     resp = client.get("/health")
@@ -680,6 +692,23 @@ def test_welcome_index_renders_real_ticket_site_and_collapsed_dev_tools(relying_
     assert 'data-welcome-step="return"' in body
     assert "stripLemmaReturnParams" in body
     assert "body.welcome-mode #attack-lab" in body
+
+
+def test_presale_redirect_resume_claims_before_stripping_params(relying_site_client):
+    """Mobile redirect returns: claimRedirectActionSign() and the sign-in verifier
+    read request_nonce from the URL, so params must not be stripped up-front."""
+    client, _mod = relying_site_client
+    body = client.get("/").get_data(as_text=True)
+
+    resume_start = body.index("async function resumeAfterLemmaRedirect")
+    signin_resume = body.index("await signInEl?.signIn();", resume_start)
+    first_strip = body.index("stripLemmaReturnParams();", resume_start)
+    # No strip may run before the sign-in resume (the buggy version stripped up-front).
+    assert signin_resume < first_strip
+    # The action-sign claim path must still exist and read the URL before any strip
+    # that follows it in the pending branch.
+    claim_call = body.index("claimRedirectActionSign()", resume_start)
+    assert claim_call > signin_resume
 
 
 def test_presale_claim_requires_registration(relying_site_client, monkeypatch):

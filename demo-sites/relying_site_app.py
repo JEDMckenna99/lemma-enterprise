@@ -2324,12 +2324,14 @@ def _generic_index():
     }});
 
     if (new URLSearchParams(window.location.search).get('lemma_ishuman_return') === '1') {{
-      try {{
-        const cleaned = new URL(window.location.href);
-        ['lemma_ishuman_return', 'request_nonce', 'redirect_kind'].forEach((k) => cleaned.searchParams.delete(k));
-        window.history.replaceState(null, '', cleaned.toString());
-      }} catch (e) {{}}
+      // Mobile redirect sign-in return: signIn() constructs a ProofVerifier that
+      // claims the deposited proof from the URL params, so only strip afterwards.
       signInEl?.signIn()?.then((result) => {{
+        try {{
+          const cleaned = new URL(window.location.href);
+          ['lemma_ishuman_return', 'request_nonce', 'redirect_kind'].forEach((k) => cleaned.searchParams.delete(k));
+          window.history.replaceState(null, '', cleaned.toString());
+        }} catch (e) {{}}
         if (result?.ok) completeLoginFromPresentation(result.presentation, result.timeMs).then((ok) => {{
           if (ok) runProtectedAction();
         }});
@@ -4218,11 +4220,14 @@ def _presale_index(welcome_mode=False):
     async function resumeAfterLemmaRedirect() {{
       const params = new URLSearchParams(window.location.search);
       if (params.get('lemma_ishuman_return') !== '1') return;
-      stripLemmaReturnParams();
       const saved = loadPresaleSession();
       const pending = saved?.pendingAction;
       if (!pending) {{
-        decisionCopy.textContent = 'Returned from lemma.id, tap the presale step to continue.';
+        // Mobile redirect sign-in return: the ProofVerifier created inside signIn()
+        // claims the deposited proof from the URL params, so only strip afterwards.
+        decisionCopy.textContent = 'Finishing sign-in after returning from lemma.id...';
+        await signInEl?.signIn();
+        stripLemmaReturnParams();
         return;
       }}
       decisionCard.innerHTML = '<strong>Resuming after passkey unlock</strong><p class="tiny">Finishing the presale step you started before returning from lemma.id.</p>';
@@ -4279,6 +4284,10 @@ def _presale_index(welcome_mode=False):
           return;
         }}
       }}
+      // action_sign claim failed above (nonce consumed/expired): clear the stale
+      // params before rerunning. For site_proof returns leave the URL intact so the
+      // verifier created inside runClaim/runRegister can claim the deposited proof.
+      if (redirectKind === 'action_sign') stripLemmaReturnParams();
       if (pending === 'claim') {{
         await runClaim();
       }} else if (pending === 'retry') {{
@@ -4286,6 +4295,7 @@ def _presale_index(welcome_mode=False):
       }} else {{
         await runRegister();
       }}
+      stripLemmaReturnParams();
     }}
 
     resumeAfterLemmaRedirect();
