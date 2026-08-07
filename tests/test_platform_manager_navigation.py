@@ -47,7 +47,8 @@ def test_root_is_home_and_app_is_manager(monkeypatch):
     assert manager.status_code == 200
     assert b'id="create-wallet-btn"' in manager.data
     assert b"Create my lemma.id" in manager.data
-    assert b'id="sf-manager-panels"' in manager.data
+    assert b'id="identity-card"' in manager.data
+    assert b'id="sf-manager-panels"' not in manager.data
     assert product.status_code == 200
     assert b"Passwordless login" in product.data
     assert b"assurance-levels" in product.data

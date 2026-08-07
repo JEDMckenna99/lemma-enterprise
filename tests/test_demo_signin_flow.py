@@ -78,8 +78,13 @@ def test_dev_root_pubkey_never_exposed_in_production(demo_client, monkeypatch):
     assert 'data-dev-root-pubkey=""' in body
 
 
-def test_flow_narration_panels_shared_with_manager():
-    """The demo's manager preview and /app render the same panels include."""
+def test_narration_panels_are_demo_only():
+    """The compare-sites explainer teaches unlinkability; it belongs to /demo.
+
+    The real manager must not render it. Fabricated example domains alongside
+    the user's own data read as a record of where they've been, and the panel
+    duplicates the PPID already shown by the manager's identity card.
+    """
     signin = (ROOT / "templates" / "demo" / "signin.html").read_text(encoding="utf-8")
     manager = (ROOT / "templates" / "wallet_simple.html").read_text(encoding="utf-8")
     panels = (ROOT / "templates" / "demo" / "_signin_panels.html").read_text(
@@ -87,14 +92,39 @@ def test_flow_narration_panels_shared_with_manager():
     )
 
     assert 'include "demo/_signin_panels.html"' in signin
-    assert 'include "demo/_signin_panels.html"' in manager
-    assert "show_signin_panels" in manager
+    assert 'include "demo/_signin_panels.html"' not in manager
+    assert "show_signin_panels" not in manager
+    assert "signin-panels.js" not in manager
     assert 'id="sf-manager-panels"' in panels
     # The compare rows must not use *.lemma.id subdomains: derivePPID
     # short-circuits those to the platform credential's PPID.
     assert "tickets-demo.lemma.id</dt>" not in panels
     assert "a-ticket-shop.example" in panels
     assert "a-news-site.example" in panels
+
+    # The manager states the same fact in one line instead of a whole panel.
+    assert 'id="identity-card"' in manager
+    assert "other site you sign into gets a different one." in manager
+
+
+def test_manager_never_lists_the_sites_you_signed_into():
+    """A per-site list on the manager is a browsing history in disguise.
+
+    It is derivable on-device from the site-VC cache, but rendering it back to
+    the user misrepresents what lemma.id keeps and normalises showing it.
+    """
+    manager = (ROOT / "templates" / "wallet_simple.html").read_text(encoding="utf-8")
+
+    assert "getSitesFromLocalStorage" not in manager
+    assert "renderSiteChips" not in manager
+    assert "proof-site-chip" not in manager
+    assert "Sites you've used" not in manager
+    # The site-VC cache is still read to load credentials, never to enumerate sites.
+    assert manager.count("ishuman_site_vc:v1:") == 1
+
+    # Devices stays: it is server-held by necessity and is how a lost device
+    # gets cut off, so the card says so rather than hiding it.
+    assert "only list lemma.id keeps about you" in manager
 
 
 def test_signin_flow_js_uses_sdk_and_session_endpoint():
@@ -115,3 +145,22 @@ def test_signin_flow_js_uses_sdk_and_session_endpoint():
     # The signed presentation is sent; a bare ppid never is.
     assert "presentation: presentation" in js
     assert "JSON.stringify({ ppid" not in js
+
+
+def test_signin_flow_js_routes_builder_returns_to_hub():
+    """Demo-site return links must not bounce signed-in users into /app."""
+    js = (ROOT / "static" / "js" / "demo" / "signin-flow.js").read_text(
+        encoding="utf-8"
+    )
+    assert "wantsBuilderHub" in js
+    assert "openBuilderHub" in js
+    assert "/demo/how-it-works?lane=builder" in js
+
+
+def test_builder_hub_js_defaults_to_in_hub_lane():
+    js = (ROOT / "static" / "js" / "demo" / "ishuman-demo.js").read_text(
+        encoding="utf-8"
+    )
+    assert "startInHubDemo" in js
+    assert "params.get('lane') === 'try'" in js
+    assert "ih-try-lane-start" in js

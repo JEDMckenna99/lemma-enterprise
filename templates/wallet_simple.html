@@ -11,16 +11,13 @@
 {% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=14">
-<link rel="stylesheet" href="/static/css/demo/signin-flow.css?v=4">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=15">
 <style nonce="{{ csp_nonce }}">
 /* Manager logos stay jewel violet; never green when unlocked */
 .wallet-logo,
 .wallet-logo.is-unlocked { color: #4E3D8F !important; }
 #nav-logo.is-unlocked .nav-logo-icon,
 .nav-logo.is-unlocked .nav-logo-icon { color: #4E3D8F !important; }
-/* Narration panels sit inside the manager column */
-.wallet-container .sf-panels { margin-bottom: 20px; }
 </style>
 {% endblock %}
 
@@ -82,109 +79,132 @@
     <!-- UNLOCKED VIEW -->
     <div id="unlocked-view" class="hidden">
 
-        {% if show_signin_panels %}
-        {% include "demo/_signin_panels.html" %}
-        {% endif %}
-
-        <div class="card card-elevated" id="proofs-card">
-            <h2>What's saved here</h2>
-            <div id="proofs-summary" class="proofs-summary">
-                <p class="proofs-loading">Loading...</p>
+        <!-- SESSION STRIP: current state plus both ways out, in one place -->
+        <div class="session-strip">
+            <div class="session-state">
+                <span class="session-dot" aria-hidden="true"></span>
+                <span class="session-state-label">Open</span>
+                <span class="session-expiry" id="session-expiry" role="status"></span>
+            </div>
+            <div class="session-actions">
+                <button id="lock-btn" class="btn btn-secondary btn-sm" type="button">Lock</button>
+                <button id="signout-btn" class="session-signout" type="button">Sign out</button>
             </div>
         </div>
 
-        <!-- OPTIONAL IDENTITY ANCHOR (shown only when no human proof yet) -->
-        <div class="card card-elevated hidden" id="anchor-identity-card">
-            <h2>Anchor with your identity</h2>
-            <p class="card-intro">
-                Optionally link this lemma.id to a one-time identity check.
-                That adds a human proof some sites may require. You can keep using
-                lemma.id without doing this.
-            </p>
-            <button id="anchor-wallet-btn" class="btn btn-primary btn-full" type="button">
-                Anchor this lemma.id
-            </button>
-            <aside class="anchor-disclaimer" aria-label="Privacy disclaimer">
-                <p><strong>What happens:</strong> you'll complete a private identity check. When it finishes, a human proof is stored on this device with your lemma.id.</p>
-                <ul>
-                    <li>No ID documents, selfies, or legal name are stored after verification.</li>
-                    <li>Sites only see a proof that you're human — nothing that reveals who you are.</li>
-                    <li>Each site gets its own private ID; they can't compare notes about you.</li>
-                </ul>
-            </aside>
-        </div>
-
-        <!-- LOCK -->
-        <div class="card">
-            <button id="lock-btn" class="btn btn-secondary btn-full">
-                Lock lemma.id
-            </button>
-            <p class="card-help">
-                You'll need Face ID, Touch ID, or your passkey to open again. Nothing is deleted.
-            </p>
-        </div>
-
-        <!-- ADD DEVICE: pull (recommended) + optional push from this device -->
-        <div class="card">
-            <h2>Add another device or browser</h2>
-
-            <p class="card-intro">
-                <strong>Recommended:</strong> on the <em>new</em> device, open
-                <a href="/link">lemma.id/link</a> and tap <strong>Show QR Code</strong>.
-                Scan that QR with this phone's Camera app. You'll confirm with your passkey to send.
-                Your lemma.id is encrypted to the new device only.
-            </p>
-            <a href="/link" class="btn btn-primary btn-full" style="text-align: center; text-decoration: none; display: block;">
-                Open add-device page
-            </a>
-
-            <div class="add-device-divider" aria-hidden="true">or send from here</div>
-
-            <p class="card-intro" style="margin-top: 0;">
-                Generate a QR or transfer link on <strong>this</strong> device (no passkey yet if you're already open).
-                Open it on the empty browser, check that both screens show the same confirmation code, then tap
-                <strong>Codes match. Send with passkey</strong> once on <strong>this</strong> screen.
-            </p>
-            <button id="show-qr-btn" type="button" class="btn btn-secondary btn-full">Generate QR Code</button>
-            <button id="show-link-btn" type="button" class="btn btn-secondary btn-full" style="margin-top: 10px;">
-                Send Transfer Link
-            </button>
-
-            <div id="qr-display" class="qr-display hidden">
-                <div id="qr-box" class="qr-box">
-                    <div id="qr-container"></div>
+        <!-- 1. WHO YOU ARE HERE -->
+        <div class="card card-elevated" id="identity-card">
+            <h2>Your lemma.id</h2>
+            <dl class="identity-rows">
+                <div class="identity-row">
+                    <dt>Your ID here</dt>
+                    <dd>
+                        <span class="identity-ppid" id="identity-ppid">&hellip;</span>
+                        <button class="identity-copy" type="button" id="identity-copy-btn" aria-label="Copy your full ID">Copy</button>
+                    </dd>
                 </div>
-                <div id="push-confirm-banner" class="push-confirm-banner hidden">
-                    <div class="push-confirm-label">Confirmation code</div>
-                    <div id="push-confirm-code-display" class="push-confirm-code"></div>
-                    <p class="push-confirm-help">
-                        Confirm on <strong>this</strong> device. When the other screen shows the same code,
-                        tap the button below to send with your passkey.
-                    </p>
+                <div class="identity-row">
+                    <dt>Proof level</dt>
+                    <dd id="identity-assurance">&hellip;</dd>
                 </div>
-                <div id="qr-timer" class="qr-timer">Expires in 5:00</div>
-                <div id="link-options" class="hidden"></div>
-                <div id="push-wait-status" class="card-help" style="margin-top: 12px;" role="status" aria-live="polite"></div>
-                <button id="confirm-push-btn" type="button" class="btn btn-primary btn-full" style="margin-top: 12px;" disabled>
-                    Waiting for other device…
+                <div class="identity-row">
+                    <dt>Signed in</dt>
+                    <dd id="identity-signin-time">&hellip;</dd>
+                </div>
+            </dl>
+            <p class="identity-note">
+                No email. No name. No password. That ID is everything lemma.id sees, and every
+                other site you sign into gets a different one.
+            </p>
+
+            <div id="proofs-summary" class="proofs-summary hidden"></div>
+
+            <!-- Optional identity anchor: the next step from this card, not a card of its own -->
+            <div class="anchor-block hidden" id="anchor-identity-card">
+                <h3>Anchor with your identity</h3>
+                <p class="card-intro">
+                    Optionally link this lemma.id to a one-time identity check.
+                    That adds a human proof some sites may require. You can keep using
+                    lemma.id without doing this.
+                </p>
+                <button id="anchor-wallet-btn" class="btn btn-primary btn-full" type="button">
+                    Anchor this lemma.id
                 </button>
-                <button id="hide-qr-btn" type="button" class="btn btn-secondary" style="margin-top: 12px;">Cancel</button>
+                <aside class="anchor-disclaimer" aria-label="Privacy disclaimer">
+                    <p><strong>What happens:</strong> you'll complete a private identity check. When it finishes, a human proof is stored on this device with your lemma.id.</p>
+                    <ul>
+                        <li>No ID documents, selfies, or legal name are stored after verification.</li>
+                        <li>Sites only see a proof that you're human — nothing that reveals who you are.</li>
+                        <li>Each site gets its own private ID; they can't compare notes about you.</li>
+                    </ul>
+                </aside>
             </div>
         </div>
 
-        <!-- DEVICES -->
+        <!-- 2. WHO CAN ACT AS YOU -->
         <div class="card" id="devices-card">
             <h2>Your devices</h2>
             <p class="card-intro">
-                Devices that can unlock this lemma.id. Revoking a device stops it from unlocking or signing again; it does not erase files already on that device.
+                Devices that can unlock this lemma.id. This is the only list lemma.id keeps about you,
+                and it exists so you can cut off a device you no longer have. Revoking stops a device
+                from unlocking or signing again; it does not erase files already on it.
             </p>
             <div id="devices-list" class="devices-list" aria-live="polite">
                 <p class="devices-loading">Loading devices...</p>
             </div>
             <p id="devices-status" class="card-help hidden" role="status"></p>
+
+            <button id="add-device-btn" type="button" class="btn btn-primary btn-full add-device-toggle"
+                    aria-expanded="false" aria-controls="add-device-panel">
+                Add a device
+            </button>
+
+            <div id="add-device-panel" class="add-device-panel hidden">
+                <p class="card-intro">
+                    <strong>Recommended:</strong> on the <em>new</em> device, open
+                    <a href="/link">lemma.id/link</a> and tap <strong>Show QR Code</strong>.
+                    Scan that QR with this phone's Camera app. You'll confirm with your passkey to send.
+                    Your lemma.id is encrypted to the new device only.
+                </p>
+                <a href="/link" class="btn btn-primary btn-full">Open add-device page</a>
+
+                <details class="add-device-other">
+                    <summary>Other ways to add a device</summary>
+                    <p class="card-intro">
+                        Generate a QR or transfer link on <strong>this</strong> device (no passkey yet if you're already open).
+                        Open it on the empty browser, check that both screens show the same confirmation code, then tap
+                        <strong>Codes match. Send with passkey</strong> once on <strong>this</strong> screen.
+                    </p>
+                    <button id="show-qr-btn" type="button" class="btn btn-secondary btn-full">Generate QR Code</button>
+                    <button id="show-link-btn" type="button" class="btn btn-secondary btn-full btn-stacked">
+                        Send Transfer Link
+                    </button>
+
+                    <div id="qr-display" class="qr-display hidden">
+                        <div id="qr-box" class="qr-box">
+                            <div id="qr-container"></div>
+                        </div>
+                        <div id="push-confirm-banner" class="push-confirm-banner hidden">
+                            <div class="push-confirm-label">Confirmation code</div>
+                            <div id="push-confirm-code-display" class="push-confirm-code"></div>
+                            <p class="push-confirm-help">
+                                Confirm on <strong>this</strong> device. When the other screen shows the same code,
+                                tap the button below to send with your passkey.
+                            </p>
+                        </div>
+                        <div id="qr-timer" class="qr-timer">Expires in 5:00</div>
+                        <div id="link-options" class="hidden"></div>
+                        <div id="push-wait-status" class="card-help btn-stacked" role="status" aria-live="polite"></div>
+                        <button id="confirm-push-btn" type="button" class="btn btn-primary btn-full btn-stacked" disabled>
+                            Waiting for other device…
+                        </button>
+                        <button id="hide-qr-btn" type="button" class="btn btn-secondary btn-stacked">Cancel</button>
+                    </div>
+                </details>
+            </div>
         </div>
 
-        <!-- SETTINGS -->
+        <!-- 3. SETTINGS -->
         <div class="card">
             <h2>Settings</h2>
             
@@ -207,7 +227,7 @@
             <p id="session-duration-note" class="setting-note hidden"></p>
         </div>
 
-        <!-- DANGER ZONE -->
+        <!-- 4. THIS DEVICE -->
         <div class="card card-danger">
             <h2 class="danger-title">Remove from this device</h2>
             <button id="clear-wallet-btn" class="btn btn-secondary btn-full btn-danger-outline" type="button">
@@ -241,6 +261,11 @@ function escapeHtml(value) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+}
+
+function getCookie(name) {
+    const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+    return match ? decodeURIComponent(match[1]) : '';
 }
 
 // BroadcastChannel for instant cross-tab session sync (same-device, same-origin)
@@ -535,13 +560,145 @@ function showUnlockedStateFast(submessage = 'Your lemma.id is ready') {
     showUnlockedView();
     const container = document.getElementById('proofs-summary');
     if (container) {
-        container.innerHTML = '<p class="proofs-loading">Loading...</p>';
+        container.innerHTML = '';
+        container.classList.add('hidden');
     }
     const devices = document.getElementById('devices-list');
     if (devices) {
         devices.innerHTML = '<p class="devices-loading">Loading devices...</p>';
     }
     setDevicesStatus('');
+    loadSessionFacts();
+    startSessionStrip();
+}
+
+// ============================================================
+// Session strip + identity card
+// ============================================================
+
+const ASSURANCE_LABELS = {
+    passkey: 'Signed in with a passkey.',
+    ishuman: 'Verified human — one account per person.',
+};
+
+function truncatePpid(ppid) {
+    if (!ppid) return '…';
+    const display = String(ppid).replace(/^did:lemma:/, '');
+    if (display.length <= 16) return display;
+    return display.slice(0, 9) + '…' + display.slice(-4);
+}
+
+function relativeTime(epochSeconds) {
+    if (!epochSeconds) return 'Just now';
+    const deltaMin = Math.round((Date.now() / 1000 - epochSeconds) / 60);
+    if (deltaMin < 1) return 'Just now';
+    if (deltaMin === 1) return '1 minute ago';
+    if (deltaMin < 60) return `${deltaMin} minutes ago`;
+    const hours = Math.round(deltaMin / 60);
+    return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+}
+
+let sessionFactsLoaded = false;
+
+async function loadSessionFacts() {
+    if (sessionFactsLoaded) return;
+    try {
+        const resp = await fetch('/api/auth/session', { credentials: 'same-origin' });
+        const data = await resp.json();
+        if (!data.signed_in) return;
+        sessionFactsLoaded = true;
+
+        document.getElementById('identity-ppid').textContent = truncatePpid(data.ppid);
+        document.getElementById('identity-assurance').textContent =
+            ASSURANCE_LABELS[data.assurance] || ASSURANCE_LABELS.passkey;
+        document.getElementById('identity-signin-time').textContent = relativeTime(data.signed_in_at);
+
+        const copyBtn = document.getElementById('identity-copy-btn');
+        if (copyBtn && !copyBtn.dataset.bound) {
+            copyBtn.dataset.bound = '1';
+            copyBtn.addEventListener('click', async () => {
+                if (!navigator.clipboard) return;
+                await navigator.clipboard.writeText(data.ppid || '');
+                copyBtn.textContent = 'Copied';
+                setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1400);
+            });
+        }
+    } catch (e) {
+        console.warn('[Manager] Could not load session facts:', e?.message || e);
+    }
+}
+
+let sessionStripTimer = null;
+
+function formatRemaining(ms) {
+    const totalMin = Math.max(0, Math.round(ms / 60000));
+    const hours = Math.floor(totalMin / 60);
+    const minutes = totalMin % 60;
+    if (hours && minutes) return `${hours}h ${minutes}m`;
+    if (hours) return `${hours}h`;
+    return `${minutes}m`;
+}
+
+function updateSessionStrip() {
+    const el = document.getElementById('session-expiry');
+    if (!el) return;
+    const expiresAt = wallet?.session?.expiresAt;
+    if (!wallet?.session?.isUnlocked || !expiresAt) {
+        el.textContent = '';
+        return;
+    }
+    const remaining = expiresAt - Date.now();
+    el.textContent = remaining > 0 ? `· locks in ${formatRemaining(remaining)}` : '· locking now';
+}
+
+function startSessionStrip() {
+    updateSessionStrip();
+    if (sessionStripTimer) return;
+    sessionStripTimer = setInterval(updateSessionStrip, 30000);
+}
+
+async function signOutOfLemma() {
+    const btn = document.getElementById('signout-btn');
+    const orig = btn?.textContent;
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Signing out…';
+    }
+    try {
+        await lockWallet();
+    } catch (e) {
+        console.warn('[Manager] Lock during sign out failed:', e?.message || e);
+    }
+    try {
+        const headers = { 'Content-Type': 'application/json' };
+        const csrf = getCookie('lemma_csrf_token');
+        if (csrf) headers['X-Lemma-CSRF'] = csrf;
+        await fetch('/api/auth/session/logout', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers,
+        });
+    } catch (e) {
+        console.warn('[Manager] Sign out request failed:', e?.message || e);
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = orig || 'Sign out';
+        }
+    }
+    window.location.href = '/app';
+}
+
+function toggleAddDevicePanel() {
+    const btn = document.getElementById('add-device-btn');
+    const panel = document.getElementById('add-device-panel');
+    if (!btn || !panel) return;
+    const open = panel.classList.toggle('hidden') === false;
+    btn.setAttribute('aria-expanded', String(open));
+    btn.textContent = open ? 'Cancel' : 'Add a device';
+    // Only one primary action per card: the panel's own CTA takes over when open.
+    btn.classList.toggle('btn-primary', !open);
+    btn.classList.toggle('btn-secondary', open);
+    if (!open) hideQR();
 }
 
 let proofCheckGeneration = 0;
@@ -1140,6 +1297,7 @@ async function applySessionDuration(options = {}) {
     const unlockedAt = wallet.session.unlockedAt || Date.now();
     wallet.session.expiresAt = unlockedAt + sessionMs;
     await wallet._put('session', { id: 'current', ...wallet.session });
+    updateSessionStrip();
 
     const onLemmaId = /^(www\.)?lemma\.id$/i.test(window.location.hostname.replace(/^www\./i, ''));
     if (onLemmaId) {
@@ -1170,32 +1328,6 @@ function normalizeSiteLabel(raw) {
         if (text.includes('://')) return new URL(text).hostname.replace(/^www\./i, '');
     } catch (_) {}
     return text.replace(/^www\./i, '').split('/')[0].split(':')[0].toLowerCase();
-}
-
-function formatProofDate(value) {
-    if (!value) return null;
-    const ms = typeof value === 'number'
-        ? (value < 1e12 ? value * 1000 : value)
-        : Date.parse(value);
-    if (!Number.isFinite(ms)) return null;
-    return new Date(ms).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
-function renderProofRow(label, value, detail) {
-    return `
-        <div class="proof-row">
-            <div class="proof-row-label">${label}</div>
-            <div class="proof-row-value">${value}</div>
-            ${detail ? `<div class="proof-row-detail">${detail}</div>` : ''}
-        </div>
-    `;
-}
-
-function renderSiteChips(sites) {
-    if (!sites.length) return '';
-    return `<div class="proof-site-chips">${sites.map((site) =>
-        `<span class="proof-site-chip">${escapeHtml(site)}</span>`
-    ).join('')}</div>`;
 }
 
 function renderAccessList(accessLabels) {
@@ -1229,19 +1361,6 @@ function credentialKey(cred) {
     const site = normalizeSiteLabel(cl.siteDomain || cl.siteId || cl.site_id || cl.site || '');
     const type = cl.isHuman ? 'human' : String(cred.packageType || 'other');
     return `${type}:${site}:${cred.id || cred.credentialId || ''}`;
-}
-
-function getSitesFromLocalStorage() {
-    const sites = new Set();
-    try {
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (!key || !key.startsWith('ishuman_site_vc:v1:')) continue;
-            const site = normalizeSiteLabel(key.slice('ishuman_site_vc:v1:'.length));
-            if (site && !isLemmaPlatformSite(site)) sites.add(site);
-        }
-    } catch (_) {}
-    return sites;
 }
 
 async function gatherAllCredentials() {
@@ -1278,6 +1397,14 @@ async function gatherAllCredentials() {
     return Array.from(seen.values());
 }
 
+/**
+ * Roles you hold on lemma.id itself (admin, developer, billing).
+ *
+ * Deliberately does NOT enumerate the sites you've signed into. That list is
+ * derivable on-device, but surfacing it turns the manager into a browsing
+ * history and tells the user something lemma.id has no business presenting
+ * back to them. The section stays hidden unless there is a role to show.
+ */
 async function loadProofSummary() {
     const container = document.getElementById('proofs-summary');
     if (!container) return;
@@ -1298,27 +1425,6 @@ async function loadProofSummary() {
                 && !!(cl.permissionId || cl.permission_level || cl.permission_id || cl.accountType || cl.account_type);
         };
 
-        let master = null;
-        if (typeof wallet.findIsHumanMasterCredential === 'function') {
-            const found = await wallet.findIsHumanMasterCredential();
-            if (isHumanIdentityAnchor(found)) master = found;
-        }
-        if (!master) {
-            master = credentials.filter(isHumanIdentityAnchor)[0] || null;
-        }
-
-        const siteSet = new Set(getSitesFromLocalStorage());
-        credentials.forEach((cred) => {
-            const assurance = credentialAssurance(cred);
-            if (assurance !== 'ishuman' && assurance !== 'passkey') return;
-            // Masters have no site binding; skip them for the site list.
-            if (String(cred.id || '').startsWith('ishuman_master_')) return;
-            const site = normalizeSiteLabel(
-                claimsFor(cred).siteDomain || claimsFor(cred).siteId || claimsFor(cred).site_id || claimsFor(cred).site
-            );
-            if (site) siteSet.add(site);
-        });
-
         const lemmaAccess = credentials.filter((cred) => {
             if (!isPermissionLemma(cred) && !hasLemmaAccessClaims(cred)) return false;
             const cl = claimsFor(cred);
@@ -1329,44 +1435,19 @@ async function loadProofSummary() {
             lemmaAccess.map((cred) => friendlyAccessLabel(claimsFor(cred)))
         )).sort();
 
-        const masterClaims = master ? claimsFor(master) : {};
-        const masterIssued = master
-            ? formatProofDate(masterClaims.issuedAt || masterClaims.issued_at || master.issuanceDate || master.storedAt)
-            : null;
-
-        let html = '';
-        html += renderProofRow(
-            'Identity check',
-            master ? 'Done' : 'Not yet',
-            master
-                ? (masterIssued ? `Completed ${masterIssued}` : 'Stored on this device')
-                : 'Optional — use Anchor with your identity below when you are ready'
-        );
-        html += renderProofRow(
-            'Sites you\'ve used',
-            String(siteSet.size),
-            siteSet.size
-                ? 'Each site gets its own private connection to you'
-                : 'Shows up after you use Lemma on a site'
-        );
-        html += renderSiteChips(Array.from(siteSet).sort());
-
-        if (accessLabels.length > 0) {
-            html += renderProofRow(
-                'Your access',
-                String(accessLabels.length),
-                'Only for lemma.id itself'
-            );
-            html += renderAccessList(accessLabels);
+        if (!accessLabels.length) {
+            container.innerHTML = '';
+            container.classList.add('hidden');
+            return;
         }
 
-        html += '<p class="proofs-privacy-note">Each site sees a different private ID. We never show those IDs here; that\'s how your activity stays separate.</p>';
-        container.innerHTML = html;
-        updateAnchorIdentityCard(!!master);
+        container.innerHTML =
+            '<div class="proof-row-label">Your access</div>' + renderAccessList(accessLabels);
+        container.classList.remove('hidden');
     } catch (e) {
         console.warn('[Proofs] summary failed:', e.message);
-        container.innerHTML = '<p class="proofs-error">Could not load your saved info.</p>';
-        updateAnchorIdentityCard(false);
+        container.innerHTML = '<p class="proofs-error">Could not load your access.</p>';
+        container.classList.remove('hidden');
     }
 }
 
@@ -1840,9 +1921,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('unlock-btn').addEventListener('click', unlockWallet);
     document.getElementById('create-wallet-btn').addEventListener('click', createWallet);
     document.getElementById('lock-btn').addEventListener('click', lockWallet);
+    document.getElementById('signout-btn')?.addEventListener('click', signOutOfLemma);
     document.getElementById('clear-wallet-btn').addEventListener('click', clearWallet);
     document.getElementById('return-passkey-btn')?.addEventListener('click', returnWithExistingPasskey);
     document.getElementById('session-duration-select').addEventListener('change', () => applySessionDuration());
+    document.getElementById('add-device-btn')?.addEventListener('click', toggleAddDevicePanel);
     document.getElementById('show-qr-btn')?.addEventListener('click', showQR);
     document.getElementById('show-link-btn')?.addEventListener('click', showTransferLink);
     document.getElementById('hide-qr-btn')?.addEventListener('click', hideQR);
@@ -1851,9 +1934,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 </script>
 <script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}"></script>
-{% if show_signin_panels %}
-<script src="/static/js/demo/signin-panels.js?v=2" defer></script>
-{% endif %}
 {% endblock %}
 
 {% block wallet_auto_init %}

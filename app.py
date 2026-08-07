@@ -758,10 +758,7 @@ def create_app():
 
         logger.info("🏠 Serving Lemma ID app (verified session)")
         app.jinja_env.cache = {}
-        return render_template(
-            'wallet_simple.html',
-            show_signin_panels=True,
-        ), 200, no_cache
+        return render_template('wallet_simple.html'), 200, no_cache
 
     @app.route('/about')
     def about():
