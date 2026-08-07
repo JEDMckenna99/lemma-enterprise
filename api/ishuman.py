@@ -2423,7 +2423,7 @@ def derive_site_proof():
         if not master:
             from api.config import passkey_assurance_enabled
 
-            if passkey_assurance_enabled():
+            if required_assurance == "passkey" and passkey_assurance_enabled():
                 person_id = _resolve_person_id_for_wallet(db, wallet_id)
                 if not person_id:
                     try:

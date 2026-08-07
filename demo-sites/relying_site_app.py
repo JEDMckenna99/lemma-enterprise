@@ -2940,6 +2940,7 @@ def _presale_index(welcome_mode=False):
           if (registerBtn && !presaleRegistered) registerBtn.disabled = false;
           pill.textContent = 'SIGNED IN';
           pill.className = 'pill ok';
+          await syncPresaleRegistrationStatus();
           return true;
         }}
       }} catch (err) {{}}
@@ -2979,6 +2980,7 @@ def _presale_index(welcome_mode=False):
         siteSessionPpid = loginPayload.ppid || null;
         lastPpid = siteSessionPpid;
         await refreshSessionState();
+        await syncPresaleRegistrationStatus();
         if (WELCOME_MODE) {{
           setWelcomeStep('claim');
           decisionCopy.textContent = "You're in. No email, no password, nothing to breach.";
@@ -3027,6 +3029,23 @@ def _presale_index(welcome_mode=False):
       }}
       if (confirmChips && !registered) confirmChips.hidden = true;
       savePresaleSession({{ registered: presaleRegistered, ppid: lastPpid || null }});
+    }}
+
+    async function syncPresaleRegistrationStatus() {{
+      if (!siteSessionPpid) return;
+      try {{
+        const res = await fetch('/api/presale/status', {{
+          method: 'POST',
+          credentials: 'include',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ drop_id: DROP_ID }}),
+        }});
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.registered) {{
+          setStepState(true);
+        }}
+      }} catch (err) {{}}
     }}
 
     function showClaimSuccess(code) {{

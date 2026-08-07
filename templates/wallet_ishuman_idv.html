@@ -1538,6 +1538,63 @@
             return msg === 'wallet_not_verified';
         }
 
+        function credentialPackageAssurance(pkg) {
+            const claims = pkg?.credential?.claims || pkg?.credential?.credentialSubject || {};
+            const raw = String(claims.assurance || '').trim().toLowerCase();
+            if (raw === 'passkey' || raw === 'ishuman') return raw;
+            if (claims.isHuman === true || claims.isHuman === 'true') return 'ishuman';
+            return null;
+        }
+
+        async function finalizeIssuedSiteProofPackage(pkg) {
+            const proofSuccess = siteProofUsesContinuityOnly()
+                ? (consumerCopy().status?.siteProofSuccess || 'You\u2019re verified for this site.')
+                : (consumerCopy().status?.firstHumanSuccess || 'You\u2019re a human');
+            setStatus(proofSuccess, 'success');
+            await finishSiteProofWithOptionalNudge({
+                credential: pkg.credential,
+                session_assertion: pkg.session_assertion,
+                session_signature: pkg.session_signature,
+                session_nonce: clientSessionNonce,
+                request_nonce: requestNonce,
+                reason: 'site_proof_issued',
+                ppid_convergence: pkg.ppid_convergence || null,
+            });
+            return true;
+        }
+
+        async function resolveSiteProofPackageForClose() {
+            const pkgParams = {
+                siteId: requestingSite,
+                sessionNonce: clientSessionNonce,
+                bloomSequence,
+                sessionTtlSec,
+                issueMode: issueMode || 'site_proof',
+                requiredAssurance,
+            };
+            let pkg = siteProofUsesContinuityOnly()
+                ? await wallet.issueSiteProofPackage(pkgParams)
+                : await issueSiteProofPackageWithMasterFallback();
+            if (!pkg) {
+                return null;
+            }
+            if (requiredAssurance === 'ishuman' && !siteProofUsesContinuityOnly()) {
+                let actual = credentialPackageAssurance(pkg);
+                if (actual !== 'ishuman') {
+                    const masterReady = await ensureMasterProofForIssuance();
+                    if (!masterReady) {
+                        return null;
+                    }
+                    pkg = await issueSiteProofPackageWithMasterFallback();
+                    actual = pkg ? credentialPackageAssurance(pkg) : null;
+                    if (actual !== 'ishuman') {
+                        return null;
+                    }
+                }
+            }
+            return pkg;
+        }
+
         /**
          * Master human proofs live in lemma.id browser storage. The server only
          * knows that this wallet completed IDV (person binding). If the local
@@ -2011,8 +2068,15 @@
                         consumerCopy().status?.siteProofIssuing || 'Confirming you\u2019re human…',
                         'loading',
                     );
-                    await issueSiteProofAndClose();
-                    return;
+                    const issued = await issueSiteProofAndClose();
+                    if (issued) {
+                        return;
+                    }
+                    const idvInFlight = document.getElementById('status')?.classList.contains('loading');
+                    if (idvInFlight) {
+                        return;
+                    }
+                    btn.classList.remove('hidden');
                 }
             } catch (err) {
                 const detail = err?.message || err?.toString() || '';
@@ -2256,34 +2320,12 @@
             // server reissue if the local copy was lost). One human proof per
             // person — full IDV only when the wallet was never verified
             // (wallet_not_verified via ensureMasterProofForIssuance fallback).
-            const pkg = siteProofUsesContinuityOnly()
-                ? await wallet.issueSiteProofPackage({
-                    siteId: requestingSite,
-                    sessionNonce: clientSessionNonce,
-                    bloomSequence,
-                    sessionTtlSec,
-                    issueMode: issueMode || 'site_proof',
-                    requiredAssurance,
-                })
-                : await issueSiteProofPackageWithMasterFallback();
+            const pkg = await resolveSiteProofPackageForClose();
             if (!pkg) {
                 return false;
             }
 
-            const proofSuccess = siteProofUsesContinuityOnly()
-                ? (consumerCopy().status?.siteProofSuccess || 'You\u2019re verified for this site.')
-                : (consumerCopy().status?.firstHumanSuccess || 'You\u2019re a human');
-            setStatus(proofSuccess, 'success');
-            await finishSiteProofWithOptionalNudge({
-                credential: pkg.credential,
-                session_assertion: pkg.session_assertion,
-                session_signature: pkg.session_signature,
-                session_nonce: clientSessionNonce,
-                request_nonce: requestNonce,
-                reason: 'site_proof_issued',
-                ppid_convergence: pkg.ppid_convergence || null,
-            });
-            return true;
+            return finalizeIssuedSiteProofPackage(pkg);
             });
         }
 

@@ -11,6 +11,7 @@ from tests.wallet_test_helpers import (
 
 
 PASSKEY_DERIVE_ASSERTION_FIELDS = DERIVE_ASSERTION_FIELDS + ["required_assurance"]
+NO_MASTER_ASSERTION_FIELDS = ["target_site", "site_signing_pubkey", "issue_mode"]
 
 
 @pytest.mark.unit
@@ -126,6 +127,34 @@ def test_derive_site_proof_defaults_to_ishuman_with_verified_master(
     payload = resp.get_json()
     assert resp.status_code == 200, payload
     assert issued == ["ishuman"]
+
+
+@pytest.mark.unit
+def test_derive_ishuman_default_without_master_returns_wallet_not_verified(
+    ishuman_client,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+    attach_wallet_assertion,
+):
+    db = fake_ishuman_db_session_factory
+    monkeypatch.setattr("api.database.SessionLocal", db.session_local)
+    monkeypatch.setenv("LEMMA_ONE_PPID_ASSURANCE_MODEL", "1")
+    monkeypatch.setenv("LEMMA_PASSKEY_ASSURANCE_ENABLED", "1")
+
+    resp = ishuman_client.post(
+        "/api/ishuman/derive-site-proof",
+        json=attach_wallet_assertion(
+            {
+                "wallet_id": "wallet_test_001",
+                "target_site": "example.com",
+                "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
+            },
+            NO_MASTER_ASSERTION_FIELDS,
+        ),
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 403, payload
+    assert payload["error"] == "wallet_not_verified"
 
 
 @pytest.mark.unit

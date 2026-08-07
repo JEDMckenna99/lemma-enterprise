@@ -7,6 +7,7 @@ import pytest
 from tests.wallet_test_helpers import SITE_SIGNING_PUBKEY_B64
 
 NO_MASTER_ASSERTION_FIELDS = ["target_site", "site_signing_pubkey", "issue_mode"]
+PASSKEY_NO_MASTER_ASSERTION_FIELDS = NO_MASTER_ASSERTION_FIELDS + ["required_assurance"]
 
 
 @pytest.mark.unit
@@ -120,8 +121,9 @@ def test_passkey_derive_site_proof_when_flags_enabled(
                 "target_site": "example.com",
                 "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
                 "issue_mode": "site_proof",
+                "required_assurance": "passkey",
             },
-            NO_MASTER_ASSERTION_FIELDS,
+            PASSKEY_NO_MASTER_ASSERTION_FIELDS,
         ),
     )
     payload = resp.get_json()
@@ -130,6 +132,35 @@ def test_passkey_derive_site_proof_when_flags_enabled(
     assert issued[0][0] == expected_ppid
     assert issued[0][1] == "passkey"
     assert issued[0][2] == "person_root_v1"
+
+
+@pytest.mark.unit
+def test_derive_ishuman_without_master_returns_wallet_not_verified_when_passkey_enabled(
+    ishuman_client,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+    attach_wallet_assertion,
+):
+    db = fake_ishuman_db_session_factory
+    monkeypatch.setattr("api.database.SessionLocal", db.session_local)
+    monkeypatch.setenv("LEMMA_ONE_PPID_ASSURANCE_MODEL", "1")
+    monkeypatch.setenv("LEMMA_PASSKEY_ASSURANCE_ENABLED", "1")
+
+    resp = ishuman_client.post(
+        "/api/ishuman/derive-site-proof",
+        json=attach_wallet_assertion(
+            {
+                "wallet_id": "wallet_test_001",
+                "target_site": "example.com",
+                "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
+                "required_assurance": "ishuman",
+            },
+            NO_MASTER_ASSERTION_FIELDS,
+        ),
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 403, payload
+    assert payload["error"] == "wallet_not_verified"
 
 
 @pytest.mark.unit

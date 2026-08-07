@@ -103,6 +103,16 @@ def test_idv_action_sign_uses_passkey_continuity_unlock():
 
 
 @pytest.mark.unit
+def test_idv_site_proof_auto_issue_falls_back_to_create_human_cta():
+    idv = (ROOT / "templates" / "wallet_ishuman_idv.html").read_text(encoding="utf-8")
+    assert "const issued = await issueSiteProofAndClose();" in idv
+    assert "if (issued) {" in idv
+    assert "btn.classList.remove('hidden');" in idv
+    assert "resolveSiteProofPackageForClose" in idv
+    assert "credentialPackageAssurance" in idv
+
+
+@pytest.mark.unit
 def test_idv_fresh_passkey_confirms_holder_presence():
     idv = (ROOT / "templates" / "wallet_ishuman_idv.html").read_text(encoding="utf-8")
     copy = (ROOT / "static" / "js" / "demo" / "ishuman-idv-preview-scenes.js").read_text(
