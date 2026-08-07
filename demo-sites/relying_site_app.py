@@ -31,6 +31,9 @@ SITE_KIND = os.getenv("LEMMA_DEMO_SITE_KIND", "ticketing")
 LEMMA_ORIGIN = os.getenv("LEMMA_ORIGIN", "https://lemma.id")
 DEMO_HUB_URL = os.getenv("LEMMA_DEMO_HUB_URL", f"{LEMMA_ORIGIN}/demo")
 TRIALS_DEMO_URL = os.getenv("LEMMA_DEMO_TRIALS_URL", "https://trials-demo.lemma.id")
+# When set (e.g. tickets-demo.lemma.id), redirect the Heroku hostname to the
+# integrator-facing host so browser Origin matches siteId.
+CANONICAL_HOST = os.getenv("LEMMA_DEMO_CANONICAL_HOST", "").strip().lower()
 
 _PLAIN_LANGUAGE_JS = """
 function formatDenyReason(reason) {
@@ -312,6 +315,20 @@ def _authorize_policy_mutation(target_ppid: str, body: dict | None = None) -> Op
 @app.before_request
 def load_demo_session():
     g.demo_session = _session_from_request()
+
+
+@app.before_request
+def redirect_to_canonical_host():
+    """Prefer the logical site hostname so Origin == siteId like a real integrator."""
+    if not CANONICAL_HOST:
+        return None
+    host = (request.host or "").split(":")[0].strip().lower()
+    if not host.endswith(".herokuapp.com") or host == CANONICAL_HOST:
+        return None
+    target = f"https://{CANONICAL_HOST}{request.full_path}"
+    if target.endswith("?"):
+        target = target[:-1]
+    return redirect(target, code=302)
 
 
 def _client_ip() -> str:

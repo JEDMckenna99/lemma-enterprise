@@ -80,6 +80,8 @@ def build_content_security_policy(nonce: str, profile: str = 'strict') -> str:
         "media-src 'self' blob:; "
         f"connect-src {' '.join(connect_src)}; "
         f"frame-src {' '.join(frame_src)} "
+            "https://tickets-demo.lemma.id "
+            "https://trials-demo.lemma.id "
             "https://lemma-demo-tickets-1d3d7411af33.herokuapp.com "
             "https://lemma-demo-trials-7090f46cae0d.herokuapp.com; "
         "object-src 'none'; "
