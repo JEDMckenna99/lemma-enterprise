@@ -100,10 +100,18 @@ def test_exempt_prefixes_are_not_gated():
     def sdk_thing():
         return jsonify({"ok": True})
 
+    @app.route("/api/verify/flow-state", methods=["POST"])
+    def flow_state():
+        return jsonify({"ok": True})
+
     client = app.test_client()
     client.set_cookie("session", "ambient-auth-value")
     resp = client.post("/api/sdk/thing")
     assert resp.status_code == 200
+    # Same-origin dogfood mints without CSRF headers while a session cookie
+    # may be present; Origin+site_id binding is the real guard.
+    flow = client.post("/api/verify/flow-state")
+    assert flow.status_code == 200
 
 
 # ---------------------------------------------------------------------------

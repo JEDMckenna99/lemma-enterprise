@@ -541,6 +541,10 @@ def init_csrf_protection(app):
         "/api/wallet/",
         "/api/health",
         "/api/revocation/",
+        # Bound by browser Origin + site_id match (not cookie session). Same-origin
+        # dogfood on lemma.id often has an ambient session cookie; CSRF would
+        # block legitimate minting from the SDK which does not send CSRF headers.
+        "/api/verify/flow-state",
     ]
 
     @app.before_request

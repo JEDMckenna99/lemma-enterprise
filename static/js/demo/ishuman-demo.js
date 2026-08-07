@@ -16,6 +16,31 @@
     tickets: 'lemma-demo-tickets-1d3d7411af33.herokuapp.com',
     trials: 'lemma-demo-trials-7090f46cae0d.herokuapp.com',
   };
+  const DEFAULT_CUSTOMER_SITE_URLS = {
+    tickets: 'https://lemma-demo-tickets-1d3d7411af33.herokuapp.com/',
+    trials: 'https://lemma-demo-trials-7090f46cae0d.herokuapp.com/',
+  };
+
+  function isPlatformHubHost() {
+    const host = String(window.location.hostname || '').toLowerCase();
+    return host === 'lemma.id' || host === 'www.lemma.id'
+      || host === 'localhost' || host === '127.0.0.1';
+  }
+
+  function customerSiteUrl(slug) {
+    const urls = (state.config && state.config.customer_site_urls) || {};
+    const raw = urls[slug] || DEFAULT_CUSTOMER_SITE_URLS[slug] || '';
+    return String(raw).replace(/\/?$/, '/');
+  }
+
+  function csrfHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    try {
+      const match = document.cookie.match(/(?:^|;\s*)lemma_csrf_token=([^;]+)/);
+      if (match && match[1]) headers['X-Lemma-CSRF'] = decodeURIComponent(match[1]);
+    } catch (_) { /* non-fatal */ }
+    return headers;
+  }
   const WIZARD_TOTAL = 7;
   const LEGACY_WIZARD_TOTAL = 7;
 
@@ -247,7 +272,7 @@
     if (state.walletId) {
       // Prefer the unified popup for unlock so the page does not run a passkey
       // ceremony and then open a second one on failure.
-      const popup = openIdvPopup({ issueMode: 'unlock' });
+      const popup = await openIdvPopup({ issueMode: 'unlock' });
       if (!popup) {
         try {
           await initWallet();
@@ -261,7 +286,7 @@
       return waitForWalletId();
     }
     setQuickInsight('Create', 'Opening passkey setup to create your lemma.id…');
-    const popup = openIdvPopup({ issueMode: 'passkey_setup' });
+    const popup = await openIdvPopup({ issueMode: 'passkey_setup' });
     if (!popup) {
       setQuickInsight('Create', 'Allow popups for lemma.id, then tap Get started again.');
       return false;
@@ -1671,7 +1696,31 @@
     return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
   }
 
-  function openIdvPopup({ demoQr = false, issueMode = '' } = {}) {
+  async function mintPlatformFlowState({ issueMode = '' } = {}) {
+    try {
+      const resp = await fetch('/api/verify/flow-state', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: csrfHeaders(),
+        body: JSON.stringify({
+          site_id: 'lemma.id',
+          issue_mode: issueMode || '',
+          redirect_return: window.location.href,
+        }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data?.success || !data?.flow_state) {
+        log('flow-state mint failed', data?.error || String(resp.status));
+        return null;
+      }
+      return String(data.flow_state);
+    } catch (err) {
+      log('flow-state mint error', err?.message || String(err));
+      return null;
+    }
+  }
+
+  async function openIdvPopup({ demoQr = false, issueMode = '' } = {}) {
     if (_demoIdvPopup && !_demoIdvPopup.closed) {
       try { _demoIdvPopup.focus(); } catch (_) { /* non-fatal */ }
       return _demoIdvPopup;
@@ -1680,7 +1729,20 @@
     const popupToken = randomPopupToken();
     broadcastIdvPopupSupersede(demoQr ? 'demo_qr' : 'idv', popupToken);
 
+    const flowState = await mintPlatformFlowState({
+      issueMode: issueMode || (demoQr ? '' : 'passkey_setup'),
+    });
+    if (!flowState && !demoQr) {
+      setPill('ih-lemma-status', 'FLOW BLOCKED', 'warn');
+      setQuickInsight(
+        'Create',
+        'Could not start the lemma.id ceremony (flow-state mint failed). Refresh and try again.',
+      );
+      return null;
+    }
+
     const popupUrl = new URL(`${window.location.origin}/verify`);
+    if (flowState) popupUrl.searchParams.set('flow_state', flowState);
     popupUrl.searchParams.set('origin', window.location.origin);
     popupUrl.searchParams.set('site_id', 'lemma.id');
     popupUrl.searchParams.set('popup_token', popupToken);
@@ -1771,7 +1833,7 @@
     if (assuranceDemoMode()) {
       setPill('ih-lemma-status', 'POPUP', 'warn');
       log('Opening lemma.id popup', 'passkey setup, same mechanism as demo sites');
-      openIdvPopup({ issueMode: 'passkey_setup' });
+      await openIdvPopup({ issueMode: 'passkey_setup' });
       return;
     }
     return openIdvPopup({ demoQr: false });
@@ -2139,6 +2201,17 @@
         : `${label} requires fresh presence — confirm with passkey…`,
     );
 
+    // Ceremonies for remote demo sites must run on that site's Origin.
+    if (isPlatformHubHost()) {
+      const url = customerSiteUrl(slug);
+      setQuickInsight(
+        'Sign in',
+        `${label} needs a ceremony on its own host — opening the demo site…`,
+      );
+      if (url) window.open(url, '_blank', 'noopener');
+      throw new Error('open_relying_site');
+    }
+
     const verifier = verifierFor(slug, { requiredAssurance });
     // Suspend local doubt during apply so a mid-flow status check cannot
     // fail-closed before we clear the server row.
@@ -2328,11 +2401,40 @@
       }
     }
 
+    // Hub is lemma.id — never mint /verify flow-state for a remote siteId here.
+    // Relying-site ceremonies belong on the demo app Origin (integrator contract).
+    const allowPopup = options.autoProvision !== false && !isPlatformHubHost();
     const backend = await verifier.verifyForBackend({
-      autoProvision: true,
-      requiredAssurance,
       ...options,
+      requiredAssurance,
+      autoProvision: allowPopup,
     });
+    if (
+      isPlatformHubHost()
+      && options.autoProvision !== false
+      && !(backend.ok || backend.human)
+      && !isSiteBanReason(backend.reason)
+    ) {
+      const url = customerSiteUrl(slug);
+      const label = slug === 'tickets' ? 'Ticketing' : 'Trials';
+      setQuickInsight(
+        'Sign in',
+        `${label} sign-in must run on ${SITE_IDS[slug]} — opening that site…`,
+      );
+      if (url) window.open(url, '_blank', 'noopener');
+      log(`${SITE_IDS[slug]} ceremony deferred`, 'open_relying_site');
+      const deferred = {
+        human: false,
+        ppid: backend.ppid || derivedPpid || resolveSitePpid(slug),
+        assurance: backend.assurance || null,
+        presentation: null,
+        reason: 'open_relying_site',
+        timeMs: backend.timeMs || 0,
+      };
+      state.results[slug] = deferred;
+      renderSite(slug, deferred);
+      return deferred;
+    }
     const ppid = backend.ppid
       || await resolveDisplayedPpid(verifier, backend, slug, options, requiredAssurance)
       || derivedPpid;
@@ -3628,7 +3730,7 @@
       const action = $('ih-step1-primary-btn')?.dataset.action;
       if (action === 'unlock') {
         // One ceremony only: unlock popup (same surface as create / IDV).
-        const popup = openIdvPopup({ issueMode: 'unlock' });
+        const popup = await openIdvPopup({ issueMode: 'unlock' });
         if (!popup) {
           try {
             await initWallet();
@@ -3643,7 +3745,7 @@
         }
         return;
       }
-      createLemmaIdViaPopup();
+      await createLemmaIdViaPopup();
     });
     bindClear('ih-clear-lemma-id-top-btn');
     bind('ih-start-idv-btn', startIdentityVerification);
@@ -3743,7 +3845,9 @@
     bind('ih-reverify-human-main-btn', reverifyTicketsIshuman);
     bind('ih-popup-retry-btn', () => {
       const mode = state.lastPopupIssueMode || 'passkey_setup';
-      openIdvPopup({ issueMode: mode === 'unlock' ? 'unlock' : mode });
+      openIdvPopup({ issueMode: mode === 'unlock' ? 'unlock' : mode }).catch((err) => {
+        log('Popup retry failed', err?.message || String(err));
+      });
     });
     bind('ih-run-all-operations', runAllOperations);
     bind('ih-reset-demo-btn', clearLemmaId);
