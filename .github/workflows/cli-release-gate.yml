@@ -43,9 +43,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install test dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install pytest requests build twine
+        run: bash scripts/ci_install_test_deps.sh
+
+      - name: Install release tooling
+        run: python -m pip install build twine
 
       - name: Run CLI unit tests
         run: python -m pytest tests/test_lemma_cli.py -v

@@ -21,6 +21,17 @@ def _run(cmd: list[str], *, env: dict[str, str] | None = None) -> None:
     subprocess.run(cmd, cwd=REPO_ROOT, env=merged, check=True)
 
 
+def _coverage_args() -> list[str]:
+    """Enable api coverage gate when pytest-cov is available (CI installs it)."""
+    if os.environ.get("LEMMA_CI_COVERAGE", "").strip().lower() in {"0", "false", "no"}:
+        return []
+    try:
+        import pytest_cov  # noqa: F401
+    except ImportError:
+        return []
+    return ["--cov=api", "--cov-report=term", "--cov-fail-under=40"]
+
+
 def main() -> int:
     test_env = {
         "SESSION_SECRET": "test-session-secret",
@@ -50,6 +61,7 @@ def main() -> int:
             "tests",
             "--ignore=tests/live",
             "-q",
+            *_coverage_args(),
         ],
         env=test_env,
     )

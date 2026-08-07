@@ -156,7 +156,13 @@ def run_platform_smoke_checks(base: str | None = None) -> list[CheckResult]:
     }
     results.append(CheckResult("POST platform-login fake wallet", login_ok, f"HTTP {status}"))
 
-    for path in ("/login", "/register", "/docs", "/sdk/ishuman-verifier.js"):
+    for path in (
+        "/login",
+        "/register",
+        "/docs",
+        "/sdk/proof-verifier.js",
+        "/sdk/lemma-signin.js",
+    ):
         status, _ = _request(base, path)
         results.append(CheckResult(f"GET {path}", status == 200, f"HTTP {status}"))
 

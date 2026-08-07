@@ -600,6 +600,24 @@
       "test_refs": []
     },
     {
+      "operation_id": "recovery.webauthn.begin",
+      "authority_class": "recovery",
+      "mutates": "Mints a one-time WebAuthn challenge bound to the recovery token and replacement passkey/PPID.",
+      "routes": [
+        {"method": "POST", "path": "/api/recovery/webauthn/begin", "module": "api/account_recovery.py"}
+      ],
+      "current_auth": ["recovery_token", "replacement_passkey_proof"],
+      "required_auth": ["one_time_recovery_token", "registered_replacement_passkey", "purpose_bound_webauthn_challenge"],
+      "required_scope": "none",
+      "site_binding": "token_bound_site",
+      "risk_tier": "high",
+      "enforcement_layer": "in_handler",
+      "compliance": "compliant",
+      "threat_tags": ["token_theft", "passkey_substitution", "challenge_forgery", "replay"],
+      "checklist_sections": [1, 6],
+      "test_refs": ["tests/test_security_containment_wave3.py"]
+    },
+    {
       "operation_id": "recovery.complete",
       "authority_class": "recovery",
       "mutates": "Issues administrator authority and may replace the bound administrator PPID.",

@@ -1,9 +1,10 @@
 name: isHuman staging smoke
 
+# Schedule paused: staging register-signing-key now requires WebAuthn enroll or
+# a demo test grant that staging no longer accepts on this path. Re-enable cron
+# after live_test_helpers enrollment matches staging. Manual runs still available.
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "45 6 * * *"
 
 jobs:
   staging-smoke:

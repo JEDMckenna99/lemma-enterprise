@@ -1,15 +1,11 @@
+# DEPRECATED: superseded by Auth Launch Gate post-deploy
+# (scripts/post_deploy_launch_gate.ps1 → launch_gate_smoke_ci.py → smoke_platform_prod.py)
+# and the daily Platform production smoke canary.
+# Kept as manual-only so historical bookmarks still resolve.
 name: Launch Gate Smoke
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - "scripts/smoke_platform_prod.py"
-      - "scripts/launch_gate_smoke_ci.py"
-      - ".github/workflows/launch-gate-smoke.yml"
-      - ".github/workflows/platform-prod-smoke.yml"
-      - "docs/status/GA_LAUNCH_READINESS_CHECKLIST.md"
-      - "ops/evidence/launch/**"
 
 jobs:
   launch-gate-smoke:
@@ -28,4 +24,3 @@ jobs:
         env:
           LEMMA_BASE_URL: https://lemma.id
         run: python scripts/smoke_platform_prod.py
-

@@ -25,6 +25,9 @@ jobs:
       - name: Install test dependencies
         run: bash scripts/ci_install_test_deps.sh
 
+      - name: Install coverage tooling
+        run: python -m pip install pytest-cov
+
       - name: Run non-live regression suite
         env:
           SESSION_SECRET: test-session-secret

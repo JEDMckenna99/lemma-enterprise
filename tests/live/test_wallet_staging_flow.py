@@ -72,7 +72,14 @@ def test_live_staging_wallet_signing_and_guardrails():
         headers=origin,
         timeout=30,
     )
-    assert unlock_begin.status_code == 403, unlock_begin.text
+    # Unknown/missing passkey triggers bootstrap enrollment (challenge) rather
+    # than a bare 403 — both deny unlock without a registered credential.
+    unlock_data = get_json_or_raise(unlock_begin)
+    if unlock_begin.status_code == 200:
+        assert unlock_data.get("bootstrap_required") is True, unlock_data
+        assert unlock_data.get("challenge_key"), unlock_data
+    else:
+        assert unlock_begin.status_code == 403, unlock_begin.text
 
     status, data = post_json(
         session,

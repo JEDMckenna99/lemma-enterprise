@@ -40,6 +40,7 @@ def fake_issuer(monkeypatch):
 @pytest.mark.unit
 def test_build_convergence_canonical_message_vector():
     artifact = {
+        "issuer": "did:lemma:issuer:federated",
         "site_id": "example.com",
         "legacy_ppid": "did:lemma:ppid_legacy0123456789abcdef0123456789abcdef0123456789abcdef01234567",
         "canonical_ppid": "did:lemma:ppid_canon0123456789abcdef0123456789abcdef0123456789abcdef012345678",
@@ -48,10 +49,12 @@ def test_build_convergence_canonical_message_vector():
         "issued_at_unix": 1700000000,
         "expires_at_unix": 1700003600,
     }
+    # Wave 4 binds issuer into the signed bytes (CANONICAL_MESSAGES.md §9).
     message = build_convergence_canonical_message(artifact)
     assert message.decode("utf-8") == "\n".join(
         [
             "lemma:ppid-convergence:v1",
+            artifact["issuer"],
             artifact["site_id"],
             artifact["legacy_ppid"],
             artifact["canonical_ppid"],

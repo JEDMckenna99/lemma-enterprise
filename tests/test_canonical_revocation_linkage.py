@@ -13,7 +13,12 @@ def test_trusted_issuer_verification_uses_canonical_revocation(monkeypatch):
     }
 
     monkeypatch.setattr(trusted_issuers, "is_trusted_issuer", lambda _issuer: True)
-    monkeypatch.setattr("api.revocation_verifier.is_credential_revoked", lambda _cid: True)
+    # Production path uses tri-state check_revocation_candidate (not the
+    # boolean is_credential_revoked wrapper).
+    monkeypatch.setattr(
+        "api.revocation_verifier.check_revocation_candidate",
+        lambda _cid: "revoked",
+    )
 
     result = trusted_issuers.verify_credential_with_trust(credential)
     assert result["valid"] is False

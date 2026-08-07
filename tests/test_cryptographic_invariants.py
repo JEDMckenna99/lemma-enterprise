@@ -278,6 +278,7 @@ def test_fresh_passkey_payload_formats():
 
     artifact = {
         "schema": "fresh_passkey_attestation.v1",
+        "issuer": "did:lemma:issuer:federated",
         "site_id": "example.com",
         "credential_id": "ishuman_site_1",
         "subject": "did:lemma:ppid_abc",
@@ -286,9 +287,10 @@ def test_fresh_passkey_payload_formats():
         "issued_at_unix": 1700000000,
         "expires_at_unix": 1700000120,
     }
+    # Wave 4 binds issuer into the signed bytes (CANONICAL_MESSAGES.md §10).
     expected = (
         b"lemma:fresh-passkey-attestation:v1\nfresh_passkey_attestation.v1\n"
-        b"example.com\nishuman_site_1\ndid:lemma:ppid_abc\n"
+        b"did:lemma:issuer:federated\nexample.com\nishuman_site_1\ndid:lemma:ppid_abc\n"
         + commitment.encode("ascii")
         + b"\nfpa_1\n1700000000\n1700000120"
     )

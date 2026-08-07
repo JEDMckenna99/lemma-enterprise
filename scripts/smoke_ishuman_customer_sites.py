@@ -20,10 +20,17 @@ DEFAULT_SITES = {
     },
 }
 
-SDK_PATTERN = re.compile(r"ishuman-verifier\.js", re.I)
-SITE_ID_PATTERN = re.compile(r"siteId\s*:\s*['\"]([^'\"]+)['\"]")
+# Canonical SDK is proof-verifier.js; ishuman-verifier.js remains a compat alias.
+SDK_PATTERN = re.compile(
+    r"(?:proof-verifier|ishuman-verifier)\.js|lemma-signin\.js",
+    re.I,
+)
+SITE_ID_PATTERN = re.compile(
+    r"siteId\s*[:=]\s*['\"]([^'\"]+)['\"]|site-id\s*=\s*['\"]([^'\"]+)['\"]",
+    re.I,
+)
 AUTO_PROVISION_PATTERN = re.compile(
-    r"autoProvision\s*:\s*true|makeVerifier\s*\(\s*true\s*\)",
+    r"autoProvision\s*:\s*true|makeVerifier\s*\(\s*true\s*\)|auto-provision\s*=\s*['\"]?true",
     re.I,
 )
 
@@ -49,15 +56,19 @@ def check_site(name: str, spec: dict) -> list[str]:
         return errors
 
     if not SDK_PATTERN.search(body):
-        errors.append(f"{name}: page missing ishuman-verifier.js reference ({url})")
+        errors.append(
+            f"{name}: page missing proof-verifier.js / lemma-signin.js reference ({url})"
+        )
 
     match = SITE_ID_PATTERN.search(body)
     if not match:
-        errors.append(f"{name}: page missing IsHumanVerifier siteId binding ({url})")
-    elif match.group(1) != expected_site_id:
-        errors.append(
-            f"{name}: siteId {match.group(1)!r} != expected {expected_site_id!r}"
-        )
+        errors.append(f"{name}: page missing siteId / site-id binding ({url})")
+    else:
+        found_site_id = match.group(1) or match.group(2)
+        if found_site_id != expected_site_id:
+            errors.append(
+                f"{name}: siteId {found_site_id!r} != expected {expected_site_id!r}"
+            )
 
     if not AUTO_PROVISION_PATTERN.search(body):
         errors.append(f"{name}: page missing autoProvision: true ({url})")
