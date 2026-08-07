@@ -49,6 +49,7 @@ PUBLIC_STATE_CHANGING_ALLOWLIST = {
     "/api/agent/validate",
     "/api/recovery/initiate",
     "/api/recovery/validate",
+    "/api/recovery/webauthn/begin",
     "/api/recovery/complete",
     "/api/recovery/complete-wallet",
     "/api/recovery/issue-admin-proof",
@@ -112,6 +113,8 @@ IN_HANDLER_AUTH_ALLOWLIST = {
     # Dogfooded platform sign-in: auth IS the server-verified signed
     # presentation in the request body (api/lemma_session_auth.py).
     "/api/auth/session",
+    # Origin-bound verify ceremony mint (opener Origin + site_id binding).
+    "/api/verify/flow-state",
     "/api/demo/ishuman/approve-network-revocation",
     "/api/demo/ishuman/clear-bans",
     "/api/demo/ishuman/clear-site-doubt",
