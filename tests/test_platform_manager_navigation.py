@@ -85,6 +85,9 @@ def test_brand_and_manager_creation_use_canonical_routes():
     assert "Sites only see a proof that you're human" in manager
     assert "updateAnchorIdentityCard" in manager
     assert "anchorWalletIdentity" in manager
+    assert "function isHumanIdentityAnchor(" in manager
+    assert "async function hasHumanIdentityAnchor(" in manager
+    assert "requiredAssurance: 'ishuman'" in manager
     assert "showIncompleteLemmaIdState();\n            return;" not in manager
     assert 'rel="preload"' in manager and "lemma-wallet.js" in manager
     assert "assessLemmaPlatformIdentity" in manager

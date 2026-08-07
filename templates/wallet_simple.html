@@ -411,6 +411,24 @@ async function checkCrossDeviceLock() {
     return;
 }
 
+function credentialAssurance(credential) {
+    const claims = credential?.claims || credential?.credentialSubject || {};
+    const raw = String(claims.assurance || '').trim().toLowerCase();
+    if (raw === 'passkey' || raw === 'ishuman') return raw;
+    if (claims.isHuman === true || String(claims.isHuman).toLowerCase() === 'true') return 'ishuman';
+    const id = String(credential?.id || '');
+    if (id.startsWith('ishuman_master_')) return 'ishuman';
+    return null;
+}
+
+/** True only for IDV / human-tier proofs — not passkey-only site credentials. */
+function isHumanIdentityAnchor(credential) {
+    if (!credential || typeof credential !== 'object') return false;
+    const id = String(credential.id || '');
+    if (id.startsWith('ishuman_master_')) return true;
+    return credentialAssurance(credential) === 'ishuman';
+}
+
 async function hasCompleteLemmaId() {
     const utils = window.LemmaCredentialUtils;
     try {
@@ -435,6 +453,29 @@ async function hasCompleteLemmaId() {
         }
     } catch (err) {
         console.warn('Could not inspect lemma.id proof:', err?.message || err);
+    }
+    return false;
+}
+
+async function hasHumanIdentityAnchor() {
+    try {
+        await initWallet();
+        if (typeof wallet.findIsHumanMasterCredential === 'function') {
+            const found = await wallet.findIsHumanMasterCredential();
+            if (isHumanIdentityAnchor(found)) return true;
+        }
+        if (typeof wallet.findIsHumanSiteCredential === 'function') {
+            const humanSite = await wallet.findIsHumanSiteCredential('lemma.id', {
+                requiredAssurance: 'ishuman',
+            });
+            if (isHumanIdentityAnchor(humanSite)) return true;
+        }
+        if (wallet.isUnlocked?.()) {
+            const creds = await gatherAllCredentials();
+            if (creds.some(isHumanIdentityAnchor)) return true;
+        }
+    } catch (err) {
+        console.warn('Could not inspect human identity anchor:', err?.message || err);
     }
     return false;
 }
@@ -513,8 +554,14 @@ async function deferUnlockedProofCheck(submessage = 'Your lemma.id is ready') {
             complete = await recoverMissingMasterFromServer() && await hasCompleteLemmaId();
         }
         if (gen !== proofCheckGeneration) return;
-        if (!complete) {
+        const anchored = await hasHumanIdentityAnchor();
+        if (gen !== proofCheckGeneration) return;
+        if (!anchored) {
+            // Passkey-only lemma.id is valid; still offer optional identity anchor.
             updateStatusDisplay(true, 'Open', 'Identity check not anchored yet');
+            updateAnchorIdentityCard(false);
+        } else {
+            updateAnchorIdentityCard(true);
         }
         if (gen !== proofCheckGeneration) return;
         await loadProofSummary();
@@ -523,6 +570,7 @@ async function deferUnlockedProofCheck(submessage = 'Your lemma.id is ready') {
     } catch (e) {
         console.warn('[Manager] Deferred proof check failed:', e?.message || e);
         if (gen === proofCheckGeneration) {
+            updateAnchorIdentityCard(false);
             loadProofSummary().catch(() => {});
             loadDevicesList().catch(() => {});
         }
@@ -1238,18 +1286,6 @@ async function loadProofSummary() {
         await initWallet();
         const credentials = await gatherAllCredentials();
         const claimsFor = (cred) => cred.claims || cred.credentialSubject || {};
-        const isHumanMaster = (cred) => {
-            const cl = claimsFor(cred);
-            if (!cl.isHuman) return false;
-            const site = normalizeSiteLabel(cl.siteDomain || cl.siteId || cl.site_id || cl.site || '');
-            return !site || isLemmaPlatformSite(site);
-        };
-        const isHumanSiteProof = (cred) => {
-            const cl = claimsFor(cred);
-            if (!cl.isHuman) return false;
-            const site = normalizeSiteLabel(cl.siteDomain || cl.siteId || cl.site_id || cl.site || '');
-            return !!site && !isLemmaPlatformSite(site);
-        };
         const isPermissionLemma = (cred) => {
             const pkg = String(cred.packageType || '').toLowerCase();
             const cl = claimsFor(cred);
@@ -1264,14 +1300,19 @@ async function loadProofSummary() {
 
         let master = null;
         if (typeof wallet.findIsHumanMasterCredential === 'function') {
-            master = await wallet.findIsHumanMasterCredential();
+            const found = await wallet.findIsHumanMasterCredential();
+            if (isHumanIdentityAnchor(found)) master = found;
         }
         if (!master) {
-            master = credentials.filter(isHumanMaster)[0] || null;
+            master = credentials.filter(isHumanIdentityAnchor)[0] || null;
         }
 
         const siteSet = new Set(getSitesFromLocalStorage());
-        credentials.filter(isHumanSiteProof).forEach((cred) => {
+        credentials.forEach((cred) => {
+            const assurance = credentialAssurance(cred);
+            if (assurance !== 'ishuman' && assurance !== 'passkey') return;
+            // Masters have no site binding; skip them for the site list.
+            if (String(cred.id || '').startsWith('ishuman_master_')) return;
             const site = normalizeSiteLabel(
                 claimsFor(cred).siteDomain || claimsFor(cred).siteId || claimsFor(cred).site_id || claimsFor(cred).site
             );
@@ -1325,6 +1366,7 @@ async function loadProofSummary() {
     } catch (e) {
         console.warn('[Proofs] summary failed:', e.message);
         container.innerHTML = '<p class="proofs-error">Could not load your saved info.</p>';
+        updateAnchorIdentityCard(false);
     }
 }
 
