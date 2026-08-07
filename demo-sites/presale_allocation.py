@@ -100,6 +100,15 @@ class PresaleAllocationBackend(Protocol):
     ) -> ClaimResult:
         ...
 
+    def clear_claim(
+        self,
+        drop_id: str,
+        ppid: str,
+        *,
+        legacy_ppid: Optional[str] = None,
+    ) -> int:
+        ...
+
     def reset(self, drop_id: Optional[str] = None) -> int:
         ...
 
@@ -272,6 +281,34 @@ class PresaleAllocationLedger:
                 claimed_at=claimed_at,
                 assurance=assurance,
             )
+
+    def clear_claim(
+        self,
+        drop_id: str,
+        ppid: str,
+        *,
+        legacy_ppid: Optional[str] = None,
+    ) -> int:
+        """Demo helper: release this person's allocation so they can claim again."""
+        drop = _normalize_drop_id(drop_id)
+        if not drop:
+            return 0
+        with self._lock:
+            codes: set[str] = set()
+            for key in self._subject_keys(drop, ppid, legacy_ppid=legacy_ppid):
+                record = self._by_key.get(key)
+                if record:
+                    codes.add(record.code)
+            if not codes:
+                return 0
+            keys = [
+                key
+                for key, record in self._by_key.items()
+                if key[0] == drop and record.code in codes
+            ]
+            for key in keys:
+                del self._by_key[key]
+            return len(keys)
 
     def reset(self, drop_id: Optional[str] = None) -> int:
         with self._lock:
@@ -526,6 +563,49 @@ class SQLitePresaleStore(PresaleRegistrationStore, PresaleAllocationLedger):
                 assurance=assurance,
                 existing=record,
             )
+
+    def clear_claim(
+        self,
+        drop_id: str,
+        ppid: str,
+        *,
+        legacy_ppid: Optional[str] = None,
+    ) -> int:
+        """Demo helper: release this person's allocation so they can claim again."""
+        drop = _normalize_drop_id(drop_id)
+        if not drop:
+            return 0
+        subjects: list[str] = []
+        for candidate in (ppid, legacy_ppid):
+            normalized = _normalize_ppid(candidate or "")
+            if normalized and normalized not in subjects:
+                subjects.append(normalized)
+        if not subjects:
+            return 0
+        with self._lock:
+            codes: set[str] = set()
+            for subject in subjects:
+                row = self._conn.execute(
+                    "SELECT code FROM presale_allocations WHERE drop_id = ? AND ppid = ?",
+                    (drop, subject),
+                ).fetchone()
+                if row:
+                    codes.add(row[0])
+            if not codes:
+                return 0
+            removed = 0
+            try:
+                for code in codes:
+                    cur = self._conn.execute(
+                        "DELETE FROM presale_allocations WHERE drop_id = ? AND code = ?",
+                        (drop, code),
+                    )
+                    removed += int(cur.rowcount or 0)
+                self._conn.commit()
+            except sqlite3.Error:
+                self._conn.rollback()
+                return 0
+            return removed
 
     def reset(self, drop_id: Optional[str] = None) -> int:
         with self._lock:

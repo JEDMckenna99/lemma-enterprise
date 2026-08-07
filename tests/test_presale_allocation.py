@@ -96,6 +96,25 @@ def test_reset_clears_drop():
     assert still_blocked is not None
 
 
+def test_clear_claim_releases_ppid_for_replay():
+    mod = _load_ledger_module()
+    ledger = mod.PresaleAllocationLedger()
+    first = ledger.claim("drop-a", "did:lemma:ppid_a", assurance="ishuman")
+    assert first.ok is True
+
+    blocked = ledger.claim("drop-a", "did:lemma:ppid_a", assurance="ishuman")
+    assert blocked.ok is False
+    assert blocked.reason == "allocation_already_claimed"
+
+    removed = ledger.clear_claim("drop-a", "did:lemma:ppid_a")
+    assert removed >= 1
+    assert ledger.lookup("drop-a", "did:lemma:ppid_a") is None
+
+    again = ledger.claim("drop-a", "did:lemma:ppid_a", assurance="ishuman")
+    assert again.ok is True
+    assert again.code != first.code
+
+
 def test_registration_store_tracks_drop_ppid():
     mod = _load_ledger_module()
     store = mod.PresaleRegistrationStore()

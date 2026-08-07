@@ -140,6 +140,94 @@ def test_trials_start_trial_accepts_ishuman_presentation(trials_site_client, mon
     assert payload["assurance"] == "ishuman"
 
 
+def test_trials_second_activation_denied_one_per_person(trials_site_client, monkeypatch):
+    client, mod = trials_site_client
+    mod.ACTION_LOG.clear()
+    mod._TRIAL_VERIFY_CTX = None
+    mod._PRESALE_LEDGER.reset(mod.TRIAL_DROP_ID)
+
+    class _FakeResult:
+        ok = True
+        ppid = "ppid_trial_repeat"
+        legacy_ppid = None
+        assurance = "ishuman"
+        reason = "valid"
+
+    monkeypatch.setattr(mod.VerificationContext, "verify", lambda self, _p: _FakeResult())
+
+    body = {
+        "action": mod.TRIAL_ACTION,
+        "email": "founder@example.com",
+        "presentation": {"credential": {"id": "cred-1"}},
+    }
+    first = client.post("/api/demo/action", json=body)
+    second = client.post("/api/demo/action", json=body)
+    second_payload = second.get_json()
+
+    assert first.status_code == 200
+    assert first.get_json()["success"] is True
+    assert second.status_code == 403
+    assert second_payload["success"] is False
+    assert second_payload["reason"] == "trial_already_used"
+    assert second_payload["activated_at"] is not None
+
+
+def test_trials_reset_allows_replay(trials_site_client, monkeypatch):
+    client, mod = trials_site_client
+    mod.ACTION_LOG.clear()
+    mod._TRIAL_VERIFY_CTX = None
+    mod._PRESALE_LEDGER.reset(mod.TRIAL_DROP_ID)
+
+    ppid = "ppid_trial_reset"
+
+    class _FakeResult:
+        ok = True
+        legacy_ppid = None
+        assurance = "ishuman"
+        reason = "valid"
+
+    _FakeResult.ppid = ppid
+    monkeypatch.setattr(mod.VerificationContext, "verify", lambda self, _p: _FakeResult())
+
+    body = {
+        "action": mod.TRIAL_ACTION,
+        "presentation": {"credential": {"id": "cred-1"}},
+    }
+    assert client.post("/api/demo/action", json=body).status_code == 200
+    assert client.post("/api/demo/action", json=body).status_code == 403
+
+    cookie = mod._sign_session(ppid, "ishuman")
+    client.set_cookie(mod.SESSION_COOKIE, cookie)
+
+    status = client.get("/api/demo/trial/status")
+    status_payload = status.get_json()
+    assert status.status_code == 200
+    assert status_payload["activated"] is True
+
+    reset = client.post("/api/demo/trial/reset", json={"ppid": ppid})
+    reset_payload = reset.get_json()
+    assert reset.status_code == 200
+    assert reset_payload["success"] is True
+    assert reset_payload["cleared"] is True
+
+    again = client.post("/api/demo/action", json=body)
+    assert again.status_code == 200
+    assert again.get_json()["success"] is True
+
+
+def test_trials_index_renders_demo_walkthrough_and_reset(trials_site_client):
+    client, _mod = trials_site_client
+    body = client.get("/").get_data(as_text=True)
+
+    assert 'id="demo-progress"' in body
+    assert 'data-demo-step="signin"' in body
+    assert 'data-demo-step="one"' in body
+    assert 'id="trial-used-notice"' in body
+    assert 'id="trial-reset-btn"' in body
+    assert "/api/demo/trial/reset" in body
+    assert "trial_already_used" in body
+
+
 def test_relying_site_health(relying_site_client):
     client, mod = relying_site_client
     resp = client.get("/health")
@@ -156,7 +244,7 @@ def test_relying_site_health(relying_site_client):
 
 
 def test_relying_site_config(relying_site_client):
-    client, _mod = relying_site_client
+    client, mod = relying_site_client
     resp = client.get("/api/demo/config")
     payload = resp.get_json()
 
@@ -165,6 +253,9 @@ def test_relying_site_config(relying_site_client):
     assert payload["site_id"] == "tickets-demo.lemma.id"
     assert payload["lemma_origin"] == "https://lemma.id"
     assert payload["required_assurance"] == "passkey"
+    # Return links must land on the builder hub, not /demo (which bounces to /app).
+    assert payload["demo_hub_url"].endswith("/demo/how-it-works")
+    assert mod.DEMO_HUB_URL.endswith("/demo/how-it-works")
 
 
 def test_relying_site_action_denies_missing_presentation(relying_site_client):
@@ -306,6 +397,34 @@ def test_relying_site_lemma_clear_page(relying_site_client):
     assert b"LEMMA_CLEAR_DONE" in resp.data
 
 
+def test_relying_site_hub_verify_rejects_unknown_hub_origin(relying_site_client):
+    client, _mod = relying_site_client
+    resp = client.get("/hub-verify?hub_origin=https://evil.example")
+
+    assert resp.status_code == 400
+    assert b"Invalid hub_origin" in resp.data
+
+
+def test_relying_site_hub_verify_page(relying_site_client):
+    client, _mod = relying_site_client
+    resp = client.get(
+        "/hub-verify"
+        "?hub_origin=https://lemma.id"
+        "&request_id=test-req-1"
+        "&required_assurance=passkey"
+        "&mode=signin"
+    )
+    body = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert "LEMMA_HUB_VERIFY_RESULT" in body
+    assert "IsHumanVerifier" in body
+    assert "https://lemma.id" in body
+    assert "verifyForBackend" in body
+    assert "window.opener.postMessage" in body
+    assert "test-req-1" in body
+
+
 def test_relying_site_index_loads_verifier_script(relying_site_client):
     client, _mod = relying_site_client
     resp = client.get("/")
@@ -372,6 +491,10 @@ def test_relying_site_index_exposes_presale_defense_and_tour_ui(relying_site_cli
     assert 'id="attack-lab"' in body
     assert "Replay last stamp" in body
     assert "Skip Step 1" in body
+    assert 'id="already-claimed-notice"' in body
+    assert 'id="clear-claim-btn"' in body
+    assert "Clear claim (demo reset)" in body
+    assert "/api/demo/presale/clear-claim" in body
     assert "renderGateChips" in body
     assert "redactFreshPasskeyAttestation" in body
     assert "resumeAfterLemmaRedirect" in body
@@ -552,6 +675,11 @@ def test_welcome_index_renders_real_ticket_site_and_collapsed_dev_tools(relying_
     assert '<details class="developer-tools">' in body
     assert "What signing up usually feels like" not in body
     assert "document.body.classList.toggle('signed-in'" in body
+    assert 'id="welcome-progress"' in body
+    assert 'data-welcome-step="signin"' in body
+    assert 'data-welcome-step="return"' in body
+    assert "stripLemmaReturnParams" in body
+    assert "body.welcome-mode #attack-lab" in body
 
 
 def test_presale_claim_requires_registration(relying_site_client, monkeypatch):
@@ -635,6 +763,59 @@ def test_presale_claim_issues_code_once(relying_site_client, monkeypatch):
     assert second_payload["success"] is False
     assert second_payload["reason"] == "allocation_already_claimed"
     assert second_payload["existing_code"] == first_payload["code"]
+
+
+def test_demo_presale_clear_claim_releases_allocation(relying_site_client, monkeypatch):
+    client, mod = relying_site_client
+    mod.ACTION_LOG.clear()
+    mod._PRESALE_LEDGER.reset()
+    mod._PRESALE_REGISTRATIONS.reset()
+    mod._CLAIM_VERIFY_CTX = None
+    mod._NONCE_STORE = mod.InMemoryNonceStore()
+
+    ppid = "did:lemma:ppid_demo_clear"
+    mod._PRESALE_REGISTRATIONS.register(mod.PRESALE_DROP_ID, ppid)
+
+    class _FakeResult:
+        ok = True
+        ppid = "did:lemma:ppid_demo_clear"
+        legacy_ppid = None
+        assurance = "ishuman"
+        reason = "valid"
+        credential_id = "cred-1"
+        issuer_did = "did:lemma:test"
+        bound_site_id = "tickets-demo.lemma.id"
+
+    def _fake_verify_action_stamp(self, *_args, **_kwargs):
+        return _FakeResult()
+
+    monkeypatch.setattr(mod.VerificationContext, "verify_action_stamp", _fake_verify_action_stamp)
+
+    body = {
+        "drop_id": mod.PRESALE_DROP_ID,
+        "required_assurance": "ishuman",
+        "lemma": {"verified": True},
+    }
+    first = client.post("/api/presale/claim-code", json=body)
+    assert first.status_code == 200
+    assert first.get_json()["success"] is True
+
+    cookie = mod._sign_session(ppid, "ishuman")
+    client.set_cookie(mod.SESSION_COOKIE, cookie)
+    clear = client.post(
+        "/api/demo/presale/clear-claim",
+        json={"ppid": ppid, "drop_id": mod.PRESALE_DROP_ID},
+    )
+    clear_payload = clear.get_json()
+    assert clear.status_code == 200
+    assert clear_payload["success"] is True
+    assert clear_payload["cleared"] is True
+
+    again = client.post("/api/presale/claim-code", json=body)
+    again_payload = again.get_json()
+    assert again.status_code == 200
+    assert again_payload["success"] is True
+    assert again_payload["code"] != first.get_json()["code"]
 
 
 def test_presale_claim_doubt_requires_escalated_assurance(relying_site_client, monkeypatch):

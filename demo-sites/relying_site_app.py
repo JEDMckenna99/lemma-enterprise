@@ -7,6 +7,7 @@ import secrets
 import time
 from collections import deque
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 from flask import Flask, Response, g, jsonify, make_response, redirect, request
 
@@ -32,7 +33,9 @@ SITE_ID = os.getenv(
 SITE_NAME = os.getenv("LEMMA_DEMO_SITE_NAME", "Lemma Demo Site")
 SITE_KIND = os.getenv("LEMMA_DEMO_SITE_KIND", "ticketing")
 LEMMA_ORIGIN = os.getenv("LEMMA_ORIGIN", "https://lemma.id")
-DEMO_HUB_URL = os.getenv("LEMMA_DEMO_HUB_URL", f"{LEMMA_ORIGIN}/demo")
+# Builder / integration hub (not /demo — that dogfood front door redirects
+# signed-in users to /app).
+DEMO_HUB_URL = os.getenv("LEMMA_DEMO_HUB_URL", f"{LEMMA_ORIGIN}/demo/how-it-works")
 TRIALS_DEMO_URL = os.getenv(
     "LEMMA_DEMO_TRIALS_URL",
     "https://lemma-demo-trials-7090f46cae0d.herokuapp.com",
@@ -43,7 +46,14 @@ function formatDenyReason(reason) {
   if (window.LemmaDemoPlain && typeof window.LemmaDemoPlain.reason === 'function') {
     return window.LemmaDemoPlain.reason(reason);
   }
-  return String(reason || 'Something went wrong — try again.');
+  const key = String(reason || '').trim();
+  if (key === 'allocation_already_claimed') {
+    return "You already got your code — it's one per person.";
+  }
+  if (key === 'trial_already_used') {
+    return 'You already activated your free workspace — free trials are one per person.';
+  }
+  return key || 'Something went wrong — try again.';
 }
 function plainAssurance(tier) {
   if (window.LemmaDemoPlain && typeof window.LemmaDemoPlain.assurance === 'function') {
@@ -61,6 +71,7 @@ PRESALE_ESCALATED_ASSURANCE = os.getenv(
     "LEMMA_PRESALE_ESCALATED_ASSURANCE", "ishuman"
 ).strip().lower()
 TRIAL_ACTION = "start_trial"
+TRIAL_DROP_ID = os.getenv("LEMMA_TRIAL_DROP_ID", "northstar-free-trial").strip()
 TRIAL_REQUIRED_ASSURANCE = os.getenv(
     "LEMMA_TRIAL_REQUIRED_ASSURANCE", "ishuman"
 ).strip().lower()
@@ -528,6 +539,7 @@ def _presale_content():
         "retry": "Request another code",
         "flag": "Simulate site risk flag",
         "clear_flag": "Clear risk flag",
+        "clear_claim": "Clear claim (demo reset)",
         "success_register": "Registered for presale",
         "success": "Your unique code",
         "form_email": "Email for code delivery",
@@ -551,8 +563,7 @@ def _sdk_script_tags() -> str:
         f'  <script src="{LEMMA_ORIGIN}/sdk/lemma-signin.js?v={ISHUMAN_VERIFIER_SDK_VERSION}" '
         f'crossorigin="anonymous" '
         f'onerror="window.__lemmaSdkLoadError=\'lemma-signin failed to load from {LEMMA_ORIGIN}\'"></script>\n'
-        f'  <script src="{LEMMA_ORIGIN}/static/js/demo/plain-language.js?v=1" '
-        f'crossorigin="anonymous"></script>'
+        f'  <script src="{LEMMA_ORIGIN}/static/js/demo/plain-language.js?v=1"></script>'
     )
 
 
@@ -703,6 +714,59 @@ def demo_policy_clear():
     return jsonify({"success": True, "ppid": ppid})
 
 
+@app.get("/api/demo/trial/status")
+def demo_trial_status():
+    session = getattr(g, "demo_session", None) or _session_from_request()
+    if not session:
+        return jsonify({"success": False, "reason": "auth_required"}), 403
+    record = _PRESALE_LEDGER.lookup(TRIAL_DROP_ID, session["ppid"])
+    return jsonify({
+        "success": True,
+        "activated": bool(record),
+        "activated_at": record.claimed_at if record else None,
+        "ppid": session["ppid"],
+    })
+
+
+@app.post("/api/demo/trial/reset")
+def demo_trial_reset():
+    """Demo-only: release this PPID's trial activation so the flow can be replayed."""
+    body = request.get_json(silent=True) or {}
+    ppid = (body.get("ppid") or "").strip()
+    denied = _authorize_policy_mutation(ppid, body)
+    if denied:
+        return denied
+    removed = _PRESALE_LEDGER.clear_claim(TRIAL_DROP_ID, ppid)
+    return jsonify({
+        "success": True,
+        "ppid": ppid,
+        "cleared": removed > 0,
+        "removed": removed,
+    })
+
+
+@app.post("/api/demo/presale/clear-claim")
+def demo_presale_clear_claim():
+    """Demo-only: release this PPID's allocated code so the claim flow can be replayed."""
+    if not _is_presale_site():
+        return jsonify({"success": False, "reason": "presale_only"}), 404
+    body = request.get_json(silent=True) or {}
+    ppid = (body.get("ppid") or "").strip()
+    denied = _authorize_policy_mutation(ppid, body)
+    if denied:
+        return denied
+    drop_id = (body.get("drop_id") or PRESALE_DROP_ID).strip() or PRESALE_DROP_ID
+    legacy_ppid = (body.get("legacy_ppid") or "").strip() or None
+    removed = _PRESALE_LEDGER.clear_claim(drop_id, ppid, legacy_ppid=legacy_ppid)
+    return jsonify({
+        "success": True,
+        "ppid": ppid,
+        "drop_id": drop_id,
+        "cleared": removed > 0,
+        "removed": removed,
+    })
+
+
 @app.post("/api/demo/action")
 def demo_action():
     body = request.get_json(silent=True) or {}
@@ -736,6 +800,31 @@ def demo_action():
                 "reason": "verify_error",
                 "error": "Presentation verification failed on the server",
             }), 500
+        if result.ok:
+            # One free trial per verified person: the PPID ledger is the
+            # integrator-side dedupe, exactly like the presale code ledger.
+            claim = _PRESALE_LEDGER.claim(
+                TRIAL_DROP_ID,
+                result.ppid or "",
+                legacy_ppid=getattr(result, "legacy_ppid", None),
+                assurance=getattr(result, "assurance", None),
+            )
+            if not claim.ok and claim.reason == "allocation_already_claimed":
+                entry = {
+                    "ok": False,
+                    "ppid": result.ppid,
+                    "assurance": getattr(result, "assurance", None),
+                    "reason": "trial_already_used",
+                    "action": action_name,
+                }
+                ACTION_LOG.appendleft(entry)
+                return jsonify({
+                    "success": False,
+                    "reason": "trial_already_used",
+                    "ppid": result.ppid,
+                    "activated_at": claim.existing.claimed_at if claim.existing else None,
+                    "action_log": list(ACTION_LOG),
+                }), 403
     elif presentation:
         ctx = _verify_ctx()
         try:
@@ -1189,6 +1278,29 @@ def presale_claim_code():
     })
 
 
+def _origin_from_url(raw: str) -> str:
+    try:
+        parsed = urlparse((raw or "").strip())
+    except Exception:
+        return ""
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return ""
+    return f"{parsed.scheme}://{parsed.netloc}".lower()
+
+
+def _allowed_hub_origins() -> set[str]:
+    """Origins allowed to open /hub-verify and receive the result postMessage."""
+    origins = {
+        _origin_from_url(DEMO_HUB_URL),
+        _origin_from_url(LEMMA_ORIGIN),
+        "https://lemma.id",
+        "https://www.lemma.id",
+        "http://localhost:5000",
+        "http://127.0.0.1:5000",
+    }
+    return {o for o in origins if o}
+
+
 @app.get("/lemma-clear")
 def lemma_clear():
     """Same-origin storage wipe, designed to be embedded as a hidden iframe by
@@ -1233,6 +1345,229 @@ Cleared.
     return Response(html, mimetype="text/html")
 
 
+@app.get("/hub-verify")
+def hub_verify():
+    """Popup bridge for the lemma.id demo hub.
+
+    Flow-state mint requires opener origin == site hostname, so the hub cannot
+    run tickets/trials ceremonies on lemma.id. Instead the hub opens this page
+    on the demo Origin; we mint/run the ceremony here and postMessage a result
+    summary back to window.opener.
+    """
+    hub_origin = _origin_from_url(request.args.get("hub_origin", ""))
+    allowed = _allowed_hub_origins()
+    if hub_origin not in allowed:
+        return Response(
+            "<!doctype html><html><body><p>Invalid hub_origin.</p></body></html>",
+            status=400,
+            mimetype="text/html",
+        )
+
+    request_id = (request.args.get("request_id") or "").strip()[:128]
+    mode = (request.args.get("mode") or "signin").strip().lower()
+    if mode not in {"signin", "fresh_presence", "fresh_idv"}:
+        mode = "signin"
+    required_assurance = (request.args.get("required_assurance") or DEMO_REQUIRED_ASSURANCE).strip().lower()
+    if required_assurance not in {"passkey", "ishuman"}:
+        required_assurance = DEMO_REQUIRED_ASSURANCE or "passkey"
+
+    theme = _site_theme()
+    html = f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hub verify · {SITE_NAME}</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <style>
+    :root {{
+      --bg: {theme.get("bg", "#fafafa")};
+      --ink: {theme.get("ink", "#1a1a24")};
+      --muted: {theme.get("muted", "#5c5b66")};
+      --accent: {theme.get("accent", "#4E3D8F")};
+      --line: {theme.get("line", "#e5e4ea")};
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0; min-height: 100vh; font-family: Georgia, 'Times New Roman', serif;
+      background: var(--bg); color: var(--ink);
+      display: grid; place-items: center; padding: 24px;
+    }}
+    .card {{
+      width: min(420px, 100%); text-align: center;
+      border-top: 3px solid var(--accent); padding: 28px 22px 24px;
+    }}
+    .brand {{ display: inline-flex; align-items: center; gap: 10px; margin-bottom: 14px; }}
+    .brand svg {{ width: 36px; height: 36px; }}
+    h1 {{ font-size: 1.35rem; margin: 0 0 8px; font-weight: 600; }}
+    p {{ margin: 0; color: var(--muted); font-size: 0.95rem; line-height: 1.45; }}
+    #status {{ margin-top: 18px; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 0.85rem; }}
+    #status[data-state="error"] {{ color: #b42318; }}
+    #status[data-state="ok"] {{ color: #027a48; }}
+  </style>
+  {_sdk_script_tags()}
+</head>
+<body>
+  <main class="card">
+    <div class="brand" aria-hidden="true">{theme.get("icon_svg", "")}</div>
+    <h1>{SITE_NAME}</h1>
+    <p>Completing sign-in for the lemma.id demo hub on this site's origin.</p>
+    <p id="status" data-state="pending">Starting…</p>
+  </main>
+  <script>
+(async function () {{
+  var HUB_ORIGIN = {hub_origin!r};
+  var REQUEST_ID = {request_id!r};
+  var MODE = {mode!r};
+  var REQUIRED_ASSURANCE = {required_assurance!r};
+  var SITE_ID = {SITE_ID!r};
+  var LEMMA_ORIGIN = {LEMMA_ORIGIN!r};
+  var statusEl = document.getElementById('status');
+  var settled = false;
+
+  function setStatus(text, state) {{
+    if (!statusEl) return;
+    statusEl.textContent = text;
+    if (state) statusEl.setAttribute('data-state', state);
+  }}
+
+  function notify(payload) {{
+    if (settled) return;
+    settled = true;
+    var msg = Object.assign({{
+      type: 'LEMMA_HUB_VERIFY_RESULT',
+      request_id: REQUEST_ID,
+      site_id: SITE_ID,
+    }}, payload || {{}});
+    try {{
+      if (window.opener && !window.opener.closed) {{
+        window.opener.postMessage(msg, HUB_ORIGIN);
+      }}
+    }} catch (e) {{}}
+    setTimeout(function () {{
+      try {{ window.close(); }} catch (e) {{}}
+    }}, msg.ok ? 600 : 1600);
+  }}
+
+  function cancel(reason) {{
+    notify({{
+      type: 'LEMMA_HUB_VERIFY_RESULT',
+      ok: false,
+      human: false,
+      ppid: null,
+      assurance: null,
+      presentation: null,
+      reason: reason || 'idv_cancelled',
+      timeMs: 0,
+    }});
+  }}
+
+  if (!window.opener) {{
+    setStatus('Open this page from the demo hub Sign in button.', 'error');
+    return;
+  }}
+  if (!window.IsHumanVerifier) {{
+    setStatus(window.__lemmaSdkLoadError || 'SDK failed to load.', 'error');
+    cancel('sdk_load_failed');
+    return;
+  }}
+
+  var Verifier = window.IsHumanVerifier || window.ProofVerifier;
+  var verifier = new Verifier({{
+    siteId: SITE_ID,
+    lemmaOrigin: LEMMA_ORIGIN,
+    autoProvision: true,
+    requiredAssurance: REQUIRED_ASSURANCE,
+    debug: true,
+    isBlockedLocally: async function (ppid) {{
+      try {{
+        var res = await fetch('/api/demo/policy/check?ppid=' + encodeURIComponent(ppid));
+        var data = await res.json();
+        return {{ blocked: !!data.blocked, doubt_required: !!data.doubt_required }};
+      }} catch (e) {{
+        return {{ blocked: false, doubt_required: false }};
+      }}
+    }},
+  }});
+
+  try {{
+    setStatus(MODE === 'fresh_idv'
+      ? 'Confirm fresh human proof…'
+      : (MODE === 'fresh_presence' ? 'Confirm fresh presence…' : 'Signing in…'));
+
+    var backend = null;
+    if (MODE === 'fresh_idv') {{
+      backend = await verifier.verifyFreshForBackend({{
+        requiredAssurance: 'ishuman',
+        freshIdv: true,
+      }});
+    }} else if (MODE === 'fresh_presence') {{
+      var issued = await verifier._issueSiteProofViaPopup({{
+        freshIdv: false,
+        requireFreshPasskey: true,
+        refreshReason: 'site_doubt',
+      }});
+      if (!issued || !issued.ok) {{
+        setStatus('Presence confirmation cancelled.', 'error');
+        cancel(issued && issued.reason ? issued.reason : 'fresh_presence_cancelled');
+        return;
+      }}
+      var applied = await verifier._applyIssuedSiteProof(
+        Object.assign({{}}, issued.detail || {{}}, {{ refresh_reason: 'site_doubt' }}),
+        performance.now()
+      );
+      backend = {{
+        ok: !!(applied && applied.human),
+        human: !!(applied && applied.human),
+        ppid: applied && applied.ppid,
+        assurance: (applied && applied.assurance) || 'passkey',
+        presentation: applied && applied.presentation,
+        reason: (applied && applied.reason) || 'valid',
+        timeMs: (applied && applied.timeMs) || 0,
+      }};
+    }} else {{
+      backend = await verifier.verifyForBackend({{
+        autoProvision: true,
+        requiredAssurance: REQUIRED_ASSURANCE,
+      }});
+    }}
+
+    var ok = !!(backend && (backend.ok || backend.human));
+    if (ok && backend.presentation) {{
+      try {{
+        await fetch('/api/login', {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          credentials: 'same-origin',
+          body: JSON.stringify({{ presentation: backend.presentation }}),
+        }});
+      }} catch (e) {{ /* session cookie optional for hub UI */ }}
+    }}
+
+    if (ok) setStatus('Signed in — returning to hub…', 'ok');
+    else setStatus('Sign-in did not complete (' + ((backend && backend.reason) || 'denied') + ').', 'error');
+
+    notify({{
+      ok: ok,
+      human: ok,
+      ppid: (backend && backend.ppid) || null,
+      assurance: (backend && backend.assurance) || null,
+      presentation: (backend && backend.presentation) || null,
+      reason: (backend && backend.reason) || (ok ? 'valid' : 'not_verified'),
+      timeMs: (backend && backend.timeMs) || 0,
+    }});
+  }} catch (err) {{
+    var reason = (err && err.message) ? String(err.message) : 'verify_failed';
+    setStatus('Sign-in failed: ' + reason, 'error');
+    cancel(reason);
+  }}
+}})();
+  </script>
+</body>
+</html>"""
+    return Response(html, mimetype="text/html")
+
+
 @app.get("/")
 def index():
     if _is_presale_site():
@@ -1254,6 +1589,14 @@ def _generic_index():
     copy = _content()
     theme = _site_theme()
     is_trial = "trial" in SITE_KIND.lower()
+    demo_walkthrough = """
+    <div class="demo-progress" id="demo-progress" aria-label="Demo walkthrough">
+      <span class="demo-progress-label">Live demo</span>
+      <span class="demo-step" data-demo-step="signin">1 · Sign in with a passkey</span>
+      <span class="demo-step" data-demo-step="activate">2 · Activate your free workspace</span>
+      <span class="demo-step" data-demo-step="deny">3 · Try to activate again</span>
+      <span class="demo-step" data-demo-step="one">4 · One trial per person</span>
+    </div>""" if is_trial else ""
     trial_gated_block = ""
     if is_trial:
         trial_gated_block = f"""
@@ -1263,6 +1606,15 @@ def _generic_index():
           <label for="email">{copy["form"]}</label>
           <input id="email" value="{copy["placeholder"]}" aria-label="{copy["form"]}">
           <button id="verify-btn" class="site-cta" disabled>{copy["primary"]}</button>
+          <div class="trial-active" id="trial-active" hidden>
+            <strong>Workspace active</strong>
+            <p>Your free workspace is live — verified one per person, no email or documents shared with Northstar.</p>
+          </div>
+          <div class="trial-used-notice" id="trial-used-notice" hidden>
+            <strong>You already used your free trial</strong>
+            <p>Free workspaces are one per person. Same lemma.id, same answer — even after clearing cookies or reinstalling.</p>
+          </div>
+          <button type="button" id="trial-reset-btn" class="trial-reset-btn" hidden>Clear trial (demo reset)</button>
         </div>"""
     else:
         trial_gated_block = f"""
@@ -1424,6 +1776,67 @@ def _generic_index():
     .dev-tools[open] > summary::after {{ content: "−"; }}
     .dev-tools .verdict {{ min-height: 0; }}
     .logout-btn {{ width: auto; margin: 0; padding: 9px 13px; color: #475569; background: #fff; border: 1px solid var(--line); font-size: 12px; }}
+    .demo-progress {{
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 18px;
+    }}
+    .demo-progress-label {{
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-right: 4px;
+    }}
+    .demo-step {{
+      font-size: 12px;
+      font-weight: 700;
+      padding: 5px 11px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      background: #fff;
+    }}
+    .demo-step.is-active {{
+      border-color: var(--brand);
+      color: var(--brand);
+      background: #f0fdf4;
+    }}
+    .demo-step.is-done {{
+      border-color: #86efac;
+      color: var(--ok);
+      background: #f0fdf4;
+    }}
+    .trial-active {{
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid #4ade80;
+      background: rgba(255, 255, 255, 0.08);
+      color: #dcfce7;
+    }}
+    .trial-active strong {{ display: block; margin-bottom: 4px; color: #fff; }}
+    .trial-active p {{ margin: 0; font-size: 13px; line-height: 1.45; color: #bbf7d0; }}
+    .trial-used-notice {{
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid #fcd34d;
+      background: rgba(255, 251, 235, 0.95);
+      color: #92400e;
+    }}
+    .trial-used-notice strong {{ display: block; margin-bottom: 4px; color: #78350f; }}
+    .trial-used-notice p {{ margin: 0; font-size: 13px; line-height: 1.45; }}
+    .trial-reset-btn {{
+      background: transparent;
+      border: 1px solid #86efac;
+      color: #dcfce7;
+      font-size: 13px;
+      padding: 10px 14px;
+    }}
     @media (max-width: 820px) {{
       .layout, .auth-shell, .dashboard-grid {{ grid-template-columns: 1fr; }}
       .auth-shell {{ min-height: auto; gap: 28px; }}
@@ -1435,6 +1848,7 @@ def _generic_index():
 <body>
   {_site_header('<button class="logout-btn" id="logout-btn" hidden>Sign out</button>')}
   <main>
+    {demo_walkthrough}
     <section class="auth-shell" id="auth-view">
       <div class="auth-copy">
         <p class="eyebrow">{copy["eyebrow"]}</p>
@@ -1490,7 +1904,7 @@ def _generic_index():
           <summary>Server-verified action log</summary>
           <pre id="action-log">[]</pre>
         </details>
-        <p class="hub-return"><a href="{DEMO_HUB_URL}?from=demo" target="_blank" rel="noopener">Open lemma.id integration guide →</a></p>
+        <p class="hub-return"><a href="{DEMO_HUB_URL}?lane=builder&from=demo">Return to demo hub →</a></p>
       </details>
     </section>
   </main>
@@ -1515,14 +1929,61 @@ def _generic_index():
     const signInEl = document.getElementById('lemma-signin-btn');
     const actionBtn = document.getElementById('verify-btn');
     const trialGated = document.getElementById('trial-gated');
+    const trialActiveEl = document.getElementById('trial-active');
+    const trialUsedNotice = document.getElementById('trial-used-notice');
+    const trialResetBtn = document.getElementById('trial-reset-btn');
     const authView = document.getElementById('auth-view');
     const appView = document.getElementById('app-view');
     const logoutBtn = document.getElementById('logout-btn');
     const SITE_POLICY = '{DEMO_REQUIRED_ASSURANCE}';
     const TRIAL_ASSURANCE = '{TRIAL_REQUIRED_ASSURANCE}';
     const IS_TRIAL_SITE = {'true' if is_trial else 'false'};
+    const DEMO_SEQUENCE = ['signin', 'activate', 'deny', 'one'];
     let sharedVerifier = null;
     let siteSessionPpid = null;
+
+    function setDemoStep(stepId) {{
+      const idx = DEMO_SEQUENCE.indexOf(stepId);
+      if (idx < 0) return;
+      document.querySelectorAll('.demo-step').forEach((el) => {{
+        const stepIdx = DEMO_SEQUENCE.indexOf(el.getAttribute('data-demo-step'));
+        el.classList.remove('is-active', 'is-done');
+        if (stepIdx < idx) el.classList.add('is-done');
+        else if (stepIdx === idx) el.classList.add('is-active');
+      }});
+    }}
+
+    function showTrialActive() {{
+      if (trialActiveEl) trialActiveEl.hidden = false;
+      if (trialUsedNotice) trialUsedNotice.hidden = true;
+      if (trialResetBtn) trialResetBtn.hidden = false;
+    }}
+
+    function showTrialAlreadyUsed() {{
+      if (trialUsedNotice) trialUsedNotice.hidden = false;
+      if (trialActiveEl) trialActiveEl.hidden = true;
+      if (trialResetBtn) trialResetBtn.hidden = false;
+      setDemoStep('one');
+    }}
+
+    function resetTrialUi() {{
+      if (trialActiveEl) trialActiveEl.hidden = true;
+      if (trialUsedNotice) trialUsedNotice.hidden = true;
+      if (trialResetBtn) trialResetBtn.hidden = true;
+    }}
+
+    async function syncTrialStatus() {{
+      if (!IS_TRIAL_SITE || !siteSessionPpid) return;
+      try {{
+        const res = await fetch('/api/demo/trial/status', {{ credentials: 'include' }});
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.activated) {{
+          showTrialActive();
+          setDemoStep('deny');
+        }}
+      }} catch (err) {{}}
+    }}
 
     function setSignInDisabled(disabled) {{
       if (!signInEl) return;
@@ -1695,6 +2156,8 @@ def _generic_index():
           pill.textContent = 'SIGNED IN';
           pill.className = 'pill ok';
           setAssurancePill(data.assurance || SITE_POLICY);
+          setDemoStep('activate');
+          await syncTrialStatus();
           return true;
         }}
       }} catch (err) {{}}
@@ -1704,6 +2167,7 @@ def _generic_index():
       setSignInDisabled(false);
       updateGatedVisibility(false);
       renderSiteSession(false);
+      setDemoStep('signin');
       return false;
     }}
 
@@ -1789,6 +2253,17 @@ def _generic_index():
           body: JSON.stringify(requestPayload),
         }});
         serverEntry = await serverRes.json();
+        await refreshActionLog();
+        if (IS_TRIAL_SITE && serverEntry.reason === 'trial_already_used') {{
+          showTrialAlreadyUsed();
+          pill.textContent = 'ALREADY USED';
+          pill.className = 'pill deny';
+          const msg = formatDenyReason('trial_already_used');
+          decisionCopy.textContent = msg;
+          decisionCard.innerHTML = '<strong>One free trial per person</strong><p class="tiny">' + msg
+            + ' Use Clear trial (demo reset) to replay the flow.</p>';
+          return;
+        }}
         const response = {{
           human: !!serverEntry.success,
           assurance: serverEntry.assurance || (IS_TRIAL_SITE ? TRIAL_ASSURANCE : SITE_POLICY),
@@ -1796,8 +2271,11 @@ def _generic_index():
           timeMs: 0,
           ppid: serverEntry.ppid || siteSessionPpid,
         }};
-        await refreshActionLog();
         applyVerdict(response, {{ requestPayload, serverEntry }});
+        if (IS_TRIAL_SITE && serverEntry.success) {{
+          showTrialActive();
+          setDemoStep('deny');
+        }}
       }} catch (err) {{
         pill.textContent = 'ERROR';
         pill.className = 'pill deny';
@@ -1819,12 +2297,38 @@ def _generic_index():
       setSignInDisabled(false);
     }});
     actionBtn?.addEventListener('click', () => runProtectedAction());
+    trialResetBtn?.addEventListener('click', async () => {{
+      if (!siteSessionPpid) return;
+      try {{
+        const res = await fetch('/api/demo/trial/reset', {{
+          method: 'POST',
+          credentials: 'include',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ ppid: siteSessionPpid }}),
+        }});
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.reason || 'reset_failed');
+        resetTrialUi();
+        setDemoStep('activate');
+        pill.textContent = 'TRIAL CLEARED';
+        pill.className = 'pill ok';
+        decisionCopy.textContent = 'Demo reset: this account can activate a free workspace again.';
+        decisionCard.innerHTML = '<strong>Demo trial cleared</strong><p class="tiny">Activation released for this site-private PPID — run the flow again.</p>';
+      }} catch (err) {{
+        decisionCopy.textContent = 'Could not clear trial: ' + err.message;
+      }}
+    }});
     logoutBtn?.addEventListener('click', async () => {{
       await fetch('/api/logout', {{ method: 'POST', credentials: 'include' }});
       window.location.reload();
     }});
 
     if (new URLSearchParams(window.location.search).get('lemma_ishuman_return') === '1') {{
+      try {{
+        const cleaned = new URL(window.location.href);
+        ['lemma_ishuman_return', 'request_nonce', 'redirect_kind'].forEach((k) => cleaned.searchParams.delete(k));
+        window.history.replaceState(null, '', cleaned.toString());
+      }} catch (e) {{}}
       signInEl?.signIn()?.then((result) => {{
         if (result?.ok) completeLoginFromPresentation(result.presentation, result.timeMs).then((ok) => {{
           if (ok) runProtectedAction();
@@ -1877,7 +2381,7 @@ def _ticketing_signin_index():
   </style>
 </head>
 <body>
-  {_site_header(f'<a href="{DEMO_HUB_URL}?from=demo" target="_blank" rel="noopener">Return to demo hub</a>')}
+  {_site_header(f'<a href="{DEMO_HUB_URL}?lane=builder&from=demo">Return to demo hub</a>')}
   <main>
     <div class="layout">
       <section class="card">
@@ -2096,8 +2600,24 @@ def _presale_index(welcome_mode=False):
           <pre id="action-log">[]</pre>
         </details>
       </aside>"""
+    verdict_intro = """
+        <div class="verdict" id="decision-card">
+          <strong>How this works</strong>
+          <p class="tiny">Sign in with your passkey, join the drop, then reveal one verified-fan code. Encore never sees your email, password, or identity documents — just a private member ID.</p>
+        </div>""" if welcome_mode else """
+        <div class="verdict" id="decision-card">
+          <strong>Protected presale flow</strong>
+          <p class="tiny">Step 1: passkey register binds your site-private ID. Step 2: confirm and reveal with verified-human assurance plus a fresh passkey — one code per person. Contact info is optional delivery after you claim.</p>
+        </div>"""
     welcome_contrast = ""
-    welcome_progress = ""
+    welcome_progress = """
+    <div class="welcome-progress" id="welcome-progress" aria-label="Demo walkthrough">
+      <span class="welcome-progress-label">Live demo</span>
+      <span class="welcome-step" data-welcome-step="signin">1 · Sign in with a passkey</span>
+      <span class="welcome-step" data-welcome-step="claim">2 · Claim your presale code</span>
+      <span class="welcome-step" data-welcome-step="deny">3 · Try to claim a second</span>
+      <span class="welcome-step" data-welcome-step="return">4 · One code per person</span>
+    </div>""" if welcome_mode else ""
     privacy_cta = f"""
     <section class="card welcome-privacy" id="welcome-privacy" hidden>
       <p class="eyebrow">Recommended for you</p>
@@ -2132,7 +2652,7 @@ def _presale_index(welcome_mode=False):
         </details>""" if welcome_mode else ""
     header_links = f"""
     <nav class="site-nav"><a href="#events">Events</a><a href="#presale">Presales</a><button class="nav-account" id="logout-btn" hidden>Sign out</button></nav>""" if welcome_mode else f"""
-    <a href="{DEMO_HUB_URL}?from=demo" target="_blank" rel="noopener">Return to demo hub</a>
+    <a href="{DEMO_HUB_URL}?lane=builder&from=demo">Return to demo hub</a>
     <a href="/" style="margin-left:12px;">← Sign-in demo</a>"""
     html = f"""<!doctype html>
 <html lang="en">
@@ -2264,6 +2784,26 @@ def _presale_index(welcome_mode=False):
     .pill.ok {{ border-color: #86efac; background: #dcfce7; color: var(--ok); }}
     .pill.deny {{ border-color: #fca5a5; background: #fee2e2; color: var(--deny); }}
     .pill.checking {{ border-color: #fde68a; background: #fef9c3; color: #854d0e; }}
+    .already-claimed-notice {{
+      margin-top: 14px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid #fcd34d;
+      background: #fffbeb;
+      color: #92400e;
+    }}
+    .already-claimed-notice strong {{
+      display: block;
+      margin-bottom: 4px;
+      font-size: 15px;
+      color: #78350f;
+    }}
+    .already-claimed-notice p {{
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.45;
+      color: #92400e;
+    }}
     .verdict {{
       margin-top: 18px;
       border-radius: 14px;
@@ -2557,8 +3097,26 @@ def _presale_index(welcome_mode=False):
       display: none;
     }}
     body.welcome-mode #flag-btn,
-    body.welcome-mode #clear-flag-btn {{
+    body.welcome-mode #clear-flag-btn,
+    body.welcome-mode #attack-lab,
+    body.welcome-mode #defense-strip,
+    body.welcome-mode .drop-meta {{
       display: none;
+    }}
+    .welcome-progress {{
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 18px;
+    }}
+    .welcome-progress-label {{
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-right: 4px;
     }}
     .attack-lab-buttons {{
       display: grid;
@@ -2645,6 +3203,11 @@ def _presale_index(welcome_mode=False):
         <button type="button" class="btn-secondary" id="retry-btn" disabled>{copy["retry"]}</button>
         <button type="button" class="btn-secondary btn-ghost" id="flag-btn">{copy["flag"]}</button>
         <button type="button" class="btn-secondary btn-ghost" id="clear-flag-btn">{copy["clear_flag"]}</button>
+        <button type="button" class="btn-secondary btn-ghost" id="clear-claim-btn" hidden>{copy["clear_claim"]}</button>
+        <div class="already-claimed-notice" id="already-claimed-notice" hidden>
+          <strong>You already claimed your code</strong>
+          <p>This drop is one code per person. Your existing code is shown below. Use Clear claim (demo reset) to release this PPID and try again.</p>
+        </div>
         {welcome_status}
         {welcome_engineer_stubs}
         <details class="attack-lab" id="attack-lab">
@@ -2671,10 +3234,7 @@ def _presale_index(welcome_mode=False):
         </div>
         </div>
         </div>
-        <div class="verdict" id="decision-card">
-          <strong>Protected presale flow</strong>
-          <p class="tiny">Step 1: passkey register binds your site-private ID. Step 2: confirm and reveal with verified-human assurance plus a fresh passkey — one code per person. Contact info is optional delivery after you claim.</p>
-        </div>
+        {verdict_intro}
       </section>
       {aside_block}
     </div>
@@ -2774,12 +3334,7 @@ def _presale_index(welcome_mode=False):
     }}
 
     if (WELCOME_MODE) {{
-      setWelcomeStep('contrast');
-      document.getElementById('welcome-contrast-next')?.addEventListener('click', () => {{
-        document.getElementById('welcome-contrast')?.classList.add('is-dismissed');
-        setWelcomeStep('signin');
-        decisionCopy.textContent = 'Tap Sign in with lemma.id — no form, no email.';
-      }});
+      setWelcomeStep('signin');
     }}
 
     function applyBackendGatesToggle(enabled) {{
@@ -2940,6 +3495,7 @@ def _presale_index(welcome_mode=False):
           if (registerBtn && !presaleRegistered) registerBtn.disabled = false;
           pill.textContent = 'SIGNED IN';
           pill.className = 'pill ok';
+          if (WELCOME_MODE) setWelcomeStep('claim');
           await syncPresaleRegistrationStatus();
           return true;
         }}
@@ -3031,6 +3587,36 @@ def _presale_index(welcome_mode=False):
       savePresaleSession({{ registered: presaleRegistered, ppid: lastPpid || null }});
     }}
 
+    function setClearClaimVisible(visible) {{
+      const clearClaimBtn = document.getElementById('clear-claim-btn');
+      if (clearClaimBtn) clearClaimBtn.hidden = !visible;
+    }}
+
+    function showAlreadyClaimed(code, {{ ppid }} = {{}}) {{
+      if (ppid) lastPpid = ppid;
+      const notice = document.getElementById('already-claimed-notice');
+      if (notice) notice.hidden = false;
+      setClearClaimVisible(true);
+      pill.textContent = 'ALREADY CLAIMED';
+      pill.className = 'pill deny';
+      const msg = formatDenyReason('allocation_already_claimed');
+      decisionCopy.textContent = msg;
+      decisionCard.innerHTML = '<strong>You already claimed your code</strong><p class="tiny">'
+        + msg
+        + ' Use Clear claim (demo reset) to release this PPID and run the flow again.</p>';
+      if (code) showClaimSuccess(code);
+      setStepState(true);
+      if (WELCOME_MODE) {{
+        setWelcomeStep('return');
+        showWelcomePrivacy();
+      }}
+    }}
+
+    function hideAlreadyClaimed() {{
+      const notice = document.getElementById('already-claimed-notice');
+      if (notice) notice.hidden = true;
+    }}
+
     async function syncPresaleRegistrationStatus() {{
       if (!siteSessionPpid) return;
       try {{
@@ -3044,6 +3630,12 @@ def _presale_index(welcome_mode=False):
         const data = await res.json();
         if (data.registered) {{
           setStepState(true);
+        }}
+        if (data.allocated && data.code) {{
+          showAlreadyClaimed(data.code, {{ ppid: data.ppid || siteSessionPpid }});
+        }} else {{
+          hideAlreadyClaimed();
+          setClearClaimVisible(false);
         }}
       }} catch (err) {{}}
     }}
@@ -3226,6 +3818,9 @@ def _presale_index(welcome_mode=False):
       }});
       lastStampedRequest = {{ path, body, action: context.action }};
       const serverEntry = await serverRes.json();
+      // The server nonce is consumed once posted; a stale challenge would
+      // only produce action_nonce_reused on the next attempt.
+      savePresaleSession({{ pendingChallenge: null }});
       await refreshActionLog();
       renderReceipt(serverEntry, context);
       return serverEntry;
@@ -3419,6 +4014,8 @@ def _presale_index(welcome_mode=False):
         }}
         if (serverEntry.success && serverEntry.code) {{
           savePresaleSession({{ pendingAction: null }});
+          hideAlreadyClaimed();
+          setClearClaimVisible(true);
           pill.textContent = 'CODE ISSUED';
           pill.className = 'pill ok';
           showClaimSuccess(serverEntry.code);
@@ -3431,21 +4028,24 @@ def _presale_index(welcome_mode=False):
           }}
           if (!isRetry) advanceTour('claim');
         }} else {{
-          pill.textContent = 'DENY';
-          pill.className = 'pill deny';
           const reason = serverEntry.reason || 'denied';
-          decisionCopy.textContent = formatDenyReason(reason);
-          decisionCard.innerHTML = '<strong>Claim denied</strong><p class="tiny">' + formatDenyReason(reason) + '</p>';
-          if (codeDisplay && serverEntry.existing_code) {{
-            showClaimSuccess(serverEntry.existing_code);
-          }}
-          if (isRetry && reason === 'allocation_already_claimed') {{
+          if (reason === 'allocation_already_claimed') {{
+            showAlreadyClaimed(serverEntry.existing_code || serverEntry.code, {{
+              ppid: serverEntry.ppid || lastPpid,
+            }});
             if (WELCOME_MODE) {{
               setWelcomeStep('return');
               showWelcomePrivacy();
-              decisionCard.innerHTML = '<strong>One per person</strong><p class="tiny">' + formatDenyReason(reason) + ' Close this tab and come back — you will still be you.</p>';
+              decisionCard.innerHTML = '<strong>One per person</strong><p class="tiny">'
+                + formatDenyReason(reason)
+                + ' Close this tab and come back — you will still be you. Or use Clear claim (demo reset) to replay.</p>';
             }}
-            advanceTour('retry');
+            if (isRetry) advanceTour('retry');
+          }} else {{
+            pill.textContent = 'DENY';
+            pill.className = 'pill deny';
+            decisionCopy.textContent = formatDenyReason(reason);
+            decisionCard.innerHTML = '<strong>Claim denied</strong><p class="tiny">' + formatDenyReason(reason) + '</p>';
           }}
           if (opts.skipStepDemo && reason === 'registration_required') {{
             advanceTour('attack');
@@ -3489,6 +4089,47 @@ def _presale_index(welcome_mode=False):
         body: JSON.stringify({{ ppid: lastPpid }}),
       }});
       decisionCopy.textContent = 'Risk flag cleared for demo reset.';
+    }}
+
+    async function clearClaimReset() {{
+      const ppid = lastPpid || siteSessionPpid;
+      if (!ppid) {{
+        decisionCopy.textContent = 'Sign in first so we know which PPID claim to clear.';
+        return;
+      }}
+      try {{
+        const res = await fetch('/api/demo/presale/clear-claim', {{
+          method: 'POST',
+          credentials: 'include',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ ppid, drop_id: DROP_ID }}),
+        }});
+        const data = await res.json();
+        if (!res.ok || !data.success) {{
+          throw new Error(data.reason || 'clear_claim_failed');
+        }}
+        hideAlreadyClaimed();
+        setClearClaimVisible(false);
+        if (codeDisplay) {{
+          codeDisplay.hidden = true;
+          codeDisplay.textContent = '--------';
+        }}
+        const confirmChips = document.getElementById('confirm-chips');
+        if (confirmChips) confirmChips.hidden = true;
+        const deliveryPanel = document.getElementById('delivery-panel');
+        if (deliveryPanel) deliveryPanel.hidden = true;
+        setStepState(presaleRegistered || !!siteSessionPpid);
+        pill.textContent = data.cleared ? 'CLAIM CLEARED' : 'NO CLAIM';
+        pill.className = 'pill ok';
+        decisionCopy.textContent = data.cleared
+          ? 'Demo reset: this PPID can claim a new code. Run Step 2 again.'
+          : 'No existing claim for this PPID — you can claim now.';
+        decisionCard.innerHTML = '<strong>Demo claim cleared</strong><p class="tiny">Allocation released for this site-private PPID. Registration is unchanged.</p>';
+      }} catch (err) {{
+        pill.textContent = 'ERROR';
+        pill.className = 'pill deny';
+        decisionCopy.textContent = 'Could not clear claim: ' + err.message;
+      }}
     }}
 
     async function runReplayAttack() {{
@@ -3555,6 +4196,7 @@ def _presale_index(welcome_mode=False):
     document.getElementById('retry-btn')?.addEventListener('click', () => runClaim(undefined, 0, {{ isRetry: true }}));
     document.getElementById('flag-btn')?.addEventListener('click', () => simulateRiskFlag());
     document.getElementById('clear-flag-btn')?.addEventListener('click', () => clearRiskFlag());
+    document.getElementById('clear-claim-btn')?.addEventListener('click', () => clearClaimReset());
     document.getElementById('replay-btn')?.addEventListener('click', () => runReplayAttack());
     document.getElementById('skip-step-btn')?.addEventListener('click', () => runSkipStepAttack());
     document.getElementById('save-delivery-btn')?.addEventListener('click', () => saveDelivery(false));
@@ -3565,9 +4207,18 @@ def _presale_index(welcome_mode=False):
       window.location.reload();
     }});
 
+    function stripLemmaReturnParams() {{
+      try {{
+        const cleaned = new URL(window.location.href);
+        ['lemma_ishuman_return', 'request_nonce', 'redirect_kind'].forEach((k) => cleaned.searchParams.delete(k));
+        window.history.replaceState(null, '', cleaned.toString());
+      }} catch (e) {{}}
+    }}
+
     async function resumeAfterLemmaRedirect() {{
       const params = new URLSearchParams(window.location.search);
       if (params.get('lemma_ishuman_return') !== '1') return;
+      stripLemmaReturnParams();
       const saved = loadPresaleSession();
       const pending = saved?.pendingAction;
       if (!pending) {{
@@ -3597,6 +4248,8 @@ def _presale_index(welcome_mode=False):
           }});
           if (serverEntry.success && serverEntry.code) {{
             savePresaleSession({{ pendingAction: null, pendingChallenge: null }});
+            hideAlreadyClaimed();
+            setClearClaimVisible(true);
             pill.textContent = 'CODE ISSUED';
             pill.className = 'pill ok';
             showClaimSuccess(serverEntry.code);
@@ -3612,6 +4265,14 @@ def _presale_index(welcome_mode=False):
             decisionCopy.textContent = 'Registered after redirect return.';
             return;
           }}
+          if (serverEntry.reason === 'allocation_already_claimed') {{
+            savePresaleSession({{ pendingAction: null, pendingChallenge: null }});
+            showAlreadyClaimed(serverEntry.existing_code || serverEntry.code, {{
+              ppid: serverEntry.ppid || lastPpid,
+            }});
+            return;
+          }}
+          savePresaleSession({{ pendingAction: null, pendingChallenge: null }});
           pill.textContent = 'DENY';
           pill.className = 'pill deny';
           decisionCopy.textContent = formatDenyReason(serverEntry.reason || 'denied');

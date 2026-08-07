@@ -26,6 +26,7 @@
     expired: 'Your session expired — sign in again.',
     untrusted_issuer: 'This site does not trust the credential issuer.',
     allocation_already_claimed: "You already got your code — it's one per person.",
+    trial_already_used: 'You already activated your free workspace — free trials are one per person.',
     registration_required: 'Sign up for the drop first.',
     action_nonce_reused: 'Blocked: someone tried to reuse an old approval.',
     rate_limited: 'Too many attempts — wait a moment and try again.',

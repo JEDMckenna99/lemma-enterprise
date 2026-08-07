@@ -21,13 +21,18 @@ Use `lemma-origin` when `LEMMA_ORIGIN` is not production `https://lemma.id` (sta
   - Default `/` — Sign in with `<lemma-signin>` → session cookie
   - `/?tour=presale` — Sybil-resistant presale enforcement demo
   - `LEMMA_PRESALE_DROP_ID=artist-presale-2026` (optional)
-  - `LEMMA_PRESALE_CODE_CLAIM_ASSURANCE=passkey` (default; optional)
+  - `LEMMA_PRESALE_CODE_CLAIM_ASSURANCE=ishuman` (default; optional)
   - `LEMMA_PRESALE_ESCALATED_ASSURANCE=ishuman` (optional, IDV penalty on site doubt)
   - `LEMMA_PRESALE_SQLITE_PATH=/tmp/presale.db` (optional, persistent ledger across restarts)
 - `lemma-demo-trials`
   - `LEMMA_DEMO_SITE_ID=lemma-demo-trials-7090f46cae0d.herokuapp.com`
   - `LEMMA_DEMO_SITE_NAME=Lemma Free Trial Demo`
   - `LEMMA_DEMO_SITE_KIND=free trial`
+  - `LEMMA_TRIAL_DROP_ID=northstar-free-trial` (optional, trial dedupe ledger key)
+  - One free trial per verified person: a successful `start_trial` claims the PPID
+    in the site-local ledger; repeats return `403 trial_already_used`.
+  - `GET /api/demo/trial/status` (session) and `POST /api/demo/trial/reset`
+    (session must own the PPID) support the on-page demo reset.
 
 ## Sign-in session (primary product demo)
 
@@ -43,6 +48,23 @@ Session endpoints:
 - `POST /api/login` — verify presentation, set HttpOnly `lemma_demo_session` cookie
 - `GET /api/me` / `POST /api/logout` — session introspection and logout
 - `POST /api/demo/action` — soft action via session cookie or presentation
+
+## Demo hub return URL
+
+`LEMMA_DEMO_HUB_URL` defaults to `{LEMMA_ORIGIN}/demo/how-it-works` (the builder
+hub). Do not point it at `/demo` — that dogfood front door redirects signed-in
+users to `/app` and breaks “Return to demo hub”.
+
+## Hub verify bridge
+
+The lemma.id demo hub cannot mint `/verify` flow-state for these remote siteIds
+(opener origin must match the site hostname). Instead the hub opens:
+
+`GET /hub-verify?hub_origin=…&request_id=…&required_assurance=passkey|ishuman&mode=signin|fresh_presence|fresh_idv`
+
+This page runs the ceremony on the demo Origin, optionally establishes a local
+session via `POST /api/login`, then `postMessage`s `LEMMA_HUB_VERIFY_RESULT` to
+`window.opener` at the validated `hub_origin` and closes.
 
 ## Presale reference flow (secondary — tickets `/?tour=presale`)
 
