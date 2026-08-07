@@ -108,8 +108,8 @@ function isMobileLikeUserAgent(ua) {
 }
 
 const DEMO_LOGICAL_SITE_IDS = new Set([
-    'tickets-demo.lemma.id',
-    'trials-demo.lemma.id',
+    'lemma-demo-tickets-1d3d7411af33.herokuapp.com',
+    'lemma-demo-trials-7090f46cae0d.herokuapp.com',
 ]);
 
 function sessionCacheKey(siteId) {

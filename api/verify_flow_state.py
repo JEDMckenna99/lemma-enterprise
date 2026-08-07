@@ -22,21 +22,6 @@ FLOW_STATE_TTL_SECONDS = 600
 FLOW_STATE_PREFIX = "verify_flow_state:"
 PLATFORM_SITE_IDS = frozenset({"lemma.id", "lemma_platform", "www.lemma.id"})
 
-# Logical demo siteIds (integrator-facing hostnames) and the Heroku apps that
-# currently serve them. Same contract as a real site: only that site's own
-# deployment origin(s) may mint flow-state for its site_id. Custom domains
-# (tickets-demo.lemma.id / trials-demo.lemma.id) match via host == site.
-_DEFAULT_DEMO_SITE_DEPLOY_ORIGINS = {
-    "tickets-demo.lemma.id": (
-        "https://tickets-demo.lemma.id",
-        "https://lemma-demo-tickets-1d3d7411af33.herokuapp.com",
-    ),
-    "trials-demo.lemma.id": (
-        "https://trials-demo.lemma.id",
-        "https://lemma-demo-trials-7090f46cae0d.herokuapp.com",
-    ),
-}
-
 
 def _bool_env(name: str, default: bool = True) -> bool:
     raw = os.getenv(name)
@@ -89,19 +74,6 @@ def _canonicalize_site(site_id: str) -> tuple[Optional[str], Optional[str]]:
     return try_canonicalize_site_hostname(raw)
 
 
-def _demo_deploy_origins_for_site(site: str) -> set[str]:
-    """Origins allowed to mint flow-state for a logical demo siteId."""
-    defaults = _DEFAULT_DEMO_SITE_DEPLOY_ORIGINS.get(site) or ()
-    allowed = {_normalize_origin(item) for item in defaults}
-    env_key = {
-        "tickets-demo.lemma.id": "LEMMA_DEMO_TICKETS_URL",
-        "trials-demo.lemma.id": "LEMMA_DEMO_TRIALS_URL",
-    }.get(site)
-    if env_key:
-        allowed.add(_normalize_origin(os.getenv(env_key) or ""))
-    return {item for item in allowed if item}
-
-
 def origin_matches_site(opener_origin: str, site_id: str) -> bool:
     """Opener origin host must equal the requested site hostname (platform exception)."""
     origin = _normalize_origin(opener_origin)
@@ -113,11 +85,7 @@ def origin_matches_site(opener_origin: str, site_id: str) -> bool:
         return False
     if site in PLATFORM_SITE_IDS or site == "lemma.id":
         return host in {"lemma.id", "www.lemma.id", "localhost", "127.0.0.1"}
-    if host == site:
-        return True
-    # Demo relying sites may be served from their Heroku deploy host while the
-    # integrator-facing siteId stays the logical hostname (tickets-demo.lemma.id).
-    return origin in _demo_deploy_origins_for_site(site)
+    return host == site
 
 
 def _redirect_allowed(redirect_return: str, opener_origin: str) -> bool:

@@ -51,33 +51,26 @@ def test_flow_state_rejects_origin_site_mismatch(flow_app):
     assert resp.get_json()["error"] == "origin_site_mismatch"
 
 
-def test_flow_state_allows_demo_deploy_origin_for_logical_site(flow_app):
-    """Demo apps keep integrator siteIds while served from Heroku hosts."""
+def test_flow_state_mints_for_demo_heroku_hostnames(flow_app):
+    """Demo apps use their Heroku hostname as siteId — same as any integrator."""
     with flow_app.test_client() as client:
+        tickets_host = "lemma-demo-tickets-1d3d7411af33.herokuapp.com"
         tickets = client.post(
             "/api/verify/flow-state",
-            json={"site_id": "tickets-demo.lemma.id", "issue_mode": "site_proof"},
-            headers={"Origin": "https://lemma-demo-tickets-1d3d7411af33.herokuapp.com"},
+            json={"site_id": tickets_host, "issue_mode": "site_proof"},
+            headers={"Origin": f"https://{tickets_host}"},
         )
         assert tickets.status_code == 200, tickets.get_json()
-        assert tickets.get_json()["site_id"] == "tickets-demo.lemma.id"
+        assert tickets.get_json()["site_id"] == tickets_host
 
+        trials_host = "lemma-demo-trials-7090f46cae0d.herokuapp.com"
         trials = client.post(
             "/api/verify/flow-state",
-            json={"site_id": "trials-demo.lemma.id", "issue_mode": "site_proof"},
-            headers={"Origin": "https://lemma-demo-trials-7090f46cae0d.herokuapp.com"},
+            json={"site_id": trials_host, "issue_mode": "site_proof"},
+            headers={"Origin": f"https://{trials_host}"},
         )
         assert trials.status_code == 200, trials.get_json()
-        assert trials.get_json()["site_id"] == "trials-demo.lemma.id"
-
-        # Foreign origin still cannot mint for a demo siteId.
-        evil = client.post(
-            "/api/verify/flow-state",
-            json={"site_id": "tickets-demo.lemma.id", "issue_mode": "site_proof"},
-            headers={"Origin": "https://evil.example.com"},
-        )
-        assert evil.status_code == 400
-        assert evil.get_json()["error"] == "origin_site_mismatch"
+        assert trials.get_json()["site_id"] == trials_host
 
 
 def test_flow_state_mints_and_binds_verify_page(flow_app, monkeypatch):

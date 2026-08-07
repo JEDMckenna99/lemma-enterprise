@@ -24,13 +24,14 @@ ishuman_demo_bp = Blueprint("ishuman_demo", __name__)
 DEMO_SITES = {
     "tickets": {
         "site_id": "site_demo_tickets",
-        "site_domain": "tickets-demo.lemma.id",
+        # siteId = hostname of the live demo app (same contract as any integrator).
+        "site_domain": "lemma-demo-tickets-1d3d7411af33.herokuapp.com",
         "company_name": "Ticketing Demo",
         "admin_email": "demo+tickets@lemma.id",
     },
     "trials": {
         "site_id": "site_demo_trials",
-        "site_domain": "trials-demo.lemma.id",
+        "site_domain": "lemma-demo-trials-7090f46cae0d.herokuapp.com",
         "company_name": "Free Trial Demo",
         "admin_email": "demo+trials@lemma.id",
     },

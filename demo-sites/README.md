@@ -2,12 +2,12 @@
 
 These tiny Flask apps simulate real third-party relying sites for the Sign in with lemma.id demo.
 
-Each app loads the documented drop-in:
+Each app loads the documented drop-in with **siteId = its own hostname** (same contract as any integrator):
 
 ```html
 <script src="https://lemma.id/sdk/proof-verifier.js"></script>
 <script src="https://lemma.id/sdk/lemma-signin.js"></script>
-<lemma-signin site-id="tickets-demo.lemma.id" lemma-origin="https://lemma.id"></lemma-signin>
+<lemma-signin site-id="lemma-demo-tickets-1d3d7411af33.herokuapp.com" lemma-origin="https://lemma.id"></lemma-signin>
 ```
 
 Use `lemma-origin` when `LEMMA_ORIGIN` is not production `https://lemma.id` (staging demos).
@@ -15,7 +15,7 @@ Use `lemma-origin` when `LEMMA_ORIGIN` is not production `https://lemma.id` (sta
 ## Expected Heroku Apps
 
 - `lemma-demo-tickets`, **Sign in shell + optional presale tour**
-  - `LEMMA_DEMO_SITE_ID=tickets-demo.lemma.id`
+  - `LEMMA_DEMO_SITE_ID=lemma-demo-tickets-1d3d7411af33.herokuapp.com`
   - `LEMMA_DEMO_SITE_NAME=Lemma Ticketing Demo`
   - `LEMMA_DEMO_SITE_KIND=ticketing`
   - Default `/` — Sign in with `<lemma-signin>` → session cookie
@@ -25,7 +25,7 @@ Use `lemma-origin` when `LEMMA_ORIGIN` is not production `https://lemma.id` (sta
   - `LEMMA_PRESALE_ESCALATED_ASSURANCE=ishuman` (optional, IDV penalty on site doubt)
   - `LEMMA_PRESALE_SQLITE_PATH=/tmp/presale.db` (optional, persistent ledger across restarts)
 - `lemma-demo-trials`
-  - `LEMMA_DEMO_SITE_ID=trials-demo.lemma.id`
+  - `LEMMA_DEMO_SITE_ID=lemma-demo-trials-7090f46cae0d.herokuapp.com`
   - `LEMMA_DEMO_SITE_NAME=Lemma Free Trial Demo`
   - `LEMMA_DEMO_SITE_KIND=free trial`
 
@@ -98,6 +98,6 @@ git subtree push --prefix demo-sites https://git.heroku.com/lemma-demo-trials.gi
 
 After deploy, verify:
 
-- https://tickets-demo.lemma.id/ (Sign in shell)
-- https://tickets-demo.lemma.id/?tour=presale (presale tour)
-- https://trials-demo.lemma.id/
+- https://lemma-demo-tickets-1d3d7411af33.herokuapp.com/ (Sign in shell)
+- https://lemma-demo-tickets-1d3d7411af33.herokuapp.com/?tour=presale (presale tour)
+- https://lemma-demo-trials-7090f46cae0d.herokuapp.com/

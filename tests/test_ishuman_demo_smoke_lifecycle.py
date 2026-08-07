@@ -66,13 +66,13 @@ def test_demo_lifecycle_site_block_unblock_and_escalation(
     fake_ishuman_db_session_factory.store.data[Site.__name__] = [
         Site(
             site_id="site_demo_tickets",
-            site_domain="tickets-demo.lemma.id",
+            site_domain="lemma-demo-tickets-1d3d7411af33.herokuapp.com",
             company_name="Demo Tickets",
             admin_email="demo@lemma.id",
         ),
         Site(
             site_id="site_demo_trials",
-            site_domain="trials-demo.lemma.id",
+            site_domain="lemma-demo-trials-7090f46cae0d.herokuapp.com",
             company_name="Demo Trials",
             admin_email="demo@lemma.id",
         ),
@@ -83,8 +83,8 @@ def test_demo_lifecycle_site_block_unblock_and_escalation(
     config = ishuman_demo_client.get("/api/demo/ishuman/config").get_json()
     assert config["success"] is True
     assert {site["site_domain"] for site in config["sites"]} == {
-        "tickets-demo.lemma.id",
-        "trials-demo.lemma.id",
+        "lemma-demo-tickets-1d3d7411af33.herokuapp.com",
+        "lemma-demo-trials-7090f46cae0d.herokuapp.com",
     }
 
     doubt = ishuman_demo_client.post(

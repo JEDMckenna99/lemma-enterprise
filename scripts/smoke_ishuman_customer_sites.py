@@ -12,11 +12,11 @@ import urllib.request
 DEFAULT_SITES = {
     "tickets": {
         "url": "https://lemma-demo-tickets-1d3d7411af33.herokuapp.com",
-        "site_id": "tickets-demo.lemma.id",
+        "site_id": "lemma-demo-tickets-1d3d7411af33.herokuapp.com",
     },
     "trials": {
         "url": "https://lemma-demo-trials-7090f46cae0d.herokuapp.com",
-        "site_id": "trials-demo.lemma.id",
+        "site_id": "lemma-demo-trials-7090f46cae0d.herokuapp.com",
     },
 }
 

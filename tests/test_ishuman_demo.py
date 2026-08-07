@@ -538,8 +538,8 @@ def test_ishuman_demo_config_seeds_sites_without_exposing_api_keys(
     assert resp.status_code == 200
     assert payload["success"] is True
     assert {site["site_domain"] for site in payload["sites"]} == {
-        "tickets-demo.lemma.id",
-        "trials-demo.lemma.id",
+        "lemma-demo-tickets-1d3d7411af33.herokuapp.com",
+        "lemma-demo-trials-7090f46cae0d.herokuapp.com",
     }
     assert all("api_key" not in site for site in payload["sites"])
     assert len(fake_ishuman_db_session_factory.store.data[Site.__name__]) == 2
@@ -827,8 +827,8 @@ def test_ishuman_demo_js_uses_real_verifier_with_two_site_bindings():
     js = (ROOT / "static" / "js" / "demo" / "ishuman-demo.js").read_text(encoding="utf-8")
 
     assert "new window.IsHumanVerifier" in js
-    assert "tickets-demo.lemma.id" in js
-    assert "trials-demo.lemma.id" in js
+    assert "lemma-demo-tickets-1d3d7411af33.herokuapp.com" in js
+    assert "lemma-demo-trials-7090f46cae0d.herokuapp.com" in js
     assert "lemmaOrigin: window.location.origin" in js
     assert "autoProvision: true" in js
     assert "runGuidedDemo" in js

@@ -10,7 +10,7 @@ import os
 import secrets
 
 DEFAULT_WALLET_ID = "wallet_ishuman_prod_fixture"
-DEFAULT_TARGET_SITE = "tickets-demo.lemma.id"
+DEFAULT_TARGET_SITE = "lemma-demo-tickets-1d3d7411af33.herokuapp.com"
 DEFAULT_SITE_ID = "site_demo_tickets"
 
 

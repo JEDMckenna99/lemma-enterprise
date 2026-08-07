@@ -13,8 +13,8 @@
     'revoked',
   ]);
   const SITE_IDS = {
-    tickets: 'tickets-demo.lemma.id',
-    trials: 'trials-demo.lemma.id',
+    tickets: 'lemma-demo-tickets-1d3d7411af33.herokuapp.com',
+    trials: 'lemma-demo-trials-7090f46cae0d.herokuapp.com',
   };
   const WIZARD_TOTAL = 7;
   const LEGACY_WIZARD_TOTAL = 7;
@@ -3601,7 +3601,7 @@
     const lane = params.get('lane') === 'builder' ? 'builder' : 'try';
     setDemoLane(lane);
     const urls = (state.config && state.config.customer_site_urls) || {};
-    const ticketsUrl = urls.tickets || 'https://tickets-demo.lemma.id/';
+    const ticketsUrl = urls.tickets || 'https://lemma-demo-tickets-1d3d7411af33.herokuapp.com/';
     const startLink = $('ih-try-lane-start');
     if (startLink) startLink.href = ticketsUrl.replace(/\/?$/, '/');
     $('ih-lane-try-btn')?.addEventListener('click', () => setDemoLane('try'));
