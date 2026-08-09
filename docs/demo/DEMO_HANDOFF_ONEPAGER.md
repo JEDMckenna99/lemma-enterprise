@@ -6,15 +6,15 @@ Give this demo to anyone — no technical background required. Default path: **T
 
 1. **Contrast** — "This is what signup usually feels like." Mock email/password form (does nothing). Click **Now try the lemma.id way**.
 
-2. **Sign in** — Tap **Sign in with lemma.id**, use your passkey. Say: "You're in. No email, no password, nothing to breach."
+2. **One person, one code** — Tap through passkey + human proof, claim your unique code. Say: "One code per person — the site never saw your ID documents."
 
-3. **Claim** — **Step 1: Passkey register**, then **Step 2: Fresh passkey unlocks unique code**. Say: "One code per person, and this site never saw your ID documents."
+3. **Denial** — Click **Try again with same lemma.id**. Say: "You already got yours — same human, can't mint a second account."
 
-4. **Denial** — Click **Try again with same lemma.id**. Say: "You already got yours — it's one per person."
+4. **Privacy** — Open the trials demo site with the same lemma.id. Say: "Tickets and trials see different private IDs. These sites can't compare notes about you."
 
-5. **Privacy** — Open the trials demo site with the same lemma.id. Say: "Tickets and trials see different private IDs. These sites can't compare notes about you."
+5. **Enforce** — (Builder lane or end card) Show doubt/ban. Say: "Ban sticks even if they clear the browser and come back."
 
-6. **Returning user** — Close the tab, come back. Say: "Still you. No forgot password."
+6. **Continuity** — Close the tab, come back. Say: "Still the same person on this site — no forgot password."
 
 7. **What's next** — Use the end card on `/demo`: integration snippet (developers), Enforce chapter (operators), or create lemma.id (users).
 
@@ -25,4 +25,4 @@ Give this demo to anyone — no technical background required. Default path: **T
 
 ## Builder lane (optional)
 
-On `/demo`, click **See how it works** for Create · Sign in · Enforce with site-owner controls.
+On `/demo`, click **See how it works** for Create · Enforce · Sign in with site-owner controls.

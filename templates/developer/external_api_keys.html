@@ -6,7 +6,7 @@
     <div class="dev-header-row" style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
         <div>
             <h1 class="dev-title">External API Key Manager</h1>
-            <p class="dev-subtitle">Issue API keys for server-side abuse controls (site-block, site-unblock). Keys are <strong>not</strong> required for basic Sign in with lemma.id login.</p>
+            <p class="dev-subtitle">Issue API keys for server-side enforcement (site-block, site-unblock, site-doubt). Keys are <strong>not</strong> required for local presentation verify or isHuman step-up.</p>
         </div>
         <a href="/developer" class="dev-btn dev-btn-secondary dev-btn-sm">Back to Developer hub</a>
     </div>
@@ -237,7 +237,7 @@ async function startDomainVerification() {
     const panel = document.getElementById('domain-verification-panel');
     panel.classList.remove('hidden');
     document.getElementById('domain-verification-copy').textContent =
-        'Publish the token below, then click Register. Basic login does not require this step.';
+        'Publish the token below, then click Register. Local verify does not require this step.';
     document.getElementById('domain-verification-token').textContent = domainVerificationToken;
     const instructions = data.instructions || {};
     const wellKnown = instructions.well_known_url || instructions.file_url || '';

@@ -16,6 +16,7 @@ from typing import FrozenSet, Optional, Tuple
 # Approved public markdown paths (posix-style, relative to docs/).
 PUBLIC_DOC_ALLOWLIST: FrozenSet[str] = frozenset(
     {
+        "integration/CONTINUITY_AND_ABUSE.md",
         "integration/ISHUMAN_AGENT_INTEGRATION.md",
         "integration/QUICK_START_SIMPLE_LOGIN.md",
         "integration/SIMPLE_INTEGRATION_GUIDE.md",

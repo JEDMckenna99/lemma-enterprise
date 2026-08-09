@@ -2,7 +2,7 @@
 {% set is_public_page = true %}
 
 {% block title %}lemma.id | One account per verified human{% endblock %}
-{% block description %}Bans that survive account rotation, presale caps that hold, and audit stamps that prove a verified human did it. Free passkey sign-in with no user data to store; step up to human proofs per action. Verification runs on your own backend.{% endblock %}
+{% block description %}Bans that survive account rotation, one trial per human, and audit stamps on verified actions. Verify presentations locally on your backend; free passkey continuity; step up to human proofs where abuse hurts.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -231,7 +231,7 @@
             </svg>
             <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary-light); margin-bottom: 16px;">lemma.id</p>
             <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 20px;">When you ban someone,<br>they stay banned.</h1>
-            <p class="home-hero-lede">One account per verified human, keyed to an ID that's private to your site. Passkey sign-in is free and passwordless; require a human proof only on the actions where abuse actually hurts.</p>
+            <p class="home-hero-lede">Verify a signed presentation on your backend and enforce on a site-private ID. One human per account on the actions that matter — trials, tickets, payouts, bans that stick. Passkey unlock mints proofs for free.</p>
             <div class="home-hero-ctas">
                 <a href="/docs" class="btn btn-primary">Add to Your Site</a>
                 <a href="/demo" class="btn btn-secondary">See the Demo</a>
@@ -264,8 +264,8 @@
         </div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; max-width: 960px; margin: 0 auto;">
             <div class="card">
-                <h3 class="card-title">Passkey sign-in · free</h3>
-                <p>Passwordless login with a stable, site-private account ID. The same person returns as the same ID every time. This is the default, and it's all most sites need. It doesn't stop someone from making another account, since anyone can create another lemma.id.</p>
+                <h3 class="card-title">Passkey continuity · free</h3>
+                <p>Local verify of a signed presentation gives you a stable, site-private account ID. The same person returns as the same ID every time. This is the default pipe — it doesn't stop someone from making another account, since anyone can create another lemma.id.</p>
             </div>
             <div class="card">
                 <h3 class="card-title">Presence proof</h3>
@@ -307,13 +307,13 @@
     </div>
 </section>
 
-<!-- The on-ramp: free sign-in -->
+<!-- The free pipe: passkey continuity -->
 <section class="section" id="why-lemma" style="background: var(--gray-100);">
     <div class="container">
         <div class="home-section-head">
-            <p class="eyebrow">The on-ramp is free sign-in</p>
-            <h2>Passwordless login. No user data to store.</h2>
-            <p class="text-gray">Sign in with lemma.id replaces the password and the signup form for free, and it's the same integration you later step up. It also changes what your servers have to hold and who sits in your login path.</p>
+            <p class="eyebrow">The free pipe</p>
+            <h2>Local verify. No user data to store.</h2>
+            <p class="text-gray">lemma.id gives your backend a verified, site-private ID and assurance level — not email, not profile data. Keep your existing login if you want; gate the actions where abuse actually hurts. Verification runs on your servers, not ours.</p>
         </div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; max-width: 960px; margin: 0 auto;">
             <div class="card">
@@ -365,8 +365,8 @@
                 <p style="margin: 0; font-size: var(--font-size-sm); color: var(--gray-700); line-height: 1.7;">Signup form → verification email → password database → reset flows → OTP codes for anything risky → <strong>a breach target you maintain forever</strong></p>
             </div>
             <div class="after">
-                <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--primary); margin-bottom: 12px;">With Sign in with lemma.id</p>
-                <p style="margin: 0; font-size: var(--font-size-sm); color: var(--gray-700); line-height: 1.7;">Passkey approval → site-private account ID → local verification → step up to presence or human proofs where it matters → <strong>nothing sensitive to store</strong></p>
+                <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--primary); margin-bottom: 12px;">With lemma.id</p>
+                <p style="margin: 0; font-size: var(--font-size-sm); color: var(--gray-700); line-height: 1.7;">Passkey unlock → signed presentation → local verify → site-private ID → step up to human proofs where it matters → <strong>nothing sensitive to store</strong></p>
             </div>
         </div>
         <p style="text-align: center; margin-top: 28px; color: var(--gray-600); font-size: var(--font-size-sm);">
@@ -380,15 +380,15 @@
     <div class="container">
         <div class="home-section-head">
             <p class="eyebrow">Why teams choose lemma.id</p>
-            <h2>Compare it to the sign-in you'd build instead</h2>
-            <p class="text-gray">Every login option makes you custodian of something: passwords, emails, or a big provider's shared user ID. And none of them makes a ban survive a fresh account. Sign in with lemma.id is the option where there's nothing to hold and the consequence sticks.</p>
+            <h2>Compare it to the stack you'd build instead</h2>
+            <p class="text-gray">Every auth option makes you custodian of something: passwords, emails, or a big provider's shared user ID. And none of them makes a ban survive a fresh account. lemma.id is the proof layer where the consequence sticks.</p>
         </div>
         <div class="home-compare-wrap">
             <table class="home-compare-table">
                 <thead>
                     <tr>
                         <th></th>
-                        <th class="col-lemma">Sign in with lemma.id</th>
+                        <th class="col-lemma">lemma.id proof layer</th>
                         <th>Google / social SSO</th>
                         <th>Email + password</th>
                     </tr>
@@ -449,12 +449,12 @@
     <div class="container">
         <div class="home-section-head">
             <p class="eyebrow">Developer integration</p>
-            <h2>Sign-in in one element</h2>
-            <p class="text-gray">The drop-in button handles the popup, the passkey, and the proof. Your backend verifies the presentation locally and uses the site-private ID as the account key. Need finer control? The SDK exposes the same flow with <code>requiredAssurance: 'passkey'</code>, and stepping up an action is the same call with <code>requiredAssurance: 'ishuman'</code>.</p>
+            <h2>Gate an action in one call</h2>
+            <p class="text-gray">Call <code>verifyForBackend</code> before a trial, claim, or checkout — or use the drop-in button to mint a presentation. Your backend verifies locally and enforces on the site-private ID. Stepping up is the same call with <code>requiredAssurance: 'ishuman'</code>.</p>
         </div>
 
         <div class="home-code">
-            <div class="home-code-label">Passwordless sign-in, no registration or API key required</div>
+            <div class="home-code-label">Verify locally — no registration or API key required</div>
             <pre><code>&lt;script src="https://lemma.id/sdk/proof-verifier.js"&gt;&lt;/script&gt;
 &lt;script src="https://lemma.id/sdk/lemma-signin.js"&gt;&lt;/script&gt;
 
@@ -522,7 +522,7 @@
 <section class="section" style="background: var(--black); color: var(--white); padding: 72px 0;">
     <div class="container" style="text-align: center;">
         <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 16px;">Make the next ban stick</h2>
-        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 36px; max-width: 520px; margin-left: auto; margin-right: auto;">One verified human per account on the actions that matter, and free passwordless sign-in everywhere else. A script tag and a backend check.</p>
+        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 36px; max-width: 520px; margin-left: auto; margin-right: auto;">One verified human per account on the actions that matter. Free passkey continuity everywhere else. A backend verify and an enforcement policy.</p>
         <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
             <a href="/docs" class="btn btn-primary" style="font-size: var(--font-size-lg); padding: 16px 32px;">Add to Your Site</a>
             <a href="/demo" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">Watch Demo</a>

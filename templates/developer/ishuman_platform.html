@@ -40,10 +40,10 @@
         <div>
             <h1 class="dev-title">lemma.id developer dashboard</h1>
             <p class="dev-subtitle">
-                Sign in with lemma.id needs nothing from this dashboard: no account, no site registration,
-                no API key. Integrate straight from the docs and verify presentations locally.
-                This dashboard is for the step-up tier — human proofs, abuse APIs, site registration,
-                API keys, and billing.
+                Local presentation verify needs nothing from this dashboard: no account, no site
+                registration, no API key. Integrate from the docs and enforce on <code>ppid</code>
+                locally. This dashboard is for the enforcement tier — human proofs, site-block
+                APIs, site registration, API keys, and billing.
             </p>
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; flex-shrink:0;">
@@ -55,7 +55,7 @@
 
 <div class="dev-card" style="margin-bottom: 24px;">
     <div class="dev-card-header">
-        <h2 class="dev-card-title">Add sign-in (free, nothing to register)</h2>
+        <h2 class="dev-card-title">Gate an action (free, nothing to register)</h2>
     </div>
     <div class="dev-card-body">
         <div class="dev-actions">
@@ -128,17 +128,18 @@
 <div class="dev-site-grid">
     <div class="dev-card" style="margin-bottom: 0;">
         <div class="dev-card-header">
-            <h2 class="dev-card-title">1) Add sign-in — free</h2>
+            <h2 class="dev-card-title">1) Verify proofs — free</h2>
         </div>
         <div class="dev-card-body">
             <p style="margin: 0 0 16px; color: var(--dev-text-muted); font-size: 14px; line-height: 1.55;">
-                Drop in <code>&lt;lemma-signin&gt;</code> (or the SDK with <code>requiredAssurance: 'passkey'</code>)
-                and verify presentations locally on your backend. No account or API key needed.
+                Call <code>verifyForBackend</code> (or drop in <code>&lt;lemma-signin&gt;</code> to mint a
+                presentation) and verify locally on your backend. No account or API key needed.
+                Keep your existing login; gate trials, claims, and payouts.
             </p>
             <ul class="dev-hub-list">
                 <li>Set <code>siteId</code> to your canonical hostname (for example <code>app.example.com</code>).</li>
-                <li>Add <code>proof-verifier.js</code> and fail closed when <code>human</code> is false.</li>
-                <li>Store the returned <code>ppid</code> on your user record, no KYC fields.</li>
+                <li>Add <code>proof-verifier.js</code> and fail closed when verification fails.</li>
+                <li>Enforce on verified <code>ppid</code> + assurance — no KYC fields on your servers.</li>
             </ul>
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:16px;">
                 <a href="/docs#quickstart" class="dev-btn dev-btn-secondary dev-btn-sm">Quickstart</a>
@@ -149,7 +150,7 @@
 
     <div class="dev-card" style="margin-bottom: 0;">
         <div class="dev-card-header">
-            <h2 class="dev-card-title">2) Step up to human proofs</h2>
+            <h2 class="dev-card-title">2) Step up to isHuman</h2>
         </div>
         <div class="dev-card-body">
             <p style="margin: 0 0 16px; color: var(--dev-text-muted); font-size: 14px; line-height: 1.55;">
@@ -174,8 +175,8 @@
         </div>
         <div class="dev-card-body">
             <p style="margin: 0 0 16px; color: var(--dev-text-muted); font-size: 14px; line-height: 1.55;">
-                API keys exist only for this tier: server-side abuse APIs on registered sites.
-                Neither sign-in nor human verification itself requires one.
+                API keys exist only for enforcement: server-side site-block on registered sites.
+                Neither local verify nor isHuman step-up requires one.
             </p>
             <ul class="dev-hub-list">
                 <li><code>POST /api/ishuman/site-block</code>, immediate site-scoped PPID ban.</li>
@@ -195,7 +196,7 @@
     </div>
     <div class="dev-card-body">
         <p style="margin: 0 0 12px; color: var(--dev-text-muted); font-size: 14px;">
-            Registered sites for abuse API keys. Sign in with lemma.id works without registering a site.
+            Registered sites for abuse API keys. Local proof verify works without registering a site.
         </p>
         <div id="dev-hub-sites-list" style="font-size: 14px; color: var(--dev-text-muted);">Loading sites…</div>
     </div>

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Sign in with lemma.id (Next.js)",
+  title: "Verify a lemma proof (Next.js)",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

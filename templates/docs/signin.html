@@ -1,46 +1,47 @@
 {% extends "docs/layout.html" %}
 {% set active_product = 'ishuman' %}
 {% set active_page = 'signin' %}
-{% set hero_title = 'Sign in with lemma.id' %}
-{% set hero_subtitle = 'Passwordless login with passkeys and a site-private account ID. No usernames, passwords, or emails to store, no API key to provision, and verification runs on your own backend. This page is everything you need for login.' %}
-{% set page_description = 'Add Sign in with lemma.id: drop in the button, verify a signed presentation on your backend, and use the site-private ppid as your account key. Free, no registration required.' %}
+{% set hero_title = 'Proof continuity for your site' %}
+{% set hero_subtitle = 'Verify signed presentations locally and enforce policy on a site-private ppid + assurance level. One trial per human, bans that stick, optional action stamps — keep your existing login if you want.' %}
+{% set page_description = 'lemma.id proof layer: verify presentations on your backend, enforce one-human policy, site-block abusers. Free local verify; optional isHuman step-up.' %}
 
 {% block docs_content %}
 <div class="docs-section" id="quickstart">
-    <h2>Add sign-in in one element</h2>
-    <p>Drop the button on your page, then wire one backend route. The button handles the popup, the passkey ceremony, and the proof. Full walkthrough with sessions and testing: <a href="/docs/integration/QUICK_START_SIMPLE_LOGIN.md">sign-in quickstart</a>.</p>
+    <h2>Gate a sensitive action</h2>
+    <p>Call the SDK from a user gesture before a trial, claim, checkout, or other abuse-prone step. The popup mints a signed <code>presentation</code>; your backend verifies it locally and enforces on <code>ppid</code>. Full walkthrough: <a href="/docs/integration/QUICK_START_SIMPLE_LOGIN.md">quick start</a> · <a href="/docs/integration/CONTINUITY_AND_ABUSE.md">continuity &amp; abuse</a>.</p>
     <div class="code-block">
         <div class="code-header">
-            <span>HTML</span>
+            <span>JavaScript</span>
             <button class="copy-btn">Copy</button>
         </div>
         <code>&lt;script src="https://lemma.id/sdk/proof-verifier.js"&gt;&lt;/script&gt;
-&lt;script src="https://lemma.id/sdk/lemma-signin.js"&gt;&lt;/script&gt;
-
-&lt;lemma-signin site-id="app.example.com"&gt;&lt;/lemma-signin&gt;
-
 &lt;script&gt;
-  document.querySelector('lemma-signin')
-    .addEventListener('lemma-signin-success', async ({ detail }) =&gt; {
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ presentation: detail.presentation }),
-      });
-      if (res.ok) window.location.href = '/dashboard';
+  const verifier = new ProofVerifier({ siteId: 'app.example.com' });
+
+  async function claimTrial() {
+    const { ok, presentation, reason } = await verifier.verifyForBackend({
+      autoProvision: true,
+      requiredAssurance: 'ishuman',
     });
+    if (!ok) throw new Error(reason || 'not_verified');
+    await fetch('/api/claim-trial', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ presentation }),
+    });
+  }
 &lt;/script&gt;</code>
     </div>
-    <p>Set <code>site-id</code> to the hostname your users see in the browser (for example <code>app.example.com</code>). That's the only configuration. No registration, no API key, no dashboard step.</p>
+    <p>Set <code>siteId</code> to the hostname your users see (for example <code>app.example.com</code>). No registration, no API key for verify.</p>
     <div class="callout callout--info">
-        <div class="callout-title">What the user sees</div>
-        <p>First-time visitors get a lemma.id in a Lemma-hosted popup, secured by their device passkey. Returning users just confirm the passkey. Either way your page receives a signed <code>presentation</code> to send to your backend. The same person presents the same ID to your site on every visit, and a different ID to every other site.</p>
+        <div class="callout-title">Mint a presentation (drop-in button)</div>
+        <p><code>&lt;lemma-signin&gt;</code> wraps the same flow for custom or login UX. It handles the popup and passkey ceremony; POST the <code>presentation</code> to your gate route.</p>
     </div>
 </div>
 
 <div class="docs-section" id="backend-verify">
     <h2>Verify on your backend</h2>
-    <p>Never trust a bare <code>ppid</code> from the browser. Verify the signed <code>presentation</code> server-side, then use <code>result.ppid</code> as the account key. Verification is local: your server checks the signature against a cached trust snapshot, with no per-login call to lemma.id.</p>
+    <p>Never trust a bare <code>ppid</code> from the browser. Verify the signed <code>presentation</code> server-side, then enforce on <code>result.ppid</code> and <code>result.assurance</code>. Verification is local: no per-request call to lemma.id.</p>
     <div class="code-block">
         <div class="code-header"><span>Node.js</span><button class="copy-btn">Copy</button></div>
         <code>npm install "@lemma.id/proof-verifier@1.4.0"</code>
@@ -52,115 +53,97 @@
 curl -O https://lemma.id/sdk/proof-verifier.py</code>
     </div>
     <div class="code-block">
-        <div class="code-header"><span>Node.js login route</span><button class="copy-btn">Copy</button></div>
+        <div class="code-header"><span>Node.js gate route</span><button class="copy-btn">Copy</button></div>
         <code>import { createVerifier } from '@lemma.id/proof-verifier';
 
 const verifier = createVerifier({
   siteId: 'app.example.com',
-  requiredAssurance: 'passkey',
+  requiredAssurance: 'ishuman',
 });
 
-app.post('/api/login', async (req, res) =&gt; {
+app.post('/api/claim-trial', async (req, res) =&gt; {
   const result = await verifier.verify(req.body.presentation);
   if (!result.ok) return res.status(403).json({ error: result.reason });
-
-  const user = await findOrCreateUser(result.ppid);
-  res.cookie('session', signSession(user.id), {
-    httpOnly: true, secure: true, sameSite: 'lax',
-  });
+  if (await alreadyClaimed(result.ppid)) {
+    return res.status(403).json({ error: 'already_claimed' });
+  }
+  await recordClaim(result.ppid, result.assurance);
   res.json({ ok: true });
 });</code>
     </div>
-    <div class="code-block">
-        <div class="code-header"><span>Python login route</span><button class="copy-btn">Copy</button></div>
-        <code>from lemma_proof_verifier import VerificationContext
+</div>
 
-ctx = VerificationContext(site_id="app.example.com", required_assurance="passkey")
-
-@app.post("/api/login")
-def login():
-    body = request.get_json() or {}
-    result = ctx.verify(body["presentation"])
-    if not result.ok:
-        return {"error": result.reason}, 403
-
-    user = find_or_create_user(result.ppid)
-    resp = jsonify(ok=True)
-    resp.set_cookie("session", sign_session(user.id), httponly=True, secure=True, samesite="Lax")
-    return resp</code>
-    </div>
+<div class="docs-section" id="step-up">
+    <h2>Enforcement: isHuman &amp; site-block</h2>
+    <p><code>passkey</code> assurance = continuity. <code>ishuman</code> = IDV-backed one human per account on the <strong>same PPID</strong>. Use site-block API keys when bans must survive browser clears and new accounts.</p>
+    <p><a href="{{ url_for('docs_human_proofs') }}" class="btn btn-primary">Human proofs &amp; abuse controls →</a> · <a href="/docs/integration/CONTINUITY_AND_ABUSE.md">Continuity &amp; abuse doc</a></p>
 </div>
 
 <div class="docs-section" id="sessions">
-    <h2>Sessions stay yours</h2>
-    <p>After the one verified login, issue your own session cookie or JWT exactly as you do today. lemma.id is not in the request path: protected routes check your session, <code>/logout</code> clears your cookie, and your user table (keyed by <code>ppid</code>) stays on your infrastructure. There is no OAuth token to refresh and no provider outage that can lock your users out mid-session.</p>
-    <p style="color: var(--gray-600); font-size: 14px;">Working examples: <a href="/docs/integration/QUICK_START_SIMPLE_LOGIN.md">quickstart</a> includes complete Express and Flask login routes with session cookies.</p>
+    <h2>Optional: sessions from the same presentation</h2>
+    <p>Many sites keep Google/OAuth/email login and use lemma only on gated actions. If you want passwordless sessions, issue your own cookie after verify — lemma.id is not in the request path afterward.</p>
+    <div class="code-block">
+        <div class="code-header"><span>After verify — optional session</span><button class="copy-btn">Copy</button></div>
+        <code>const user = await findOrCreateUser(result.ppid);
+res.cookie('session', signSession(user.id), {
+  httpOnly: true, secure: true, sameSite: 'lax',
+});</code>
+    </div>
+    <p style="color: var(--gray-600); font-size: 14px;">Examples: <a href="/docs/integration/QUICK_START_SIMPLE_LOGIN.md">quickstart</a> · <a href="/docs/integration/SIMPLE_INTEGRATION_GUIDE.md">integration guide</a>.</p>
 </div>
 
 <div class="docs-section" id="sdk-integration">
-    <h2>Prefer your own button? Use the SDK directly</h2>
-    <p>The <code>&lt;lemma-signin&gt;</code> element wraps <code>ProofVerifier</code>. Call it yourself for custom UI. Always pass <code>requiredAssurance: 'passkey'</code> for login.</p>
+    <h2>Mint a presentation (drop-in button)</h2>
+    <p><code>&lt;lemma-signin&gt;</code> wraps <code>ProofVerifier</code> for login or gate UX. Always pass <code>requiredAssurance</code>.</p>
     <div class="code-block">
-        <div class="code-header"><span>JavaScript</span><button class="copy-btn">Copy</button></div>
+        <div class="code-header"><span>HTML</span><button class="copy-btn">Copy</button></div>
         <code>&lt;script src="https://lemma.id/sdk/proof-verifier.js"&gt;&lt;/script&gt;
-&lt;script&gt;
-  const verifier = new ProofVerifier({ siteId: 'app.example.com' });
+&lt;script src="https://lemma.id/sdk/lemma-signin.js"&gt;&lt;/script&gt;
 
-  async function signIn() {
-    const { ok, presentation, reason } = await verifier.verifyForBackend({
-      autoProvision: true,
-      requiredAssurance: 'passkey',
+&lt;lemma-signin site-id="app.example.com" required-assurance="ishuman"&gt;&lt;/lemma-signin&gt;
+
+&lt;script&gt;
+  document.querySelector('lemma-signin')
+    .addEventListener('lemma-signin-success', async ({ detail }) =&gt; {
+      await fetch('/api/gate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ presentation: detail.presentation }),
+      });
     });
-    if (!ok) throw new Error(reason || 'not_verified');
-    await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ presentation }),
-    });
-  }
 &lt;/script&gt;</code>
     </div>
-    <p><code>autoProvision: true</code> lets first-time users create a lemma.id in the popup. Without it, the SDK never opens a popup and returns <code>no_credential</code> for new visitors.</p>
+    <p><code>autoProvision: true</code> lets first-time users create a lemma.id in the popup.</p>
 </div>
 
 <div class="docs-section" id="testing">
     <h2>Local development and testing</h2>
     <ul style="line-height: 1.8; color: var(--gray-700); padding-left: 24px;">
-        <li><strong>localhost works out of the box:</strong> run your site at any <code>http://localhost</code> port with <code>siteId: 'localhost'</code> against the production lemma.id popup. All localhost ports collapse to one binding.</li>
-        <li><strong>Offline tests:</strong> mint valid test presentations without a browser or network using the test helpers, <code>@lemma.id/proof-verifier/testing</code> (Node) or <code>lemma_proof_verifier_testing</code> (Python). Your login route tests run entirely locally.</li>
+        <li><strong>localhost works out of the box:</strong> run your site at any <code>http://localhost</code> port with <code>siteId: 'localhost'</code> against the production lemma.id popup.</li>
+        <li><strong>Offline tests:</strong> mint valid test presentations without a browser using <code>@lemma.id/proof-verifier/testing</code> (Node) or <code>lemma_proof_verifier_testing</code> (Python).</li>
     </ul>
-    <p style="color: var(--gray-600); font-size: 14px;">Copy-paste test examples are in the <a href="/docs/integration/QUICK_START_SIMPLE_LOGIN.md">quickstart</a>. Browser requirements: <a href="/docs/integration/BROWSER_SUPPORT.md">supported browsers</a> (passkeys + WebAuthn PRF).</p>
+    <p style="color: var(--gray-600); font-size: 14px;">Examples in the <a href="/docs/integration/QUICK_START_SIMPLE_LOGIN.md">quickstart</a>. Browsers: <a href="/docs/integration/BROWSER_SUPPORT.md">support matrix</a>.</p>
 </div>
 
 <div class="docs-section" id="troubleshooting">
     <h2>Troubleshooting</h2>
     <ul>
-        <li><strong><code>siteId</code> hostname mismatch</strong>, staging and production subdomains derive different account IDs. Use the exact hostname users see; do not mix <code>www.</code> and bare domain unless that is intentional.</li>
-        <li><strong>Persistent <code>no_credential</code></strong>, pass <code>{ autoProvision: true }</code> on your sign-in call. Without it, the SDK will not open the popup for first-time users.</li>
-        <li><strong>Popup blocked or closed</strong>, call the SDK from a click handler (not on page load) so the browser allows the popup, and prompt the user to retry if they closed it.</li>
-        <li><strong><code>revocation_data_untrusted</code></strong>, the local trust snapshot could not be validated (clock skew, stale cache). Retry after a moment; check the system clock if it persists.</li>
+        <li><strong><code>siteId</code> hostname mismatch</strong> — staging and production subdomains derive different PPIDs.</li>
+        <li><strong>Persistent <code>no_credential</code></strong> — pass <code>{ autoProvision: true }</code> for first-time users.</li>
+        <li><strong><code>assurance_insufficient</code></strong> — match client and backend <code>requiredAssurance</code>.</li>
+        <li><strong>Popup blocked</strong> — call the SDK from a click handler.</li>
     </ul>
 </div>
 
 <div class="docs-section" id="faq">
     <h2>FAQ</h2>
-    <h3>How do users recover their account?</h3>
-    <p>A lemma.id lives with the user, secured by device passkeys. Users should enroll it on more than one device (phone plus laptop); any enrolled device signs them back in. Passkeys synced through iCloud Keychain or Google Password Manager survive a lost device. There is no password reset because there is no password, and no recovery email because you never collected one.</p>
-    <h3>What happens if I change my domain?</h3>
-    <p>Account IDs are derived from your hostname, so <code>app.oldname.com</code> and <code>app.newname.com</code> produce different IDs for the same person. There is deliberately no "remap my users" API: an endpoint like that would let sites correlate users across hostnames, which the per-site privacy design exists to prevent. Pick your canonical hostname before launch and keep it stable. If you do migrate, run both domains for a window and link accounts yourself: the user signs in on the old domain, your site hands them to the new domain with your own short-lived token, they sign in there too, and your backend, now holding both IDs in one authenticated session, links the rows and carries over any bans or roles. See the <a href="/docs/integration/QUICK_START_SIMPLE_LOGIN.md">quickstart</a> for the full recipe.</p>
-    <h3>Why is there no API key?</h3>
-    <p>Login verification is cryptographic, not permissioned: your backend checks a signed presentation bound to your hostname against a published trust snapshot. An API key would add a secret to leak without adding security. Keys exist only for the optional server-side abuse APIs (PPID blocks), which sign-in doesn't need.</p>
-    <h3>What does lemma.id learn about my users?</h3>
-    <p>Not who they are: no names, emails, or phone numbers exist in the flow. Routine logins verify locally on your servers, so lemma.id doesn't observe when your users sign in. Each site gets a different ID for the same person, so there is nothing to correlate across sites and no data to build an ad profile from.</p>
-    <h3>Is it really free?</h3>
-    <p>Yes. Passkey sign-in is free with no user caps: see <a href="/pricing">pricing</a>. Paid features (human proofs) are a separate step-up you may never need.</p>
+    <h3>Do I need to replace my login?</h3>
+    <p>No. Gate specific actions; keep OAuth/email if you want. lemma returns <code>ppid</code> + assurance, not a session provider.</p>
+    <h3>How do users recover?</h3>
+    <p>Passkeys sync (iCloud/Google); add a second device at <a href="https://lemma.id/link">lemma.id/link</a>. Single-device non-synced passkeys are not guaranteed recoverable — document honestly.</p>
+    <h3>Why is there no API key for verify?</h3>
+    <p>Verification is cryptographic and local. Keys are for server-side site-block enforcement only.</p>
     <h3>Using an AI coding agent?</h3>
-    <p>Point it at <a href="/llms.txt">llms.txt</a> or the <a href="/docs/integration/ISHUMAN_AGENT_INTEGRATION.md">machine-oriented integration guide</a>.</p>
-</div>
-
-<div class="docs-section" id="step-up">
-    <h2>Need one account per verified human?</h2>
-    <p>Sign-in gives you continuity: the same lemma.id always returns as the same account. It does not stop a banned user from creating another lemma.id. When new-account rotation is the attack you're fighting, step up to <strong>isHuman</strong> human proofs: one verified human per account, on the same integration and the same account ID, by changing <code>requiredAssurance</code> to <code>'ishuman'</code> on the actions that need it.</p>
-    <p><a href="{{ url_for('docs_human_proofs') }}" class="btn btn-primary">Human proofs &amp; abuse controls →</a></p>
+    <p><a href="/llms.txt">llms.txt</a> · <a href="/docs/integration/ISHUMAN_AGENT_INTEGRATION.md">integration guide</a>.</p>
 </div>
 {% endblock %}

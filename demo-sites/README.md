@@ -1,6 +1,6 @@
-# Sign in with lemma.id — relying-site demo apps
+# lemma.id proof continuity — relying-site demo apps
 
-These tiny Flask apps simulate real third-party relying sites for the Sign in with lemma.id demo.
+These tiny Flask apps simulate real third-party relying sites for the lemma.id proof-layer demo.
 
 Each app loads the documented drop-in with **siteId = its own hostname** (same contract as any integrator):
 
@@ -18,7 +18,7 @@ Use `lemma-origin` when `LEMMA_ORIGIN` is not production `https://lemma.id` (sta
   - `LEMMA_DEMO_SITE_ID=lemma-demo-tickets-1d3d7411af33.herokuapp.com`
   - `LEMMA_DEMO_SITE_NAME=Lemma Ticketing Demo`
   - `LEMMA_DEMO_SITE_KIND=ticketing`
-  - Default `/` — Sign in with `<lemma-signin>` → session cookie
+  - Default `/` — mint a presentation with `<lemma-signin>` → optional session cookie
   - `/?tour=presale` — Sybil-resistant presale enforcement demo
   - `LEMMA_PRESALE_DROP_ID=artist-presale-2026` (optional)
   - `LEMMA_PRESALE_CODE_CLAIM_ASSURANCE=ishuman` (default; optional)
@@ -34,9 +34,9 @@ Use `lemma-origin` when `LEMMA_ORIGIN` is not production `https://lemma.id` (sta
   - `GET /api/demo/trial/status` (session) and `POST /api/demo/trial/reset`
     (session must own the PPID) support the on-page demo reset.
 
-## Sign-in session (primary product demo)
+## Verify + enforce (primary product demo)
 
-Both demo sites use Sign in with lemma.id:
+Both demo sites use lemma.id proof continuity:
 
 1. User clicks `<lemma-signin>` (passkey ceremony in Lemma popup).
 2. Browser sends signed `presentation` to `POST /api/login`.

@@ -1,8 +1,8 @@
 {% extends "modern/layout.html" %}
 {% set is_public_page = true %}
 
-{% block title %}Try lemma.id | Sign in without an account, an email, or a password{% endblock %}
-{% block description %}Create a lemma.id on your device, then use it to sign in to lemma.id itself. No email, no password, no form. The site learns one random ID and nothing else.{% endblock %}
+{% block title %}Try lemma.id | Proof continuity without email or passwords{% endblock %}
+{% block description %}Create a lemma.id on your device, then verify a signed presentation. The site learns one private ID and nothing else — no email, no password, no form.{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -33,8 +33,8 @@
   <section class="sf-state" id="sf-state-create" hidden>
     <div class="sf-card">
       {{ atom_mark() }}
-      <h1 class="sf-h1">Sign in without an account, an email, or a password.</h1>
-      <p class="sf-lead">Create a lemma.id on this device, then use it to sign in to this very site. About 15&nbsp;seconds.</p>
+      <h1 class="sf-h1">Proof continuity without an account, an email, or a password.</h1>
+      <p class="sf-lead">Create a lemma.id on this device, then mint a signed presentation for this site. About 15&nbsp;seconds.</p>
       <button class="sf-btn" type="button" id="sf-create-btn">
         <span class="sf-btn-label">Create your lemma.id</span>
       </button>
@@ -48,8 +48,8 @@
     <div class="sf-card">
       {{ atom_mark() }}
       <p class="sf-done-line"><span class="sf-done-check" aria-hidden="true">&#10003;</span> Your lemma.id is ready on this device.</p>
-      <h1 class="sf-h1">Now use it to sign in &mdash; to this very site.</h1>
-      <p class="sf-lead">lemma.id runs on its own product. Your device signs a proof; this site verifies it and learns nothing else about you.</p>
+      <h1 class="sf-h1">Now verify a presentation for this site.</h1>
+      <p class="sf-lead">lemma.id runs on its own product. Your device signs a proof; this site verifies it locally and learns nothing else about you.</p>
       <button class="sf-btn" type="button" id="sf-signin-btn">
         <span class="sf-btn-label">Sign in with lemma.id</span>
       </button>

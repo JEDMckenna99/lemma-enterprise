@@ -33,6 +33,95 @@
     return String(raw).replace(/\/?$/, '/');
   }
 
+  function customerSiteOrigin(slug) {
+    try {
+      return new URL(customerSiteUrl(slug)).origin;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /**
+   * Hub cannot mint flow-state for remote demo siteIds (opener origin must
+   * match site hostname). Open /hub-verify on the demo Origin and await a
+   * typed postMessage result — ceremony stays honest; hub stays the control UI.
+   */
+  function verifySiteViaHubBridge(slug, {
+    requiredAssurance = 'passkey',
+    mode = 'signin',
+    timeoutMs = 180000,
+  } = {}) {
+    const base = customerSiteUrl(slug);
+    const expectedOrigin = customerSiteOrigin(slug);
+    if (!base || !expectedOrigin) {
+      return Promise.reject(new Error('demo_site_url_missing'));
+    }
+
+    const requestId = randomPopupToken();
+    const popupUrl = new URL('hub-verify', base);
+    popupUrl.searchParams.set('hub_origin', window.location.origin);
+    popupUrl.searchParams.set('request_id', requestId);
+    popupUrl.searchParams.set('required_assurance', requiredAssurance || 'passkey');
+    popupUrl.searchParams.set('mode', mode || 'signin');
+
+    const width = 480;
+    const height = 720;
+    const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
+    const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
+    // Do NOT use noopener — the demo page must retain window.opener for postMessage.
+    const popup = window.open(
+      popupUrl.toString(),
+      `lemma_hub_verify_${slug}`,
+      `popup=yes,width=${width},height=${height},left=${left},top=${top}`,
+    );
+    if (!popup) {
+      return Promise.reject(new Error('popup_blocked'));
+    }
+
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      let closeGraceTimer = null;
+      const finish = (fn, value) => {
+        if (settled) return;
+        settled = true;
+        window.removeEventListener('message', onMessage);
+        clearInterval(closedTimer);
+        clearTimeout(timeoutTimer);
+        if (closeGraceTimer) clearTimeout(closeGraceTimer);
+        try { if (!popup.closed) popup.close(); } catch (_) { /* non-fatal */ }
+        fn(value);
+      };
+      const onMessage = (event) => {
+        if (event.origin !== expectedOrigin) return;
+        const data = event.data || {};
+        if (data.type !== 'LEMMA_HUB_VERIFY_RESULT') return;
+        if (data.request_id && data.request_id !== requestId) return;
+        finish(resolve, {
+          ok: !!(data.ok || data.human),
+          human: !!(data.ok || data.human),
+          ppid: data.ppid || null,
+          assurance: data.assurance || null,
+          presentation: data.presentation || null,
+          reason: data.reason || ((data.ok || data.human) ? 'valid' : 'not_verified'),
+          timeMs: Number(data.timeMs) || 0,
+        });
+      };
+      const closedTimer = setInterval(() => {
+        if (!popup.closed || closeGraceTimer) return;
+        // Brief grace so a just-posted success message can settle before we
+        // treat user/site close as cancellation.
+        closeGraceTimer = setTimeout(() => {
+          finish(reject, new Error('popup_closed'));
+        }, 400);
+      }, 800);
+      const timeoutTimer = setTimeout(() => {
+        finish(reject, new Error('hub_verify_timeout'));
+      }, timeoutMs);
+      window.addEventListener('message', onMessage);
+      try { popup.focus(); } catch (_) { /* non-fatal */ }
+    });
+  }
+
   function csrfHeaders() {
     const headers = { 'Content-Type': 'application/json' };
     try {
@@ -2201,25 +2290,27 @@
         : `${label} requires fresh presence — confirm with passkey…`,
     );
 
-    // Ceremonies for remote demo sites must run on that site's Origin.
-    if (isPlatformHubHost()) {
-      const url = customerSiteUrl(slug);
-      setQuickInsight(
-        'Sign in',
-        `${label} needs a ceremony on its own host — opening the demo site…`,
-      );
-      if (url) window.open(url, '_blank', 'noopener');
-      throw new Error('open_relying_site');
-    }
-
-    const verifier = verifierFor(slug, { requiredAssurance });
     // Suspend local doubt during apply so a mid-flow status check cannot
     // fail-closed before we clear the server row.
     if (ppid) state.localDoubts[slug].delete(ppid);
 
     let backend = null;
     try {
-      if (tier === 'ishuman') {
+      // Hub: ceremony on demo Origin via /hub-verify popup + postMessage.
+      if (isPlatformHubHost()) {
+        const mode = tier === 'ishuman' ? 'fresh_idv' : 'fresh_presence';
+        setQuickInsight(
+          'Sign in',
+          tier === 'ishuman'
+            ? `${label} humanity was doubted — complete fresh human proof in the site popup…`
+            : `${label} requires fresh presence — confirm in the site popup…`,
+        );
+        backend = await verifySiteViaHubBridge(slug, { requiredAssurance, mode });
+        if (!backend?.ok && !backend?.human) {
+          throw new Error(backend?.reason || 'hub_verify_failed');
+        }
+      } else if (tier === 'ishuman') {
+        const verifier = verifierFor(slug, { requiredAssurance });
         backend = await verifier.verifyFreshForBackend({
           requiredAssurance: 'ishuman',
           ...options,
@@ -2229,6 +2320,7 @@
           throw new Error(backend?.reason || 'fresh_human_proof_failed');
         }
       } else {
+        const verifier = verifierFor(slug, { requiredAssurance });
         const issued = await verifier._issueSiteProofViaPopup({
           freshIdv: false,
           requireFreshPasskey: true,
@@ -2402,38 +2494,51 @@
     }
 
     // Hub is lemma.id — never mint /verify flow-state for a remote siteId here.
-    // Relying-site ceremonies belong on the demo app Origin (integrator contract).
-    const allowPopup = options.autoProvision !== false && !isPlatformHubHost();
-    const backend = await verifier.verifyForBackend({
-      ...options,
-      requiredAssurance,
-      autoProvision: allowPopup,
-    });
-    if (
-      isPlatformHubHost()
-      && options.autoProvision !== false
-      && !(backend.ok || backend.human)
-      && !isSiteBanReason(backend.reason)
-    ) {
-      const url = customerSiteUrl(slug);
+    // Open /hub-verify on the demo Origin and receive the result via postMessage.
+    let backend;
+    if (isPlatformHubHost() && options.autoProvision !== false) {
       const label = slug === 'tickets' ? 'Ticketing' : 'Trials';
+      const mode = options.freshIdv === true ? 'fresh_idv' : 'signin';
       setQuickInsight(
         'Sign in',
-        `${label} sign-in must run on ${SITE_IDS[slug]} — opening that site…`,
+        `${label} ceremony opens on ${SITE_IDS[slug]} — complete it in the popup…`,
       );
-      if (url) window.open(url, '_blank', 'noopener');
-      log(`${SITE_IDS[slug]} ceremony deferred`, 'open_relying_site');
-      const deferred = {
-        human: false,
-        ppid: backend.ppid || derivedPpid || resolveSitePpid(slug),
-        assurance: backend.assurance || null,
-        presentation: null,
-        reason: 'open_relying_site',
-        timeMs: backend.timeMs || 0,
-      };
-      state.results[slug] = deferred;
-      renderSite(slug, deferred);
-      return deferred;
+      try {
+        backend = await verifySiteViaHubBridge(slug, { requiredAssurance, mode });
+        log(
+          `${SITE_IDS[slug]} hub bridge result`,
+          `${backend.reason || (backend.ok ? 'valid' : 'denied')}`,
+        );
+      } catch (err) {
+        const reason = err?.message || 'hub_verify_failed';
+        if (reason === 'popup_blocked') {
+          setQuickInsight(
+            'Popup blocked',
+            `Allow popups for lemma.id, then retry Sign in for ${label}.`,
+          );
+        } else if (reason !== 'popup_closed') {
+          setQuickInsight('Sign in', `${label} sign-in did not finish (${reason}).`);
+        }
+        log(`${SITE_IDS[slug]} hub bridge failed`, reason);
+        const failed = {
+          human: false,
+          ppid: derivedPpid || resolveSitePpid(slug),
+          assurance: null,
+          presentation: null,
+          reason,
+          timeMs: 0,
+        };
+        state.results[slug] = failed;
+        renderSite(slug, failed);
+        return failed;
+      }
+    } else {
+      const allowPopup = options.autoProvision !== false;
+      backend = await verifier.verifyForBackend({
+        ...options,
+        requiredAssurance,
+        autoProvision: allowPopup,
+      });
     }
     const ppid = backend.ppid
       || await resolveDisplayedPpid(verifier, backend, slug, options, requiredAssurance)
@@ -3685,7 +3790,7 @@
     const builderLane = $('ih-builder-lane');
     const tryBtn = $('ih-lane-try-btn');
     const builderBtn = $('ih-lane-builder-btn');
-    const isBuilder = lane === 'builder';
+    const isBuilder = lane !== 'try';
     if (tryLane) tryLane.hidden = isBuilder;
     if (builderLane) builderLane.hidden = !isBuilder;
     if (tryBtn) tryBtn.classList.toggle('is-active', !isBuilder);
@@ -3693,22 +3798,33 @@
     try {
       const url = new URL(window.location.href);
       if (isBuilder) url.searchParams.set('lane', 'builder');
-      else url.searchParams.delete('lane');
+      else url.searchParams.set('lane', 'try');
       window.history.replaceState({}, '', url);
     } catch (_) { /* ignore */ }
   }
 
+  function startInHubDemo() {
+    setDemoLane('builder');
+    $('ih-step-1')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Prefer the create CTA when the wallet is not ready yet.
+    const primary = $('ih-step1-primary-btn');
+    if (primary && !primary.hidden && primary.dataset.action === 'create') {
+      primary.focus({ preventScroll: true });
+    }
+  }
+
   function initDemoLanes() {
     const params = new URLSearchParams(window.location.search);
-    const lane = params.get('lane') === 'builder' ? 'builder' : 'try';
+    // Default to the in-hub Create · Sign in · Enforce flow. Overview is opt-in.
+    const lane = params.get('lane') === 'try' ? 'try' : 'builder';
     setDemoLane(lane);
     const urls = (state.config && state.config.customer_site_urls) || {};
-    const ticketsUrl = urls.tickets || 'https://lemma-demo-tickets-1d3d7411af33.herokuapp.com/';
-    const startLink = $('ih-try-lane-start');
-    if (startLink) startLink.href = ticketsUrl.replace(/\/?$/, '/');
+    const ticketsUrl = (urls.tickets || 'https://lemma-demo-tickets-1d3d7411af33.herokuapp.com/').replace(/\/?$/, '/');
+    const liveLink = $('ih-try-lane-live-link');
+    if (liveLink) liveLink.href = ticketsUrl;
     $('ih-lane-try-btn')?.addEventListener('click', () => setDemoLane('try'));
     $('ih-lane-builder-btn')?.addEventListener('click', () => setDemoLane('builder'));
-    $('ih-try-lane-builder-link')?.addEventListener('click', () => setDemoLane('builder'));
+    $('ih-try-lane-start')?.addEventListener('click', () => startInHubDemo());
     $('ih-end-enforce-link')?.addEventListener('click', () => {
       setDemoLane('builder');
       $('ih-step-3')?.scrollIntoView({ behavior: 'smooth', block: 'start' });

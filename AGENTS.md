@@ -1,8 +1,8 @@
 # AI agent instructions: lemma.id
 
-You are helping a developer add **Sign in with lemma.id** to their web platform: passwordless login with passkeys and a site-private, stable `ppid` as the account key — no usernames, passwords, or email collection. **isHuman** is an optional step-up assurance tier (one verified human per account, same PPID) that sites can require per action; it is not the product name and not a separate integration.
+You are helping a developer add **lemma.id proof continuity** to their web platform: verify signed presentations locally and enforce policy on a site-private, stable `ppid` + assurance level. The primary job is **person continuity under abuse** — optional **isHuman** step-up (one verified human per account, same PPID), action stamps, and site-block — not replacing their login stack unless they want that. Users mint presentations via passkey unlock in the lemma.id popup.
 
-Default to `requiredAssurance: 'passkey'` for login/continuity. Use `'ishuman'` only when the developer needs Sybil resistance on a specific action.
+Default to `requiredAssurance: 'ishuman'` when the action needs Sybil resistance (trials, tickets, payouts, post-ban). Use `'passkey'` for continuity-only gates. Developers may keep existing auth and use lemma only on T2/T2+ paths.
 
 ## Read this first
 
@@ -32,7 +32,7 @@ Or locally: `llms.txt`
 
 ## Product scope
 
-- **In scope:** Browser SDK (`proof-verifier.js`), site-private PPIDs, local backend verification, optional site API keys for abuse controls.
+- **In scope:** Browser SDK (`proof-verifier.js`), site-private PPIDs, local backend verification, assurance ladder (`passkey` / `ishuman`), action stamps, site-block/doubt/check abuse APIs, optional site API keys for enforcement.
 - **Out of scope:** Agent Ops (lemma-cli, Lemma Firewall, runtime control plane), operator-only, not for relying-site integration.
 
 ## Hard rules
@@ -42,17 +42,9 @@ Or locally: `llms.txt`
 3. For signup/account creation, verify a signed `presentation` on the server, never trust a bare client `ppid`.
 4. No customer webhooks, no wallet secret on the developer's backend, no KYC field storage.
 
-## Quick integration (sign-in, default)
+## Quick integration (gate an action, default)
 
-Drop-in button:
-
-```html
-<script src="https://lemma.id/sdk/proof-verifier.js"></script>
-<script src="https://lemma.id/sdk/lemma-signin.js"></script>
-<lemma-signin site-id="app.example.com"></lemma-signin>
-```
-
-SDK directly (always pass `requiredAssurance`; `'passkey'` for login, `'ishuman'` for Sybil-resistant step-up):
+SDK (always pass `requiredAssurance`; `'ishuman'` for Sybil-sensitive actions):
 
 ```html
 <script src="https://lemma.id/sdk/proof-verifier.js"></script>
@@ -60,19 +52,28 @@ SDK directly (always pass `requiredAssurance`; `'passkey'` for login, `'ishuman'
   const verifier = new ProofVerifier({ siteId: 'app.example.com' });
   const { ok, presentation } = await verifier.verifyForBackend({
     autoProvision: true,
-    requiredAssurance: 'passkey',
+    requiredAssurance: 'ishuman',
   });
   if (!ok) throw new Error('not_verified');
-  await fetch('/api/login', { method: 'POST', body: JSON.stringify({ presentation }) });
+  await fetch('/api/gate', { method: 'POST', body: JSON.stringify({ presentation }) });
 </script>
+```
+
+Drop-in button (mint a presentation; same event for gated actions or optional login):
+
+```html
+<script src="https://lemma.id/sdk/proof-verifier.js"></script>
+<script src="https://lemma.id/sdk/lemma-signin.js"></script>
+<lemma-signin site-id="app.example.com"></lemma-signin>
 ```
 
 The legacy `ishuman-verifier.js` URL and `IsHumanVerifier` class remain supported
 as compatibility aliases.
 
 Verify on the server with `@lemma.id/proof-verifier` or `lemma_proof_verifier.py`.
+Enforce on `ppid` + assurance; optionally issue your own session cookie.
 
-See the full guide for trust tiers, abuse APIs, anti-patterns, and framework notes.
+See the full guide for trust tiers, abuse APIs, stamps, anti-patterns, and framework notes.
 
 ## Terminology
 

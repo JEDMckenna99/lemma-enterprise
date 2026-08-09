@@ -251,7 +251,7 @@
             document.addEventListener('DOMContentLoaded', () => {
                 const el = document.getElementById('status') || document.body;
                 if (el) {
-                    el.textContent = 'This verification link is missing a server-issued flow state. Re-open Sign in with lemma.id from the relying site.';
+                    el.textContent = 'This verification link is missing a server-issued flow state. Re-open lemma.id from the relying site.';
                 }
             });
         }
@@ -439,7 +439,7 @@
             const copy = consumerCopy();
             if (siteProofUsesContinuityOnly()) {
                 applyConsumerShell({
-                    eyebrow: 'Sign in with lemma.id',
+                    eyebrow: 'Continue with lemma.id',
                     headline: copy.headlineSiteContinuity || 'Unlock to continue',
                     documentTitle: copy.documentTitleSiteContinuity,
                     introKey: 'siteProofPasskey',
@@ -783,7 +783,7 @@
                 },
                 passkey: {
                     shell: () => applyConsumerShell({
-                        eyebrow: 'Sign in with lemma.id',
+                        eyebrow: 'Continue with lemma.id',
                         headline: copy.headlineSiteContinuity || 'Unlock to continue',
                         documentTitle: copy.documentTitleSiteContinuity,
                         introKey: 'siteProofPasskey',
@@ -2654,7 +2654,7 @@
         (async function boot() {
             if (FLOW_STATE_ERROR || flowStateBlocked) {
                 setStatus(
-                    'This verification link is missing a server-issued flow state. Re-open Sign in with lemma.id from the relying site.',
+                    'This verification link is missing a server-issued flow state. Re-open lemma.id from the relying site.',
                     'error',
                 );
                 try {

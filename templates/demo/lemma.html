@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 {% set is_public_page = true %}
 
-{% block title %}lemma.id demo | Sign in with lemma.id in action{% endblock %}
+{% block title %}lemma.id demo | Proof continuity in action{% endblock %}
 {% block description %}Interactive demo: sign in with a passkey-protected lemma.id on two demo sites and get a different private ID on each. Then step up to human proofs and site-scoped blocks to see how bans stick to a person instead of an account.{% endblock %}
 
 {% block head %}
@@ -29,8 +29,8 @@
     <div class="demo-hero-copy">
       <img class="demo-hero-logo" src="/static/img/lemma_logo.svg" alt="lemma.id" width="56" height="56">
       <p class="demo-eyebrow">lemma.id demo</p>
-      <h1 class="demo-title">One lemma.id. A different private ID on every site.</h1>
-      <p class="demo-lead" id="ih-intro-lead"><strong>Create</strong> a passkey-protected lemma.id on your device. <strong>Sign in</strong> on two demo sites and get a different private ID on each one — sites can't link them. <strong>Enforce</strong> is the step-up: doubt a user, require human proof, or ban. Proofs stay on your device; sites verify offline.</p>
+      <h1 class="demo-title">One lemma.id. Enforce one person per site.</h1>
+      <p class="demo-lead" id="ih-intro-lead"><strong>Create</strong> a passkey-protected lemma.id on your device. <strong>Enforce</strong> one-human policy: one code per person, bans that stick, human proof when Sybil matters. <strong>Sign in</strong> on demo sites and get a different private ID on each hostname — sites can't link them. Proofs stay on your device; sites verify offline.</p>
       <div class="demo-hero-cta">
         <button class="demo-btn demo-btn-primary" id="ih-get-started" type="button">Get started</button>
         <a class="demo-btn demo-btn-secondary demo-btn-outline" href="/developer">View developer docs</a>
@@ -138,27 +138,27 @@
   </header>
 
   <nav class="demo-lane-chooser" id="ih-lane-chooser" aria-label="Demo mode">
-    <button type="button" class="demo-lane-btn is-active" id="ih-lane-try-btn" data-lane="try">Try it</button>
-    <button type="button" class="demo-lane-btn" id="ih-lane-builder-btn" data-lane="builder">See how it works</button>
+    <button type="button" class="demo-lane-btn" id="ih-lane-try-btn" data-lane="try">Overview</button>
+    <button type="button" class="demo-lane-btn is-active" id="ih-lane-builder-btn" data-lane="builder">Operate on this hub</button>
   </nav>
 
-  <section class="demo-try-lane" id="ih-try-lane">
+  <section class="demo-try-lane" id="ih-try-lane" hidden>
     <div class="demo-try-card">
-      <h2>Feel the difference in under two minutes</h2>
-      <p class="demo-muted">A guided story on the ticketing demo site: contrast the old signup way, sign in with a passkey, claim a code, and see one-code-per-person enforcement.</p>
+      <h2>Operate the full flow on this page</h2>
+      <p class="demo-muted">Create a lemma.id, sign in to the two demo sites from here, then Enforce — without leaving this hub. Live third-party sites stay optional.</p>
       <ol class="demo-try-steps">
-        <li>See what email/password signup feels like (mock)</li>
-        <li>Sign in with lemma.id — no form</li>
-        <li>Claim a presale code</li>
-        <li>Try to grab a second code — denied</li>
-        <li>Close the tab and come back — still you</li>
+        <li>Create your passkey-protected lemma.id</li>
+        <li>Sign in on Presale and SaaS trial (popups return here)</li>
+        <li>Compare the two private IDs</li>
+        <li>Doubt, ban, or require human proof — site-scoped</li>
+        <li>Optional: open a live demo site in another tab</li>
       </ol>
-      <a class="demo-btn demo-btn-primary" id="ih-try-lane-start" href="#" target="_blank" rel="noopener">Start the guided demo →</a>
-      <button type="button" class="demo-btn demo-btn-secondary demo-btn-outline" id="ih-try-lane-builder-link">See how it works instead</button>
+      <button type="button" class="demo-btn demo-btn-primary" id="ih-try-lane-start">Start on this hub →</button>
+      <a class="demo-btn demo-btn-secondary demo-btn-outline" id="ih-try-lane-live-link" href="#" target="_blank" rel="noopener">Open live tickets tour (optional)</a>
     </div>
   </section>
 
-  <div id="ih-builder-lane" hidden>
+  <div id="ih-builder-lane">
 
   <button class="demo-btn demo-btn-secondary demo-btn-quiet" id="ih-popup-retry-btn" type="button" hidden>Retry popup</button>
 
@@ -290,7 +290,7 @@
         <div class="workflow-head" id="ih-demo-cockpit">
           <div>
             <h2 id="ih-step2-title">Sign in on the demo sites</h2>
-            <p class="demo-muted" id="ih-step2-desc">This is what the Sign in with lemma.id button does on a real site: each site declares the assurance it requires, your lemma.id mints a site-private proof, and the site verifies it offline. Same wallet, different private ID on every hostname.</p>
+            <p class="demo-muted" id="ih-step2-desc">Each site declares the assurance it requires; your lemma.id mints a site-private proof, and the site verifies it offline. Same lemma.id, different private ID on every hostname.</p>
           </div>
         </div>
 
@@ -331,8 +331,8 @@
               <span class="result-value" id="ih-tickets-latency">—</span>
             </div>
             <div class="site-card-actions">
-              <a class="demo-site-open-link" id="ih-link-tickets-tour" href="#" target="_blank" rel="noopener">Walk presale defenses →</a>
               <button class="demo-btn demo-btn-secondary demo-btn-quiet demo-site-verify-btn" id="ih-verify-tickets-step2" type="button">Sign in</button>
+              <a class="demo-site-open-link" id="ih-link-tickets-tour" href="#" target="_blank" rel="noopener">Open live site (optional) →</a>
             </div>
           </article>
 
@@ -365,8 +365,8 @@
               <span class="result-value" id="ih-trials-latency">—</span>
             </div>
             <div class="site-card-actions">
-              <a class="demo-site-open-link" id="ih-link-trials-step2" href="#" target="_blank" rel="noopener">Open trials demo →</a>
               <button class="demo-btn demo-btn-secondary demo-btn-quiet demo-site-verify-btn" id="ih-verify-trials-step2" type="button">Sign in</button>
+              <a class="demo-site-open-link" id="ih-link-trials-step2" href="#" target="_blank" rel="noopener">Open live site (optional) →</a>
             </div>
           </article>
         </div>
@@ -569,7 +569,7 @@
   <section class="demo-outcome-footer">
     <img src="/static/img/lemma_logo.svg" alt="" width="56" height="56" class="demo-outcome-logo">
     <div class="demo-outcome-footer-body">
-      <h2 class="demo-outcome-footer-title">Create · Sign in · Enforce</h2>
+      <h2 class="demo-outcome-footer-title">Create · Enforce · Sign in</h2>
       <div class="demo-outcome-grid">
         <article class="demo-outcome-item">
           <h3>Create</h3>
@@ -598,7 +598,7 @@
 
       <section class="demo-advanced-section">
         <h3>Manual site verification</h3>
-        <p class="demo-muted">Sign in on one site at a time or both together without leaving the hub.</p>
+        <p class="demo-muted">Sign in on one site at a time or both together. Each site opens a short popup on its own origin, then returns the result here.</p>
         <div class="action-row">
           <button class="demo-btn demo-btn-secondary" id="ih-verify-tickets-btn" type="button">Sign in on ticketing site</button>
           <button class="demo-btn demo-btn-secondary" id="ih-verify-trials-btn" type="button">Sign in on trials site</button>
@@ -640,8 +640,8 @@
         <h3>Relying-site demos</h3>
         <p class="demo-muted">Reserve a ticket or start a trial on separate origins. Each site verifies the signed presentation on its own backend.</p>
         <div class="action-row">
-          <a class="demo-btn demo-btn-secondary" id="ih-link-tickets-site" href="#" target="_blank" rel="noopener">Walk presale defenses</a>
-          <a class="demo-btn demo-btn-secondary" id="ih-link-trials-site" href="#" target="_blank" rel="noopener">Open trials demo</a>
+          <a class="demo-btn demo-btn-secondary" id="ih-link-tickets-site" href="#" target="_blank" rel="noopener">Open live tickets (optional)</a>
+          <a class="demo-btn demo-btn-secondary" id="ih-link-trials-site" href="#" target="_blank" rel="noopener">Open live trials (optional)</a>
         </div>
       </section>
 
@@ -738,5 +738,5 @@ const { ok, ppid, assurance, presentation } = await new ProofVerifier({
 <!-- Legacy SDK alias remains available at /sdk/ishuman-verifier.js. -->
 <script src="/sdk/proof-verifier.js?v={{ proof_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script src="/static/js/demo/plain-language.js?v=1" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=88" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=89" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}

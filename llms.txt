@@ -1,24 +1,51 @@
 # lemma.id: relying-site integration pointers for AI agents
 
-lemma.id is **Sign in with lemma.id**: passwordless login with passkeys and a
-site-private, stable `ppid` as the account key. No usernames, passwords, or
-email collection; your backend verifies a signed presentation locally.
-**isHuman** is an optional step-up assurance tier (one verified human per
-account) on the same PPID — request it per action, it is not a separate
-integration.
+lemma.id is a **local-first proof layer** for relying sites: verify a signed
+presentation on your backend and get a site-private, stable `ppid` + assurance
+level. Use it for **person continuity under abuse** — one handle per human per
+site, optional **isHuman** step-up (one verified human per account on the same
+PPID), action stamps, and site-block so bans survive new accounts. Users mint
+presentations with a passkey; passkey unlock is the free pipe, not the product.
+
+Keep your existing login if you want; gate sensitive actions with lemma proofs.
 
 ## Start here
 
-- Sign-in quickstart: https://lemma.id/docs/integration/QUICK_START_SIMPLE_LOGIN.md
-- Full sign-in guide (sessions, linking, sign-out): https://lemma.id/docs/integration/SIMPLE_INTEGRATION_GUIDE.md
+- Continuity & abuse: https://lemma.id/docs/integration/CONTINUITY_AND_ABUSE.md
+- Quick start (gate an action): https://lemma.id/docs/integration/QUICK_START_SIMPLE_LOGIN.md
+- Integration guide (assurance, stamps, sessions): https://lemma.id/docs/integration/SIMPLE_INTEGRATION_GUIDE.md
 - Canonical integration contract (machine-oriented, authoritative): https://lemma.id/docs/integration/ISHUMAN_AGENT_INTEGRATION.md
+- Trust, recovery, availability: https://lemma.id/docs/integration/SIGN_IN_TRUST_AND_RECOVERY.md
 - Browser support + SDK error codes: https://lemma.id/docs/integration/BROWSER_SUPPORT.md
 - Human-readable docs: https://lemma.id/docs
 - Repo agent entrypoint (if working in the lemma-enterprise repo): AGENTS.md
 
-## Sign in (default integration)
+## Gate a sensitive action (default integration path)
 
-Drop-in button:
+Mint a presentation (passkey unlock in the lemma.id popup), verify locally,
+enforce by `ppid` and assurance:
+
+```javascript
+const verifier = new ProofVerifier({ siteId: 'app.example.com' });
+const { ok, presentation } = await verifier.verifyForBackend({
+  autoProvision: true,
+  requiredAssurance: 'ishuman', // or 'passkey' for continuity-only
+});
+if (!ok) throw new Error('not_verified');
+await fetch('/api/claim-trial', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ presentation }),
+});
+```
+
+Backend: verify the presentation locally with `@lemma.id/proof-verifier` or
+`lemma_proof_verifier.py` — no per-request call to lemma.id. Enforce policy on
+`result.ppid` and `result.assurance`; optionally call site-block APIs.
+
+## Mint a presentation (browser UX)
+
+Drop-in button (same SDK; use on gated actions or optional login):
 
 ```html
 <script src="https://lemma.id/sdk/proof-verifier.js"></script>
@@ -26,32 +53,19 @@ Drop-in button:
 <lemma-signin site-id="app.example.com"></lemma-signin>
 <script>
   document.querySelector('lemma-signin').addEventListener('lemma-signin-success', (e) => {
-    fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    fetch('/api/gate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ presentation: e.detail.presentation }) });
   });
 </script>
 ```
 
-SDK directly (always pass `requiredAssurance` — `'passkey'` for login):
+## Assurance ladder (same PPID)
 
-```javascript
-const verifier = new ProofVerifier({ siteId: 'app.example.com' });
-const { ok, presentation } = await verifier.verifyForBackend({
-  autoProvision: true,
-  requiredAssurance: 'passkey',
-});
-```
+- `passkey` — continuity proof (daily unlock)
+- `ishuman` — IDV-backed one human per account (Sybil-sensitive actions: trials,
+  tickets, payouts, post-ban recovery)
 
-Backend: verify the presentation locally, find-or-create the user by
-`result.ppid`, issue **your own** session cookie. Login returns `ppid` +
-`assurance` only — no email/name/avatar; collect profile fields yourself on
-first login.
-
-## isHuman step-up (optional, same PPID)
-
-Require one verified human per account for Sybil-sensitive actions (trials,
-ticketing, payouts, post-ban recovery): set `requiredAssurance: 'ishuman'` on
-both client and backend. The PPID does not change when a user upgrades tiers.
+Request per action on client and backend; PPID does not change when upgrading tiers.
 
 ## Backend verifiers (local-first)
 
@@ -76,7 +90,7 @@ both client and backend. The PPID does not change when a user upgrades tiers.
 
 1. `siteId` = canonical hostname (`app.example.com`), not internal `site_...` IDs.
 2. Fail closed when `human` is false.
-3. For signup/account creation and login, verify a signed `presentation` on the server, never trust a bare client `ppid`.
+3. For account binding and gated actions, verify a signed `presentation` on the server, never trust a bare client `ppid`.
 4. No customer webhooks, no local identity seed (`wallet_secret`) on the developer's backend, no KYC field storage.
 
 ## Terminology

@@ -1,4 +1,4 @@
-"""Sign in with lemma.id — FastAPI example with session cookies."""
+"""Verify a lemma proof — FastAPI example with optional session cookies."""
 
 from __future__ import annotations
 
@@ -75,8 +75,8 @@ class LoginBody(BaseModel):
 
 
 LOGIN_HTML = f"""<!doctype html>
-<html><head><title>Sign in with lemma.id (FastAPI)</title></head><body>
-<h1>Sign in with lemma.id</h1>
+<html><head><title>Verify a lemma proof (FastAPI)</title></head><body>
+<h1>Verify a lemma proof</h1>
 <p id="status">Loading…</p>
 <button id="signin" type="button" style="display:none">Sign in with lemma.id</button>
 <script src="https://lemma.id/sdk/proof-verifier.js"></script>

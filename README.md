@@ -1,10 +1,10 @@
 # lemma.id
 
-**Passwordless login with no user data to store — and bans that stick.**
+**Site-private person continuity with optional human proof — and bans that stick.**
 
-lemma.id is **Sign in with lemma.id**: passkey login that gives your site a stable, site-private PPID as the account key, with no usernames, passwords, or email collection and signed local backend verification. The optional **isHuman** step-up tier binds one verified human per account on the same PPID, so bans survive email, SIM, device, and IP rotation — without your site storing ID documents or building a KYC stack.
+lemma.id is a **proof layer** for relying sites: verify a signed presentation, get a stable site-private PPID plus assurance metadata, and enforce policy (one-human, site blocks, action stamps). Passkey continuity is the default tier; **isHuman** step-up binds one verified human per account on the same PPID, so bans survive email, SIM, device, and IP rotation — without your site storing ID documents or building a KYC stack.
 
-- **Live:** https://lemma.id · **Docs:** https://lemma.id/docs · **AI integration guide:** [`docs/integration/ISHUMAN_AGENT_INTEGRATION.md`](docs/integration/ISHUMAN_AGENT_INTEGRATION.md)
+- **Live:** https://lemma.id · **Docs:** https://lemma.id/docs · **Continuity & abuse:** [`docs/integration/CONTINUITY_AND_ABUSE.md`](docs/integration/CONTINUITY_AND_ABUSE.md) · **AI integration guide:** [`docs/integration/ISHUMAN_AGENT_INTEGRATION.md`](docs/integration/ISHUMAN_AGENT_INTEGRATION.md)
 
 ## The problem
 

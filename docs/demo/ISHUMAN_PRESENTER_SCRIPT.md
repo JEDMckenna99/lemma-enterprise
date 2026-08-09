@@ -1,4 +1,4 @@
-# Sign in with lemma.id — demo presenter script (user lane)
+# lemma.id demo — presenter script (user lane)
 
 Read this verbatim when giving the demo to a non-technical audience. Use the **Try it** lane on `/demo`, then the ticketing demo site.
 
@@ -19,15 +19,13 @@ Click **Now try the lemma.id way**.
 
 ---
 
-## Beat 2 — Form-free sign-in
+## Beat 2 — One person, one code
 
-> "Tap Sign in with lemma.id. Use your passkey."
+> "Use your passkey to prove you're one person. Claim your unique code."
 
-After sign-in:
+After claim:
 
-> "You're in. No email, no password, nothing to breach."
-
----
+> "One code per person — this site never saw your ID documents."
 
 ## Beat 3 — Claim the scarce thing
 

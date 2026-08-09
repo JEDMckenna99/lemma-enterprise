@@ -1,14 +1,15 @@
-# Sign in with lemma.id — demo playground
+# lemma.id demo playground
 
 ## What this proves
 
-The public **`/demo`** route (alias `/demo/ishuman`) demonstrates Sign in with lemma.id in three concepts: **Create**, **Sign in**, **Enforce** — not Agent Ops.
+The public **`/demo`** route (alias `/demo/ishuman`) demonstrates lemma.id proof
+continuity in three concepts: **Create**, **Enforce**, **Sign in** — not Agent Ops.
 
 When one-PPID assurance flags are enabled on staging:
 
 - **Create**: passkey-backed lemma.id + provisional person root (no IDV required to start).
-- **Sign in**: hub derives distinct site PPIDs via `verifyForBackend`; Heroku demo sites use the drop-in **`<lemma-signin>`** element → `POST /api/login` → site session cookie; soft actions reuse the session until fresh passkey step-up (presale claim).
-- **Enforce**: set assurance (`passkey` → `ishuman`), site doubt, and site ban via `/api/demo/ishuman/*`. Hub Enforce attaches the last verified site `presentation`; mutations are allowed when the presentation PPID matches the target (**self-scoped**) or the caller is **SiteAdmin / platform operator** for `site_demo_*`. After Didit IDV, re-sign-in with `requiredAssurance: 'ishuman'`: **same PPID**, assurance flips to `ishuman`.
+- **Enforce**: set assurance (`passkey` → `ishuman`), site doubt, and site ban via `/api/demo/ishuman/*`. One-code-per-PPID presale; bans survive fresh sign-in. Hub Enforce attaches the last verified site `presentation`; mutations are allowed when the presentation PPID matches the target (**self-scoped**) or the caller is **SiteAdmin / platform operator** for `site_demo_*`. After Didit IDV, re-verify with `requiredAssurance: 'ishuman'`: **same PPID**, assurance flips to `ishuman`.
+- **Sign in**: hub derives distinct site PPIDs via `verifyForBackend`; Heroku demo sites use the drop-in **`<lemma-signin>`** element → `POST /api/login` → optional site session cookie; soft actions reuse the session until fresh passkey step-up (presale claim).
 
 Legacy IDV-first copy remains when `assurance_demo_mode` is false (flags off).
 

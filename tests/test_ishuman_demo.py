@@ -37,7 +37,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
-    assert "One lemma.id. A different private ID on every site." in body
+    assert "One lemma.id. Enforce one person per site." in body
     assert "Create</strong> a passkey-protected lemma.id" in body
     assert "lemma.id demo" in body
     assert "Get started" in body
@@ -133,8 +133,11 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-link-tickets-step2" not in body
     assert "ih-verify-tickets-step2" in body
     assert "ih-verify-trials-step2" in body
-    assert "Walk presale defenses →" in body
-    assert "Open trials demo →" in body
+    assert "Open live site (optional) →" in body
+    assert "Start on this hub →" in body
+    assert 'id="ih-builder-lane"' in body
+    assert "Operate on this hub" in body
+    assert "Open live trials (optional)" in body
     adv_start = body.index('id="ih-advanced-panel"')
     assert body.index("ih-verify-tickets-btn") > adv_start
     step2_start = body.index('id="ih-step-2"')
@@ -152,7 +155,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
     assert "/static/js/demo/plain-language.js?v=1" in body
-    assert "/static/js/demo/ishuman-demo.js?v=88" in body
+    assert "/static/js/demo/ishuman-demo.js?v=89" in body
     assert "ih-clear-my-bans-btn" in body
     assert "Clear my bans" in body
     js = (ROOT / "static/js/demo/ishuman-demo.js").read_text(encoding="utf-8")
@@ -840,6 +843,10 @@ def test_ishuman_demo_js_uses_real_verifier_with_two_site_bindings():
     assert "/api/demo/ishuman/verify-once-test-mode" in js
     assert "/api/demo/ishuman/probe-derive" in js
     assert "verifyForBackend" in js
+    assert "verifySiteViaHubBridge" in js
+    assert "hub-verify" in js
+    assert "LEMMA_HUB_VERIFY_RESULT" in js
+    assert "open_relying_site" not in js
     assert "/api/demo/ishuman/require-ishuman" in js
     assert "headers: demoHeaders()" in js
     assert "createLemmaIdViaPopup" in js

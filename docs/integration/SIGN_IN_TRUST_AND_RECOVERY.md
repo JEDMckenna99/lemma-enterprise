@@ -1,7 +1,7 @@
-# Sign in with lemma.id: trust, recovery, and failure modes
+# lemma.id: trust, recovery, and availability
 
-This page answers the three questions developers ask before putting an
-auth dependency on their critical path: **What happens if a user loses their
+This page answers the three questions developers ask before putting a **proof
+dependency** on their critical path: **What happens if a user loses their
 device? What happens if lemma.id goes down? And is this a crypto/blockchain
 thing?** Short answers first, detail below.
 
@@ -12,22 +12,22 @@ thing?** Short answers first, detail below.
   lemma.id is not promised — see the honest matrix below.
 - **Availability:** the verifier runs **on your backend, offline** — there is no
   per-request call to lemma.id, so verification and your own sessions do not
-  depend on lemma being up. A lemma.id outage blocks **new** sign-ins (the popup
-  mints the presentation), not your active sessions.
+  depend on lemma being up. A lemma.id outage blocks **new presentation mints**
+  (the popup), not your active sessions or already-verified policy.
 - **No blockchain:** there is no token, no coin, and no chain. See
   ["What this is not"](#what-this-is-not).
 
 ---
 
-## Where lemma.id sits in your login path (and where it doesn't)
+## Where lemma.id sits in your proof path (and where it doesn't)
 
 ```
 Browser                         Your backend                    lemma.id
 -------                         ------------                    --------
-<lemma-signin> popup  --------> POST /api/login
+verifyForBackend / popup  ----> POST /api/gate
   (mints signed                   verify(presentation)  ← runs LOCALLY, offline
-   presentation) ← talks           find/create user by ppid
-   to lemma to derive             set your OWN session cookie
+   presentation) ← talks           enforce on ppid + assurance
+   to lemma to derive             optional: set your OWN session cookie
    the site proof
 ```
 
@@ -52,7 +52,7 @@ moment a user signs in, and its failure mode is spelled out below.
 
 | Scenario | Active sessions (already logged in) | New sign-in / re-auth | Your data |
 |----------|-------------------------------------|-----------------------|-----------|
-| lemma.id API/popup **down** | ✅ Unaffected — validated by your own cookie | ❌ Blocked while down (popup can't mint a presentation) | ✅ Your `ppid`→account rows are in **your** DB |
+| lemma.id API/popup **down** | ✅ Unaffected — validated by your own cookie / prior verify | ❌ Blocked while down (popup can't mint a presentation) | ✅ Your `ppid`→account rows are in **your** DB |
 | lemma.id **verifier/SDK CDN down** | ✅ Unaffected | ✅ Pin/self-host the verifier (npm/PyPI/vendored) and it keeps working | ✅ Unaffected |
 | Issuer key rotation | ✅ Unaffected | ✅ Trust list carries `previous_keys`; verifiers refresh automatically, no site action | ✅ Unaffected |
 | lemma.id **shuts down permanently** | ✅ Sessions persist until expiry | ⚠️ New logins stop; migrate via a dual-run window to another method | ✅ You keep every `ppid` and all site-scoped state |

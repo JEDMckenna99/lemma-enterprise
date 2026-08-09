@@ -1,4 +1,4 @@
-"""Sign in with lemma.id — Flask example with session cookies."""
+"""Verify a lemma proof — Flask example with optional session cookies."""
 
 from __future__ import annotations
 
@@ -76,9 +76,9 @@ def require_auth():
 LOGIN_PAGE = """
 <!doctype html>
 <html>
-<head><title>Sign in with lemma.id (Flask)</title></head>
+<head><title>Verify a lemma proof (Flask)</title></head>
 <body>
-  <h1>Sign in with lemma.id</h1>
+  <h1>Verify a lemma proof</h1>
   <p id="status">Loading…</p>
   <button id="signin" type="button" style="display:none">Sign in with lemma.id</button>
   <div id="link-panel" style="display:none; margin-top:1rem">

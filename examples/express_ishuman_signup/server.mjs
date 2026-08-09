@@ -1,5 +1,5 @@
 /**
- * Sign in with lemma.id — Express example with session cookies.
+ * Verify a lemma proof — Express example with optional session cookies.
  */
 import crypto from "node:crypto";
 import express from "express";
@@ -60,8 +60,8 @@ function requireAuth(req, res, next) {
 }
 
 const loginPage = `<!doctype html>
-<html><head><title>Sign in with lemma.id (Express)</title></head><body>
-<h1>Sign in with lemma.id</h1>
+<html><head><title>Verify a lemma proof (Express)</title></head><body>
+<h1>Verify a lemma proof</h1>
 <p id="status">Loading…</p>
 <button id="signin" type="button" style="display:none">Sign in with lemma.id</button>
 <script src="https://lemma.id/sdk/proof-verifier.js"></script>

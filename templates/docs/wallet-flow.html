@@ -1,17 +1,17 @@
 {% extends "docs/layout.html" %}
 {% set active_page = 'wallet-flow' %}
 {% set hero_title = 'lemma.id Redirect Flow' %}
-{% set hero_subtitle = 'How the authentication redirect works' %}
+{% set hero_subtitle = 'How the unlock redirect mints a presentation for your site' %}
 
 {% block docs_content %}
 <div class="docs-section">
     <h2>Authentication Flow</h2>
-    <p>Lemma uses a redirect-based authentication flow similar to OAuth, but simpler:</p>
+    <p>Lemma uses a redirect-based unlock flow similar to OAuth, but simpler:</p>
     
     <ol style="color: var(--gray-600); line-height: 2;">
-        <li>User clicks "Sign in with Lemma" on your site</li>
+        <li>User clicks your lemma.id button (or calls <code>verifyForBackend</code>) on your site</li>
         <li>SDK redirects to <code>lemma.id/wallet/unlock</code></li>
-        <li>User authenticates with their passkey</li>
+        <li>User unlocks lemma.id with their passkey</li>
         <li>Lemma redirects back to your <code>returnUrl</code></li>
         <li>SDK decrypts credential from URL fragment</li>
         <li>Credential is verified locally before your app performs any backend session/auth binding it requires</li>

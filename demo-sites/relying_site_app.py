@@ -517,7 +517,7 @@ def _signin_content():
             "action": TRIAL_ACTION,
         }
     return {
-        "eyebrow": "Sign in with lemma.id",
+        "eyebrow": "lemma.id proof",
         "headline": "Sign in to this demo site",
         "subhead": "Same integration as the docs quickstart: drop in the lemma-signin element, verify the presentation on your backend, issue a session cookie. When you need Sybil-resistant enforcement, open the presale tour.",
         "primary": "Run protected action",
@@ -1592,7 +1592,7 @@ def _generic_index():
     demo_walkthrough = """
     <div class="demo-progress" id="demo-progress" aria-label="Demo walkthrough">
       <span class="demo-progress-label">Live demo</span>
-      <span class="demo-step" data-demo-step="signin">1 · Sign in with a passkey</span>
+      <span class="demo-step" data-demo-step="signin">1 · Verify with a passkey</span>
       <span class="demo-step" data-demo-step="activate">2 · Activate your free workspace</span>
       <span class="demo-step" data-demo-step="deny">3 · Try to activate again</span>
       <span class="demo-step" data-demo-step="one">4 · One trial per person</span>
@@ -2174,7 +2174,7 @@ def _generic_index():
     async function completeLoginFromPresentation(presentation, timeMs) {{
       pill.textContent = 'CHECKING';
       pill.className = 'pill checking';
-      decisionCard.innerHTML = '<strong>Sign in with lemma.id</strong><p class="tiny">Server verifies your signed presentation and sets a site session cookie.</p>';
+      decisionCard.innerHTML = '<strong>Verify with lemma.id</strong><p class="tiny">Server verifies your signed presentation and sets a site session cookie.</p>';
       try {{
         const loginRes = await fetch('/api/login', {{
           method: 'POST',
@@ -2206,7 +2206,7 @@ def _generic_index():
       if (!siteSessionPpid) {{
         const signedIn = await refreshSessionState();
         if (!signedIn) {{
-          decisionCopy.textContent = 'Sign in with lemma.id first.';
+          decisionCopy.textContent = 'Verify a presentation first.';
           return;
         }}
       }}
@@ -2406,7 +2406,7 @@ def _ticketing_signin_index():
           <span class="pill" id="assurance-pill">policy: {DEMO_REQUIRED_ASSURANCE}</span></p>
         <p class="muted" id="decision-copy">Sign in to start.</p>
         <ol class="how">
-          <li>Sign in with lemma.id once — server verifies presentation and sets a session cookie.</li>
+          <li>Verify with lemma.id once — server verifies presentation and sets a session cookie.</li>
           <li>Protected actions reuse the site session until policy requires fresh passkey.</li>
           <li>For Sybil-resistant presale flows, open the presale tour.</li>
         </ol>
@@ -2485,7 +2485,7 @@ def _ticketing_signin_index():
 
     async function runProtectedAction() {{
       if (!siteSessionPpid && !(await refreshSessionState())) {{
-        decisionCopy.textContent = 'Sign in with lemma.id first.';
+        decisionCopy.textContent = 'Verify a presentation first.';
         return;
       }}
       actionBtn.disabled = true;
@@ -2605,7 +2605,7 @@ def _presale_index(welcome_mode=False):
     verdict_intro = """
         <div class="verdict" id="decision-card">
           <strong>How this works</strong>
-          <p class="tiny">Sign in with your passkey, join the drop, then reveal one verified-fan code. Encore never sees your email, password, or identity documents — just a private member ID.</p>
+          <p class="tiny">Verify with your passkey, join the drop, then reveal one verified-fan code. Encore never sees your email, password, or identity documents — just a private member ID.</p>
         </div>""" if welcome_mode else """
         <div class="verdict" id="decision-card">
           <strong>Protected presale flow</strong>
@@ -2615,7 +2615,7 @@ def _presale_index(welcome_mode=False):
     welcome_progress = """
     <div class="welcome-progress" id="welcome-progress" aria-label="Demo walkthrough">
       <span class="welcome-progress-label">Live demo</span>
-      <span class="welcome-step" data-welcome-step="signin">1 · Sign in with a passkey</span>
+      <span class="welcome-step" data-welcome-step="signin">1 · Verify with a passkey</span>
       <span class="welcome-step" data-welcome-step="claim">2 · Claim your presale code</span>
       <span class="welcome-step" data-welcome-step="deny">3 · Try to claim a second</span>
       <span class="welcome-step" data-welcome-step="return">4 · One code per person</span>
@@ -3150,7 +3150,7 @@ def _presale_index(welcome_mode=False):
         <li data-tour-step="flag" id="tour-step-flag">Simulate risk flag, IDV penalty, then code at isHuman</li>
         <li data-tour-step="attack" id="tour-step-attack">Attack lab, replay stamp or skip Step 1</li>
       </ol>
-      <p class="tour-impact" id="tour-impact">Sign in with a passkey first. Join the drop, then confirm and reveal your code with verified-human + fresh passkey proof.</p>
+      <p class="tour-impact" id="tour-impact">Verify with a passkey first. Join the drop, then confirm and reveal your code with verified-human + fresh passkey proof.</p>
     </div>
     <div class="{layout_class}">
       <section class="card">
@@ -3516,14 +3516,14 @@ def _presale_index(welcome_mode=False):
       if (siteSessionPpid) return true;
       const ok = await refreshSessionState();
       if (ok) return true;
-      decisionCopy.textContent = 'Sign in with lemma.id before running presale steps.';
+      decisionCopy.textContent = 'Verify a presentation before running presale steps.';
       return false;
     }}
 
     async function completeLoginFromPresentation(presentation) {{
       pill.textContent = 'CHECKING';
       pill.className = 'pill checking';
-      decisionCard.innerHTML = '<strong>Sign in with lemma.id</strong><p class="tiny">Server verifies your signed presentation and sets a site session cookie.</p>';
+      decisionCard.innerHTML = '<strong>Verify with lemma.id</strong><p class="tiny">Server verifies your signed presentation and sets a site session cookie.</p>';
       try {{
         const loginRes = await fetch('/api/login', {{
           method: 'POST',

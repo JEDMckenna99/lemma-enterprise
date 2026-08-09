@@ -1,6 +1,6 @@
 """Public marketing pages lead with enforcement (one account per verified human).
 
-Free Sign in with lemma.id is the on-ramp; human proofs are the headline claim.
+Free passkey continuity / local verify is the on-ramp; human proofs are the headline claim.
 Honest-copy invariants (passkey tier is not Sybil resistance, no revocation
 overclaims) must survive any repositioning.
 """
@@ -34,12 +34,12 @@ def test_homepage_leads_with_enforcement(public_client):
     # Enforcement is the headline; hero leads with the consequence claim.
     assert "they stay banned" in body
     assert "One account per verified human" in body
-    # Free sign-in remains the on-ramp, present and named.
-    assert "Sign in with lemma.id" in body
-    assert "Passwordless login" in body
-    assert "No user data to store" in body
+    # Free passkey continuity remains the on-ramp, present via component + code sample.
+    assert "lemma.id proof layer" in body
     assert "lemma-signin" in body
-    assert "requiredAssurance: 'passkey'" in body
+    assert "Passkey for continuity" in body
+    assert "local verify" in body.lower()
+    assert "requiredAssurance" in body
     # Honest step-up framing stays: passkey tier alone is not Sybil resistance.
     assert "anyone can create another lemma.id" in body
     assert "Revoke everywhere" not in body
@@ -58,11 +58,11 @@ def test_trust_page_distinguishes_passkey_and_human_proofs(public_client):
 
 
 @pytest.mark.integration
-def test_pricing_page_leads_with_free_sign_in(public_client):
+def test_pricing_page_leads_with_free_local_verify(public_client):
     resp = public_client.get("/pricing")
     body = resp.get_data(as_text=True)
     assert resp.status_code == 200
-    assert "Sign-in is free" in body
+    assert "Local verify is free" in body
     assert "no card required" in body
     assert "Free forever, not a trial" in body
     assert "human proof" in body.lower()
@@ -91,15 +91,15 @@ def test_ticketing_page_links_live_presale_demo(public_client):
 
 
 @pytest.mark.integration
-def test_docs_split_sign_in_first(public_client):
-    """/docs is login-only; step-up material lives at /docs/human-proofs."""
+def test_docs_split_continuity_first(public_client):
+    """/docs leads with proof continuity; step-up material lives at /docs/human-proofs."""
     docs = public_client.get("/docs")
     body = docs.get_data(as_text=True)
     assert docs.status_code == 200
-    assert "Sign in with lemma.id" in body
+    assert "Proof continuity for your site" in body
     assert "lemma-signin" in body
-    assert "requiredAssurance: 'passkey'" in body
-    # Step-up sections must not render on the sign-in page.
+    assert "requiredAssurance" in body
+    # Step-up sections must not render on the continuity page.
     assert "Global Bloom revocation" not in body
     assert "What you configure vs what lemma.id runs" not in body
 

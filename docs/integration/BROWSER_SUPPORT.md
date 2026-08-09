@@ -1,6 +1,6 @@
-# Browser support — Sign in with lemma.id
+# Browser support — lemma.id proof minting
 
-Passkey login requires a browser with WebAuthn and (for encrypted local lemma.id storage on lemma.id) PRF support.
+Passkey unlock (presentation minting) requires a browser with WebAuthn and (for encrypted local lemma.id storage on lemma.id) PRF support.
 
 ## Supported browsers (passkey sign-in)
 

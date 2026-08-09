@@ -967,7 +967,7 @@ def create_app():
     # ==================== DOCUMENTATION ====================
     @app.route('/docs')
     def docs_overview():
-        """Public docs entrypoint: Sign in with lemma.id (login only)."""
+        """Public docs entrypoint: proof continuity (passkey tier)."""
         return render_template('docs/signin.html')
 
     @app.route('/docs/human-proofs')

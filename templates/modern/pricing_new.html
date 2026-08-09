@@ -2,7 +2,7 @@
 {% set is_public_page = true %}
 
 {% block title %}Pricing - lemma.id{% endblock %}
-{% block description %}Sign in with lemma.id is free: unlimited users, unlimited logins, no card required. Human proofs cost $0.50 once per user, verification included, then $0.03 for each month they come back.{% endblock %}
+{% block description %}Passkey continuity and local verify are free — unlimited presentations, no card required. Human proofs cost $0.50 once per user (verification included), then $0.03 for each month they renew.{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -293,13 +293,13 @@
 
 {% block content %}
 <div class="pricing-hero">
-    <h1>Sign-in is free</h1>
-    <p class="subtitle">Sign in with lemma.id costs nothing: unlimited users, unlimited logins, no card required. Free forever, not a trial. You pay only if you step up to human proofs.</p>
-    <p class="description">Passwordless login with a stable, site-private account ID is the free product, full stop. When new-account abuse becomes your problem, require a human proof on the same integration: fifty cents per user once, verification included, then three cents for each month they come back.</p>
+    <h1>Local verify is free</h1>
+    <p class="subtitle">Passkey continuity costs nothing: unlimited verifies, no card required. Free forever, not a trial. You pay only when your policy requires a human proof or site-block enforcement.</p>
+    <p class="description">Verify signed presentations locally and enforce on a site-private ID — that's the free pipe. When new-account abuse becomes your problem, require isHuman on the same integration: fifty cents per user once, verification included, then three cents for each month they renew.</p>
     <div class="pricing-hero-highlight">
         <div class="pricing-hero-stat">
             <span class="amount">$0</span>
-            <span class="label">Sign in with lemma.id, unlimited</span>
+            <span class="label">Passkey continuity / local verify, unlimited</span>
         </div>
         <div class="pricing-hero-stat">
             <span class="amount">$0.50</span>
@@ -318,13 +318,13 @@
 
 <div class="lemma-pricing">
     <h2>How billing works</h2>
-    <p class="intro">Passkey sign-in is free with no user caps, and day-to-day proof checks run on your own servers, never metered, so there's no per-login line item at any tier. Billing starts only when your policy requires a human proof: you pay once when the user binds, identity verification included, then a small monthly fee in months where that user actually comes back and renews. Users who already verified on another lemma.id-enabled site skip the ID ceremony at binding.</p>
+    <p class="intro">Passkey continuity is free with no user caps, and day-to-day proof checks run on your own servers — never metered. Billing starts only when your policy requires a human proof: you pay once when the user binds, identity verification included, then a small monthly fee in months where that user renews. Users who already verified on another lemma.id-enabled site skip the ID ceremony at binding.</p>
 
     <div class="lemma-pricing-grid">
         <div class="lemma-price-card featured">
-            <h3>Sign in with lemma.id</h3>
+            <h3>Passkey continuity</h3>
             <p class="price">Free</p>
-            <p>Passwordless passkey login with a stable, site-private account ID. Unlimited users, unlimited logins, no registration or card required, and no cap that appears at scale. The same integration you'd later use for human proofs, so stepping up never means migrating accounts.</p>
+            <p>Verify signed presentations locally and get a stable, site-private ID + assurance level. Unlimited verifies, no registration or card required. The same integration you'd later use for human proofs — stepping up never means migrating accounts.</p>
         </div>
         <div class="lemma-price-card featured">
             <h3>Human proof binding, verification included</h3>
@@ -351,7 +351,7 @@
     <div class="pricing-rules">
         <h3>Billing rules</h3>
         <ol>
-            <li><strong>Sign in with lemma.id (free):</strong> passkey-tier login is never billed. No user caps, no metering, no card on file. Billing only enters the picture when your policy requires a human proof.</li>
+            <li><strong>Passkey continuity (free):</strong> local verify and presentation minting are never billed. No user caps, no metering, no card on file. Billing only enters when your policy requires a human proof.</li>
             <li><strong>Human proof binding ($0.50, verification included):</strong> one-time fee for the user's first human-proof credential on your site. The identity check is included in the fifty cents. There is no separate IDV charge and no markup hiding in it.</li>
             <li><strong>MAU ($0.03):</strong> billed for each calendar month a human-proof user renews after the month they bound. The binding month itself is never billed as an MAU.</li>
             <li><strong>What counts as active:</strong> a user whose credential is re-issued that month, which normally happens when the old one expires after about 30 days and they complete the renewal popup. Daily local checks never count toward this.</li>
@@ -366,13 +366,13 @@
         <h3>Example: 1,000 users step up to human proofs in January, 600 return in February</h3>
         <p><strong>January:</strong> 1,000 × $0.50 = <strong>$500</strong>, verification included. No MAU charges yet, since the binding month is excluded.</p>
         <p><strong>February:</strong> 600 returning human-proof users × $0.03 = <strong>$18.00</strong>, plus $0.50 for each user who newly steps up that month.</p>
-        <p><strong>Worth noting:</strong> a user who logs in every single day still counts as one MAU in a month, because billing follows renewals, not logins. And every user who stays on the free sign-in tier costs nothing, forever.</p>
+        <p><strong>Worth noting:</strong> a user who verifies every single day still counts as one MAU in a month, because billing follows renewals, not verify calls. Every user who stays on passkey continuity only costs nothing, forever.</p>
     </div>
 </div>
 
 <div class="features-included">
     <h2>What the paid tier actually buys</h2>
-    <p class="intro" style="max-width:720px;margin:0 auto 48px;color:var(--gray-600);line-height:1.7;">Free sign-in already gives you passwordless login with nothing to store. The fifty cents buys what no login provider gives you: a durable, private handle on the verified person behind the account, so a ban costs the abuser something real, with none of their identity data on your servers.</p>
+    <p class="intro" style="max-width:720px;margin:0 auto 48px;color:var(--gray-600);line-height:1.7;">Free continuity already gives you local verify with nothing sensitive to store. The fifty cents buys what no auth provider gives you: a durable, private handle on the verified person behind the account, so a ban costs the abuser something real — with none of their identity data on your servers.</p>
     <div class="features-grid">
         <div class="feature-item">
             <div class="feature-check">✓</div>

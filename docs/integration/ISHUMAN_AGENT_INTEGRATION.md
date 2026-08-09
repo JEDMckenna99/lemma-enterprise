@@ -1,10 +1,10 @@
 # isHuman integration guide for AI coding agents
 
-> **Audience:** AI coding agents (Cursor, Copilot, Claude Code, etc.) helping a developer add **Sign in with lemma.id** — passwordless passkey login with a site-private PPID — and optionally **isHuman** step-up assurance to a web platform.
+> **Audience:** AI coding agents (Cursor, Copilot, Claude Code, etc.) helping a developer add **lemma.id proof continuity** to a web platform: verify signed presentations locally, enforce policy on a site-private PPID + assurance, optional action stamps and site-block. Passkey unlock mints presentations. Optional session cookies are secondary.
 >
-> **Goal:** Give the platform a site-private PPID for login and account continuity, plus **isHuman** assurance for one-human-per-account enforcement when Sybil resistance matters, without building KYC, without customer webhooks, and without storing government ID data.
+> **Goal:** Give the platform a site-private PPID for **person continuity under abuse**, plus **isHuman** assurance for one-human-per-account enforcement when Sybil resistance matters, without building KYC, without customer webhooks, and without storing government ID data.
 >
-> **Just adding login?** Start with the [sign-in quickstart](https://lemma.id/docs/integration/QUICK_START_SIMPLE_LOGIN.md) (`requiredAssurance: 'passkey'`, drop-in `<lemma-signin>` button), then return here for trust tiers, abuse APIs, and step-up policy. This guide remains the canonical contract for both tiers.
+> **Start here:** [Continuity & abuse](https://lemma.id/docs/integration/CONTINUITY_AND_ABUSE.md) for the product framing, then [Quick start](https://lemma.id/docs/integration/QUICK_START_SIMPLE_LOGIN.md) to gate an action. This guide remains the canonical contract.
 
 ## Start here
 
@@ -28,11 +28,12 @@
 
 ## What you are building
 
-1. **Browser:** Load `proof-verifier.js` (and optionally `lemma-signin.js`), then call `verifyForBackend({ autoProvision: true, requiredAssurance: 'passkey' })` for login / signup.
-2. **Backend:** Accept the signed `presentation`, verify it locally with `@lemma.id/proof-verifier` or `lemma-proof-verifier`, and use **`result.ppid`** from the verified result.
-3. **Account binding:** Store that site-private `ppid` as the platform's durable account key; issue **your own** session cookie.
-4. **Assurance policy:** Default login to `passkey`. Require `ishuman` only when the action needs one verified human (Sybil-resistant signup, trials, ticketing, payouts, recovery after abuse).
-5. **Optional:** Register a site API key only when the developer needs server-side PPID blocks.
+1. **Browser:** Load `proof-verifier.js` (and optionally `lemma-signin.js`), then call `verifyForBackend({ autoProvision: true, requiredAssurance: 'ishuman' })` before gated actions (or `'passkey'` for continuity-only).
+2. **Backend:** Accept the signed `presentation`, verify it locally with `@lemma.id/proof-verifier` or `lemma-proof-verifier`, and use **`result.ppid`** + **`result.assurance`** from the verified result.
+3. **Enforcement:** Policy on PPID — one-per-human claims, site-block, stamps on mutations.
+4. **Assurance policy:** Default Sybil-sensitive actions to `ishuman`. Use `passkey` for continuity-only gates.
+5. **Optional:** Issue your own session cookie from the same verified presentation.
+6. **Optional:** Register a site API key for server-side PPID blocks.
 
 lemma.id runs unlock and proof issuance in a Lemma-hosted popup. IDV (Didit by default) is used only for **isHuman** step-up. **The relying site does not configure webhooks, Didit, or Stripe Identity.**
 
@@ -75,14 +76,16 @@ Apply these on every integration. Do not skip or "simplify" them.
 
 Work through these in order. Stop and ask the developer if hostname or trust tier is unclear.
 
-- [ ] **1. Identify protected actions**: signup/login, posting, checkout, voting, account recovery, etc.
+- [ ] **1. Identify gated actions**: trials, claims, checkout, posting, voting, payouts, account recovery, etc.
 - [ ] **2. Set `siteId`**: canonical hostname for each environment.
 - [ ] **3. Add browser SDK**: script tag or bundler import from `https://lemma.id/sdk/proof-verifier.js` (optional drop-in: `lemma-signin.js`).
-- [ ] **4. Gate login/signup**: `await verifier.verifyForBackend({ autoProvision: true, requiredAssurance: 'passkey' })`; fail closed when `ok` is false.
-- [ ] **5. Choose backend trust tier** (see below), default to **T2 (verify presentation)** for login/signup. Always set `required_assurance='passkey'` (or `'ishuman'` when needed) — do not rely on package defaults.
-- [ ] **6. Bind `ppid` to account**: store **verified** `result.ppid` on the user row; issue your own session.
-- [ ] **7. Optional audit stamps**: `stamp` / `stampAction` on mutations the developer logs (T2+).
-- [ ] **8. Optional abuse controls**: API key + `POST /api/ishuman/site-block` when bans must survive browser clears.
+- [ ] **4. Choose assurance policy**: `'ishuman'` for Sybil-sensitive actions; `'passkey'` for continuity-only.
+- [ ] **5. Gate actions**: `await verifier.verifyForBackend({ autoProvision: true, requiredAssurance })`; fail closed when `ok` is false.
+- [ ] **6. Choose backend trust tier** (see below), default to **T2 (verify presentation)**. Always set `required_assurance` explicitly.
+- [ ] **7. Enforce on verified `ppid`**: policy, rate limits, one-per-human ledgers.
+- [ ] **8. Optional audit stamps**: `stamp` / `stampAction` on mutations the developer logs (T2+).
+- [ ] **9. Optional abuse controls**: API key + `POST /api/ishuman/site-block` when bans must survive browser clears.
+- [ ] **10. Optional session**: store verified `ppid` on user row; issue your own cookie if replacing or augmenting login.
 
 ---
 

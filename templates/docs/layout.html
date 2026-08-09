@@ -2,7 +2,7 @@
 {% set is_public_page = true %}
 
 {% block title %}{{ page_title or 'Documentation' }} - lemma.id{% endblock %}
-{% block description %}{{ page_description or 'Developer docs for isHuman and lemma.id: add one-verified-human-per-account to your site with the browser SDK, site-private PPIDs, and verification that runs on your own backend.' }}{% endblock %}
+{% block description %}{{ page_description or 'Developer docs for lemma.id: site-private proof continuity, local verification, optional isHuman step-up, and site-block enforcement.' }}{% endblock %}
 
 {% block preload_scripts %}
 <!-- Docs pages skip lemma.id SDK preload for faster LCP -->
@@ -26,7 +26,7 @@
     <div class="container" style="position: relative; z-index: 1;">
         <p class="docs-hero-eyebrow">Developer documentation</p>
         <h1>{{ hero_title or 'lemma.id Documentation' }}</h1>
-        <p class="docs-hero-subtitle">{{ hero_subtitle or 'How to add lemma.id to your site: the browser SDK, site-private PPIDs, backend verification that runs offline, and three levels of proof, lemma.id, presence proof, and human proof.' }}</p>
+        <p class="docs-hero-subtitle">{{ hero_subtitle or 'Verify signed presentations locally. Enforce one-human policy on a site-private ppid. Optional sessions, action stamps, and site-block.' }}</p>
         
         <!-- Docs Search -->
         <div class="docs-search-container">
@@ -83,25 +83,27 @@
                     <a href="{{ url_for('docs_human_proofs') }}#troubleshooting" class="nav-link">Troubleshooting</a>
                 </div>
                 <div class="nav-section">
-                    <div class="nav-title">Sign in with lemma.id</div>
-                    <a href="{{ url_for('docs_overview') }}" class="nav-link">← Back to sign-in docs</a>
+                    <div class="nav-title">Proof continuity</div>
+                    <a href="{{ url_for('docs_overview') }}" class="nav-link">← Back to proof continuity docs</a>
                 </div>
                 {% else %}
                 <div class="nav-section">
                     <div class="nav-title">On this page</div>
-                    <a href="{{ url_for('docs_overview') }}#quickstart" class="nav-link">Add sign-in</a>
+                    <a href="{{ url_for('docs_overview') }}#quickstart" class="nav-link">Gate an action</a>
                     <a href="{{ url_for('docs_overview') }}#backend-verify" class="nav-link">Verify on your backend</a>
-                    <a href="{{ url_for('docs_overview') }}#sessions" class="nav-link">Sessions</a>
-                    <a href="{{ url_for('docs_overview') }}#sdk-integration" class="nav-link">SDK directly</a>
+                    <a href="{{ url_for('docs_overview') }}#step-up" class="nav-link">Enforcement</a>
+                    <a href="{{ url_for('docs_overview') }}#sessions" class="nav-link">Optional sessions</a>
+                    <a href="{{ url_for('docs_overview') }}#sdk-integration" class="nav-link">Mint a presentation</a>
                     <a href="{{ url_for('docs_overview') }}#testing" class="nav-link">Local dev &amp; testing</a>
                     <a href="{{ url_for('docs_overview') }}#troubleshooting" class="nav-link">Troubleshooting</a>
                     <a href="{{ url_for('docs_overview') }}#faq" class="nav-link">FAQ</a>
-                    <a href="{{ url_for('docs_overview') }}#step-up" class="nav-link">Step up: human proofs</a>
+                    <a href="{{ url_for('docs_human_proofs') }}" class="nav-link">Human proofs (deep dive)</a>
                 </div>
                 {% endif %}
                 <div class="nav-section">
                     <div class="nav-title">Resources</div>
-                    <a href="/docs/integration/QUICK_START_SIMPLE_LOGIN.md" class="nav-link">Sign-in quickstart (full)</a>
+                    <a href="/docs/integration/CONTINUITY_AND_ABUSE.md" class="nav-link">Continuity &amp; abuse</a>
+                    <a href="/docs/integration/QUICK_START_SIMPLE_LOGIN.md" class="nav-link">Quick start (full)</a>
                     <a href="/docs/integration/ISHUMAN_AGENT_INTEGRATION.md" class="nav-link">AI agent integration guide</a>
                     <a href="/developer" class="nav-link">Developer hub</a>
                     <a href="/demo" class="nav-link">Live demo</a>
@@ -193,18 +195,18 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const docsIndex = [
         {
-            title: 'Sign in with lemma.id',
+            title: 'Proof continuity for your site',
             url: '{{ url_for("docs_overview") }}',
             category: 'integration',
-            keywords: 'sign in with lemma.id passwordless login passkey ppid account key no password no email free lemma-signin button quickstart',
-            excerpt: 'Add passwordless login: drop in the button, verify a signed presentation on your backend, use the site-private ppid as the account key.'
+            keywords: 'lemma.id proof continuity ppid assurance site-block one human per account abuse enforce verify locally',
+            excerpt: 'Verify signed presentations locally and enforce policy on a site-private ppid + assurance level.'
         },
         {
-            title: 'Add sign-in in one element',
+            title: 'Gate a sensitive action',
             url: '{{ url_for("docs_overview") }}#quickstart',
             category: 'integration',
-            keywords: 'lemma-signin button quickstart site-id drop-in element login',
-            excerpt: 'The drop-in button handles the popup, passkey, and proof. One backend route completes login.'
+            keywords: 'verifyForBackend ishuman gate trial claim presentation quickstart',
+            excerpt: 'Call the SDK before abuse-prone actions; verify presentation on your backend.'
         },
         {
             title: 'Verify on your backend',

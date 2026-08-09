@@ -1,7 +1,6 @@
-# Next.js Sign in with lemma.id
+# Next.js — verify a lemma proof
 
-Runnable App Router example: browser SDK → verify presentation → HttpOnly session cookie.
-
+Runnable App Router example: browser SDK → verify presentation → optional HttpOnly session cookie.
 ## Run
 
 ```bash

@@ -12,6 +12,13 @@ The scenario:
   3. Static tools: write still succeeds (policy hasn't changed)
   4. Lemma.id:   write is DENIED  (taint epoch bumped on fetch,
                  proof is now stale, human must re-approve)
+  5. The agent cannot talk its way out: editing the epoch claim breaks
+     the signature, and a self-issued credential is not from a trusted
+     issuer. Only the trusted issuer, driven by a human, can restore it.
+
+Credentials are real Ed25519-signed objects minted by a local dev issuer
+and verified locally by the firewall (signature, issuer trust, expiry,
+revocation freshness). No network calls leave the machine.
 
 This script is fully self-contained -- it starts a mock upstream,
 starts the firewall, and runs the full sequence locally.
@@ -41,6 +48,16 @@ _CYAN = "\033[96m"
 _DIM = "\033[2m"
 _BOLD = "\033[1m"
 _RESET = "\033[0m"
+
+
+def _enable_utf8_stdout() -> None:
+    """Windows consoles default to cp1252, which cannot encode the box-drawing
+    and check characters used below."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError):
+            pass
 
 
 def _ok(msg: str) -> None:
@@ -151,21 +168,58 @@ def _build_policy(upstream_port: int) -> dict:
     }
 
 
-def _make_credential(scope: list[str], taint_epoch: int = 0) -> str:
-    return json.dumps({
-        "id": "cred_demo_injection_test",
-        "issuer": "did:lemma:local_cli",
-        "subject": "did:lemma:demo_agent",
-        "claims": {
-            "scope": scope,
-            "site_id": "lemma.id",
-            "taint_epoch": taint_epoch,
-        },
-    })
+# Fixed 32-byte dev issuer seed (NOT a production key). Stands in for the
+# control plane that signs a proof only after a human approves.
+_ISSUER_SEED = b"lemma-injection-demo-issuer-01!!"
+# A keypair the agent can generate for itself. Deliberately not trusted.
+_ROGUE_SEED = b"rogue-agent-self-minted-seed-01!"
+
+# Initializes an empty Bloom revocation view (nothing revoked) so the
+# fail-closed freshness gate is satisfied without a control plane.
+BOOTSTRAP_CODE = '''
+from api import permission_verification as pv
+from api import revocation_verifier as rv
+
+pv.get_global_verifier()
+rv.mark_revocation_sync_ready()
+
+from scripts.lemma_firewall import APP  # noqa: E402,F401
+'''
+
+
+def _load_issuer(seed: bytes):
+    from lemma_crypto import PyMinimalIssuer
+
+    return PyMinimalIssuer.from_seed(list(seed))
+
+
+def _make_credential(issuer, scope: list[str], taint_epoch: int = 0) -> str:
+    """Mint a real Ed25519-signed credential.
+
+    Claim values are strings at the crypto boundary; the firewall parses the
+    JSON-encoded scope list and the integer taint epoch back out.
+    """
+    now = int(time.time())
+    claims = {
+        "scope": json.dumps(scope),
+        "site_id": "lemma.id",
+        "taint_epoch": str(taint_epoch),
+        "expiresAt": str(now + 3600),
+    }
+    return issuer.issue_credential("did:lemma:demo_agent", claims)
+
+
+def _tamper_taint_epoch(credential_json: str, taint_epoch: int) -> str:
+    """Rewrite the epoch claim after signing, leaving the signature untouched."""
+    payload = json.loads(credential_json)
+    payload["credentialSubject"]["taint_epoch"] = str(taint_epoch)
+    return json.dumps(payload)
 
 
 def run_demo(json_output: bool = False) -> int:
     import requests as req
+
+    _enable_utf8_stdout()
 
     results: list[dict] = []
     upstream_port = _find_free_port()
@@ -175,7 +229,9 @@ def run_demo(json_output: bool = False) -> int:
     tmpdir = tempfile.mkdtemp(prefix="lemma_injection_demo_")
     policy_path = os.path.join(tmpdir, "policy.json")
     mock_path = os.path.join(tmpdir, "mock_upstream.py")
+    bootstrap_path = os.path.join(tmpdir, "lemma_demo_bootstrap.py")
     log_path = os.path.join(tmpdir, "session.jsonl")
+    repo_root = str(Path(__file__).resolve().parent.parent)
 
     policy = _build_policy(upstream_port)
     with open(policy_path, "w") as f:
@@ -184,6 +240,13 @@ def run_demo(json_output: bool = False) -> int:
     mock_code = MOCK_UPSTREAM_CODE.format(injected_page=INJECTED_PAGE.replace('"', '\\"'))
     with open(mock_path, "w") as f:
         f.write(mock_code)
+
+    with open(bootstrap_path, "w") as f:
+        f.write(BOOTSTRAP_CODE)
+
+    issuer = _load_issuer(_ISSUER_SEED)
+    rogue_issuer = _load_issuer(_ROGUE_SEED)
+    issuer_did = issuer.get_did()
 
     if not json_output:
         _header("Lemma.id, Prompt Injection Containment Demo")
@@ -216,20 +279,25 @@ def run_demo(json_output: bool = False) -> int:
             "LEMMA_FIREWALL_TAINT_ENFORCEMENT_ENABLED": "1",
             "LEMMA_FIREWALL_TAINT_ON_VIOLATION_ENABLED": "1",
             "LEMMA_FIREWALL_LOCAL_PROOF_ENFORCEMENT": "1",
+            # Credential mode: signatures are fully verified locally. The
+            # stricter proof-required mode needs delegated X-Lemma-Proof
+            # objects, which this demo does not mint.
             "LEMMA_FIREWALL_PROOF_REQUIRED_TIERS": "",
+            "LEMMA_ENFORCE_PROOF_REQUIRED": "0",
             "LEMMA_FIREWALL_RUNTIME_AUTHORIZE_REQUIRED_TIERS": "",
             "LEMMA_FIREWALL_PASSKEY_AGE_ENFORCEMENT": "0",
             "LEMMA_FIREWALL_LOCAL_OPS_GATE": "1",
             "LEMMA_FIREWALL_LOCAL_OPS_LOG_DECISIONS": "1",
             "LEMMA_SESSION_LOG_FILE": log_path,
-            "TRUSTED_ISSUER_DIDS": "did:lemma:local_cli",
+            "TRUSTED_ISSUER_DIDS": issuer_did,
+            "PYTHONPATH": os.pathsep.join([tmpdir, repo_root]),
             "FLASK_RUN_PORT": str(firewall_port),
         }
         firewall_proc = subprocess.Popen(
-            [sys.executable, "-m", "flask", "--app", "scripts.lemma_firewall:APP", "run",
+            [sys.executable, "-m", "flask", "--app", "lemma_demo_bootstrap:APP", "run",
              "--host", "127.0.0.1", "--port", str(firewall_port)],
             env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            cwd=str(Path(__file__).resolve().parent.parent),
+            cwd=repo_root,
         )
         if not _wait_for_port(firewall_port, timeout=8):
             if not json_output:
@@ -237,8 +305,9 @@ def run_demo(json_output: bool = False) -> int:
             return 1
         if not json_output:
             _ok(f"Firewall on :{firewall_port} (taint enforcement ON, taint_on_response for web_search)")
+            _ok(f"Trusted issuer: {issuer_did[:32]}... (Ed25519, signature verified locally)")
 
-        cred_rw = _make_credential(["read", "write"], taint_epoch=0)
+        cred_rw = _make_credential(issuer, ["read", "write"], taint_epoch=0)
         headers_rw = {"X-Lemma-Credential": cred_rw}
 
         # ══════════════════════════════════════════════════════════
@@ -305,7 +374,8 @@ def run_demo(json_output: bool = False) -> int:
         step4_denied = resp.status_code == 403 and body.get("error") == "proof_taint_epoch_stale"
         results.append({
             "step": 4, "action": "file.write /root/.ssh/authorized_keys",
-            "status": resp.status_code, "allowed": not step4_denied,
+            "status": resp.status_code, "allowed": bool(body.get("allowed")),
+            "contained": step4_denied,
             "error": body.get("error"),
             "proof_taint_epoch": body.get("proof_taint_epoch"),
             "runtime_taint_epoch": body.get("runtime_taint_epoch"),
@@ -336,7 +406,8 @@ def run_demo(json_output: bool = False) -> int:
         step5_denied = resp.status_code == 403 and body.get("error") == "proof_taint_epoch_stale"
         results.append({
             "step": 5, "action": "file.write /etc/cron.d/exfil",
-            "status": resp.status_code, "allowed": not step5_denied,
+            "status": resp.status_code, "allowed": bool(body.get("allowed")),
+            "contained": step5_denied,
             "error": body.get("error"),
         })
         if not json_output:
@@ -345,11 +416,68 @@ def run_demo(json_output: bool = False) -> int:
                 _info(f"Same stale epoch, {_BOLD}all privileged actions blocked{_RESET}")
 
         # ══════════════════════════════════════════════════════════
-        # STEP 6: Human re-approves with fresh proof at new epoch
+        # STEP 6: Agent edits the epoch claim on its own credential
         # ══════════════════════════════════════════════════════════
         if not json_output:
-            _subheader("Step 6: Human reviews and issues fresh proof (step-up)")
-        cred_fresh = _make_credential(["read", "write"], taint_epoch=1)
+            _subheader("Step 6: Agent tries to edit the epoch claim on its credential")
+            print(f"  {_DIM}The epoch is just a number in the credential. Rewrite it to 1.{_RESET}")
+        cred_tampered = _tamper_taint_epoch(cred_rw, 1)
+        resp = req.post(
+            f"{firewall_url}/aim/authorize",
+            json={"action": "file.write", "resource": "/root/.ssh/authorized_keys"},
+            headers={"X-Lemma-Credential": cred_tampered}, timeout=5,
+        )
+        body = resp.json()
+        step6_denied = body.get("error") == "invalid_signature"
+        results.append({
+            "step": 6, "action": "file.write with tampered taint_epoch",
+            "status": resp.status_code, "allowed": bool(body.get("allowed")),
+            "contained": step6_denied,
+            "error": body.get("error"),
+        })
+        if not json_output:
+            if step6_denied:
+                _denied(f"POST /aim/authorize (tampered epoch) → {_RED}DENIED{_RESET}")
+                _info(f"Error: {_BOLD}invalid_signature{_RESET}")
+                _info("The epoch is inside the signed payload, editing it breaks the signature")
+            else:
+                _warn(f"Expected invalid_signature but got: {resp.status_code} {body}")
+
+        # ══════════════════════════════════════════════════════════
+        # STEP 7: Agent mints itself a fresh credential
+        # ══════════════════════════════════════════════════════════
+        if not json_output:
+            _subheader("Step 7: Agent generates its own keypair and self-issues a fresh proof")
+        cred_rogue = _make_credential(rogue_issuer, ["read", "write"], taint_epoch=1)
+        resp = req.post(
+            f"{firewall_url}/aim/authorize",
+            json={"action": "file.write", "resource": "/root/.ssh/authorized_keys"},
+            headers={"X-Lemma-Credential": cred_rogue}, timeout=5,
+        )
+        body = resp.json()
+        step7_denied = body.get("error") == "untrusted_issuer"
+        results.append({
+            "step": 7, "action": "file.write with self-minted credential",
+            "status": resp.status_code, "allowed": bool(body.get("allowed")),
+            "contained": step7_denied,
+            "error": body.get("error"),
+        })
+        if not json_output:
+            if step7_denied:
+                _denied(f"POST /aim/authorize (self-minted) → {_RED}DENIED{_RESET}")
+                _info(f"Error: {_BOLD}untrusted_issuer{_RESET}")
+                _info("Well-formed and correctly signed, but not by a trusted issuer")
+                print()
+                print(f"  {_GREEN}{_BOLD}The agent cannot restore its own authority.{_RESET}")
+            else:
+                _warn(f"Expected untrusted_issuer but got: {resp.status_code} {body}")
+
+        # ══════════════════════════════════════════════════════════
+        # STEP 8: Human re-approves with fresh proof at new epoch
+        # ══════════════════════════════════════════════════════════
+        if not json_output:
+            _subheader("Step 8: Human reviews and the trusted issuer signs a fresh proof")
+        cred_fresh = _make_credential(issuer, ["read", "write"], taint_epoch=1)
         headers_fresh = {"X-Lemma-Credential": cred_fresh}
         resp = req.post(
             f"{firewall_url}/aim/authorize",
@@ -357,41 +485,52 @@ def run_demo(json_output: bool = False) -> int:
             headers=headers_fresh, timeout=5,
         )
         body = resp.json()
-        step6_ok = resp.status_code == 200 and body.get("allowed") is True
+        step8_ok = resp.status_code == 200 and body.get("allowed") is True
         results.append({
-            "step": 6, "action": "file.write /src/app.ts (fresh proof)",
-            "status": resp.status_code, "allowed": step6_ok,
+            "step": 8, "action": "file.write /src/app.ts (fresh signed proof)",
+            "status": resp.status_code, "allowed": step8_ok,
+            "error": body.get("error"),
         })
         if not json_output:
-            if step6_ok:
+            if step8_ok:
                 _ok(f"POST /aim/authorize file.write /src/app.ts → {_GREEN}ALLOWED{_RESET}")
                 _info(f"Fresh proof at epoch=1 matches runtime epoch=1")
-                _info(f"Human reviewed the action and approved, agent can write again")
+                _info(f"Only the trusted issuer can mint it, and only a human triggers that")
+            else:
+                _warn(f"Expected allow but got: {resp.status_code} {body}")
 
         # ══════════════════════════════════════════════════════════
         # Summary
         # ══════════════════════════════════════════════════════════
-        all_passed = step1_ok and step2_ok and step3_ok and step4_denied and step5_denied and step6_ok
+        all_passed = (
+            step1_ok and step2_ok and step3_ok
+            and step4_denied and step5_denied
+            and step6_denied and step7_denied
+            and step8_ok
+        )
 
         if not json_output:
             _subheader("Summary")
             print(f"  Step 1: Read internal API .......... {_GREEN}ALLOWED{_RESET} (trusted)")
             print(f"  Step 2: Write before injection ..... {_GREEN}ALLOWED{_RESET} (clean epoch)")
             print(f"  Step 3: Fetch external content ..... {_GREEN}ALLOWED{_RESET} (epoch bumped)")
-            print(f"  Step 4: Write after injection ...... {_RED}DENIED{_RESET}  (epoch stale)")
-            print(f"  Step 5: Second injected action ..... {_RED}DENIED{_RESET}  (epoch stale)")
-            print(f"  Step 6: Write with fresh proof ..... {_GREEN}ALLOWED{_RESET} (human re-approved)")
+            print(f"  Step 4: Write after injection ...... {_RED}DENIED{_RESET}  (proof_taint_epoch_stale)")
+            print(f"  Step 5: Second injected action ..... {_RED}DENIED{_RESET}  (proof_taint_epoch_stale)")
+            print(f"  Step 6: Tampered epoch claim ....... {_RED}DENIED{_RESET}  (invalid_signature)")
+            print(f"  Step 7: Self-minted credential ..... {_RED}DENIED{_RESET}  (untrusted_issuer)")
+            print(f"  Step 8: Write with fresh proof ..... {_GREEN}ALLOWED{_RESET} (human re-approved)")
             print()
             if all_passed:
-                print(f"  {_GREEN}{_BOLD}All 6 steps passed.{_RESET}")
-                print(f"  {_DIM}The taint epoch caught the prompt injection and blocked")
-                print(f"  all privileged actions until human step-up re-approval.{_RESET}")
+                print(f"  {_GREEN}{_BOLD}All 8 steps passed.{_RESET}")
+                print(f"  {_DIM}The taint epoch invalidated the agent's authority the moment")
+                print(f"  it read untrusted content, and the agent could not restore that")
+                print(f"  authority by editing or reissuing its own credential.{_RESET}")
             else:
                 print(f"  {_RED}{_BOLD}Some steps did not produce expected results.{_RESET}")
             print()
-            print(f"  {_DIM}Comparison: A static sandbox (OpenShell, AgentWard) would")
-            print(f"  allow Steps 4 and 5, because write permission was granted")
-            print(f"  at session start and the policy never changed.{_RESET}")
+            print(f"  {_DIM}Contrast with static policy tools (sandboxes, YAML allowlists,")
+            print(f"  session-scoped tokens): they allow Steps 4 and 5, because write")
+            print(f"  permission was granted at session start and the policy never changed.{_RESET}")
             print()
             print(f"  Session log: {log_path}")
 

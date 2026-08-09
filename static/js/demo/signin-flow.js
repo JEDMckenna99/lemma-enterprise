@@ -1,5 +1,5 @@
 /**
- * Sign in with lemma.id — dogfooded demo flow state machine.
+ * lemma.id proof continuity — dogfooded demo flow state machine.
  *
  * States: create -> signin -> manager   plus a standalone `gate`
  * used when /app is opened without a session. After sign-in, open the manager
@@ -248,6 +248,26 @@
     },
   };
 
+  /** Returning from relying-site demos / builder deep-links must not bounce to /app. */
+  function wantsBuilderHub() {
+    try {
+      var p = new URLSearchParams(window.location.search);
+      return p.get('lane') === 'builder' || p.has('from');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function openBuilderHub() {
+    var dest = '/demo/how-it-works?lane=builder';
+    try {
+      var p = new URLSearchParams(window.location.search);
+      var from = p.get('from');
+      if (from) dest += '&from=' + encodeURIComponent(from);
+    } catch (_) { /* ignore */ }
+    window.location.replace(dest);
+  }
+
   var driver = MOCK ? mockDriver : realDriver;
 
   /* ------------------------------------------------------------------ */
@@ -356,6 +376,14 @@
   if (initial && SCREENS[initial]) {
     if (MOCK && initial === 'manager') fillMockPanels();
     show(initial);
+    return;
+  }
+
+  // Old bookmarks and demo-site "Return to demo hub" links still hit /demo.
+  // When they carry builder/return markers, send signed-in users to the hub
+  // instead of the manager so the Create · Sign in · Enforce flow stays usable.
+  if (!MOCK && wantsBuilderHub()) {
+    openBuilderHub();
     return;
   }
 

@@ -1,6 +1,10 @@
 # Lemma Documentation (internal index)
 
-lemma.id is **Sign in with lemma.id**: passwordless login with passkeys and site-private PPIDs, no user data to store, plus an optional **isHuman** step-up when one account must map to one verified human (same PPID across tiers).
+lemma.id is a **local-first proof layer** for relying sites: verify a signed
+presentation and enforce policy on a site-private `ppid` + assurance level.
+Optional **isHuman** step-up (one verified human per account, same PPID),
+action stamps, and site-block for continuity under abuse. Passkey unlock mints
+presentations; optional session cookies are an appendix, not the headline.
 
 This index classifies in-repo markdown for operators and contributors. Only **Public** entries are served anonymously at `https://lemma.id/docs/<path>`.
 
@@ -10,9 +14,10 @@ Served without auth per `api/public_docs.py`:
 
 | URL | Source file | Description |
 |-----|-------------|-------------|
-| [integration/QUICK_START_SIMPLE_LOGIN.md](https://lemma.id/docs/integration/QUICK_START_SIMPLE_LOGIN.md) | `integration/QUICK_START_SIMPLE_LOGIN.md` | Sign in with lemma.id quickstart (passkey login) |
-| [integration/SIMPLE_INTEGRATION_GUIDE.md](https://lemma.id/docs/integration/SIMPLE_INTEGRATION_GUIDE.md) | `integration/SIMPLE_INTEGRATION_GUIDE.md` | Full sign-in guide: sessions, account linking, sign-out |
-| [integration/SIGN_IN_TRUST_AND_RECOVERY.md](https://lemma.id/docs/integration/SIGN_IN_TRUST_AND_RECOVERY.md) | `integration/SIGN_IN_TRUST_AND_RECOVERY.md` | Trust, recovery, failure modes, and "what this is not" |
+| [integration/CONTINUITY_AND_ABUSE.md](https://lemma.id/docs/integration/CONTINUITY_AND_ABUSE.md) | `integration/CONTINUITY_AND_ABUSE.md` | Continuity, assurance, site-block, stamps — start here |
+| [integration/QUICK_START_SIMPLE_LOGIN.md](https://lemma.id/docs/integration/QUICK_START_SIMPLE_LOGIN.md) | `integration/QUICK_START_SIMPLE_LOGIN.md` | Quick start: verify a lemma proof / gate an action |
+| [integration/SIMPLE_INTEGRATION_GUIDE.md](https://lemma.id/docs/integration/SIMPLE_INTEGRATION_GUIDE.md) | `integration/SIMPLE_INTEGRATION_GUIDE.md` | Full guide: assurance, stamps, abuse, optional sessions |
+| [integration/SIGN_IN_TRUST_AND_RECOVERY.md](https://lemma.id/docs/integration/SIGN_IN_TRUST_AND_RECOVERY.md) | `integration/SIGN_IN_TRUST_AND_RECOVERY.md` | Trust, recovery, availability for the proof dependency |
 | [integration/ISHUMAN_AGENT_INTEGRATION.md](https://lemma.id/docs/integration/ISHUMAN_AGENT_INTEGRATION.md) | `integration/ISHUMAN_AGENT_INTEGRATION.md` | Canonical relying-site integration contract |
 | [integration/BROWSER_SUPPORT.md](https://lemma.id/docs/integration/BROWSER_SUPPORT.md) | `integration/BROWSER_SUPPORT.md` | Browser/passkey support matrix + SDK error codes |
 | [ERROR_CODES.md](https://lemma.id/docs/ERROR_CODES.md) | `ERROR_CODES.md` | Error handling reference |
@@ -22,31 +27,43 @@ Served without auth per `api/public_docs.py`:
 
 Rendered HTML docs hub (templates): [https://lemma.id/docs](https://lemma.id/docs)
 
-## 1. Sign in with lemma.id (start here)
+## 1. Continuity & enforcement (start here)
 
-Free passwordless login; the default integration for relying sites.
+Site-private person handle, assurance ladder, stamps, and abuse controls.
 
 | Document | Description | Audience |
 |----------|-------------|----------|
-| [Quick start: Sign in with lemma.id](integration/QUICK_START_SIMPLE_LOGIN.md) | Drop-in button, backend verify, sessions, testing | Developers |
-| [Sign in with lemma.id — integration guide](integration/SIMPLE_INTEGRATION_GUIDE.md) | Architecture, account linking, sign-out, non-features | Developers |
-| [Trust, recovery & failure modes](integration/SIGN_IN_TRUST_AND_RECOVERY.md) | What happens on device loss / lemma outage; "no blockchain" | Developers |
-| [Browser support + error codes](integration/BROWSER_SUPPORT.md) | Passkey/PRF matrix, stable SDK outcomes | Developers |
+| [Continuity & abuse](integration/CONTINUITY_AND_ABUSE.md) | PPID, assurance, site-block, stamps, keep-your-login pattern | Developers |
+| [Quick start: verify a lemma proof](integration/QUICK_START_SIMPLE_LOGIN.md) | Gate an action, backend verify, testing | Developers |
+| [Integration guide](integration/SIMPLE_INTEGRATION_GUIDE.md) | Architecture, assurance, stamps, abuse, optional sessions | Developers |
+| [Trust, recovery & availability](integration/SIGN_IN_TRUST_AND_RECOVERY.md) | Proof dependency failure modes; "no blockchain" | Developers |
+| [ISHUMAN Agent Integration Guide](integration/ISHUMAN_AGENT_INTEGRATION.md) | Canonical contract: guardrails, trust tiers, checklist | AI agents / developers |
+| [Assurance tiers + input burn](product/PASSKEY_STAMP_INPUT_BURN.md) | One PPID, `passkey` vs `ishuman`, site-local burn policy | Developers |
 | [llms.txt](https://lemma.id/llms.txt) | Pointer file for agents | AI coding agents |
 
-## 2. isHuman step-up (optional paid tier)
+## 2. isHuman step-up (Sybil-sensitive actions)
 
 One verified human per account on the **same PPID**; request per action with `requiredAssurance: 'ishuman'`.
 
 | Document | Description |
 |----------|-------------|
-| [ISHUMAN Agent Integration Guide](integration/ISHUMAN_AGENT_INTEGRATION.md) | Canonical contract: guardrails, trust tiers, abuse APIs, checklist |
+| [ISHUMAN Agent Integration Guide](integration/ISHUMAN_AGENT_INTEGRATION.md) | Canonical contract: assurance policy, abuse APIs, stamps |
 | [Assurance tiers + input burn](product/PASSKEY_STAMP_INPUT_BURN.md) | One PPID, `passkey` vs `ishuman`, site-local burn policy |
 
-## 3. Reference
+## 3. Optional: sessions & sign-in UX
+
+Issue your own session cookie from a verified presentation if you want passwordless login.
 
 | Document | Description |
 |----------|-------------|
+| [Integration guide — sessions appendix](integration/SIMPLE_INTEGRATION_GUIDE.md) | Session cookies, account linking, sign-out |
+| [Quick start — mint a presentation](integration/QUICK_START_SIMPLE_LOGIN.md) | `<lemma-signin>` drop-in for presentation mint |
+
+## 4. Reference
+
+| Document | Description |
+|----------|-------------|
+| [Browser support + error codes](integration/BROWSER_SUPPORT.md) | Passkey/PRF matrix, stable SDK outcomes |
 | [ERROR_CODES.md](ERROR_CODES.md) | API + SDK error reference |
 | [AGENTS.md](../AGENTS.md) | Repo-root agent entrypoint |
 | [lemma.id Presentation Model](product/LEMMA_ID_PRESENTATION_MODEL.md) | Platform identity + permission contract (internal) |
@@ -63,7 +80,7 @@ Retained for historical reference. Do not use for new integrations.
 | [Permission Lemmas Guide](integration/PERMISSION_LEMMAS_IAM_DEVELOPER_GUIDE.md) | IAM developer reference |
 | [Integration Guide](integration/INTEGRATION_GUIDE.md) | lemma.id-based user authentication, legacy `LemmaWallet` SDK (old redirect flow) |
 
-All superseded by the sign-in docs above and the [ISHUMAN Agent Integration Guide](integration/ISHUMAN_AGENT_INTEGRATION.md).
+All superseded by the continuity docs above and the [ISHUMAN Agent Integration Guide](integration/ISHUMAN_AGENT_INTEGRATION.md).
 
 ## Operator-only
 

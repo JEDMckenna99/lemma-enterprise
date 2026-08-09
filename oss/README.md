@@ -1,4 +1,4 @@
-# Sign in with lemma.id — verifiable source
+# lemma.id — verifiable source
 
 This repository contains every artifact a relying site or auditor needs to
 verify lemma.id's claims **without trusting the lemma.id service**: the
@@ -6,10 +6,10 @@ verifier code sites run on their own backends, the browser SDK served from
 `https://lemma.id/sdk/`, the client-side credential-store crypto, and the
 protocol specs. Apache-2.0 licensed.
 
-lemma.id is passwordless sign-in with passkeys and a site-private, stable
-`ppid` as the account key — no usernames, passwords, or email collection.
-**isHuman** is an optional step-up assurance tier (one verified human per
-account, same PPID).
+lemma.id is a **proof layer** for site-private person continuity: verify a
+signed presentation, get a stable site-private `ppid`, and optionally step up
+to **isHuman** (one verified human per account, same PPID) for Sybil-resistant
+enforcement — no usernames, passwords, or email collection on the default path.
 
 ## What is here, and what each piece lets you verify
 

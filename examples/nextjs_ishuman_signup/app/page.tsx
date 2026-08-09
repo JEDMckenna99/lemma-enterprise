@@ -68,7 +68,7 @@ export default function SignInPage() {
   return (
     <main style={{ fontFamily: "system-ui", padding: 24, maxWidth: 480 }}>
       <Script src="https://lemma.id/sdk/proof-verifier.js" strategy="afterInteractive" />
-      <h1>Sign in with lemma.id</h1>
+      <h1>Verify a lemma proof</h1>
       <p>{status}</p>
       {!signedIn && (
         <button type="button" onClick={onSignIn}>

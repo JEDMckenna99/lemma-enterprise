@@ -41,6 +41,7 @@ def test_public_doc_allowlist_serves_approved_markdown(monkeypatch):
     app.config["TESTING"] = True
     with app.test_client() as client:
         for path in (
+            "/docs/integration/CONTINUITY_AND_ABUSE.md",
             "/docs/integration/ISHUMAN_AGENT_INTEGRATION.md",
             "/docs/integration/QUICK_START_SIMPLE_LOGIN.md",
             "/docs/integration/SIMPLE_INTEGRATION_GUIDE.md",
@@ -141,14 +142,15 @@ def test_llms_txt_is_served(monkeypatch):
     with app.test_client() as client:
         response = client.get("/llms.txt")
         assert response.status_code == 200
+        assert b"CONTINUITY_AND_ABUSE.md" in response.data
         assert b"ISHUMAN_AGENT_INTEGRATION.md" in response.data
         assert b"proof-verifier.js" in response.data
         assert b"ishuman-verifier.js" in response.data
-        # Sign-in-first contract: llms.txt must steer agents to passkey login,
-        # not the ishuman default policy.
+        # Proof-layer-first contract: llms.txt steers agents to gate actions and
+        # local verify, not login-only integration.
         assert b"QUICK_START_SIMPLE_LOGIN.md" in response.data
-        assert b"lemma-signin" in response.data
-        assert b"requiredAssurance: 'passkey'" in response.data
+        assert b"verifyForBackend" in response.data
+        assert b"local-first proof layer" in response.data.lower()
 
 
 @pytest.mark.integration
