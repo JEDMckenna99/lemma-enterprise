@@ -91,6 +91,7 @@ def test_seed_transfer_finalizes_person_root_ppid_and_platform_role():
     assert "lemma.id/site-ppid/v1" in source
     assert "async finalizeIdentityAfterSeedTransfer" in source
     assert "async _restorePlatformAccessForCurrentPpid" in source
+    assert "async ensurePersonRootSeedsLoaded" in source
 
     derive_idx = source.index("async derivePPID(siteId)")
     derive_chunk = source[derive_idx:derive_idx + 4500]
@@ -104,12 +105,26 @@ def test_seed_transfer_finalizes_person_root_ppid_and_platform_role():
     assert "reissueMasterCredential" not in enroll_chunk
 
     finalize_idx = source.index("async finalizeIdentityAfterSeedTransfer")
-    finalize_chunk = source[finalize_idx:finalize_idx + 2200]
+    finalize_chunk = source[finalize_idx:finalize_idx + 2800]
     assert "reissueMasterCredential" in finalize_chunk
     assert "_restorePlatformAccessForCurrentPpid" in finalize_chunk
+    assert "_persistPersonRootSeedsAtRest" in finalize_chunk
+
+    persist_idx = source.index("async _persistPersonRootSeedsAtRest")
+    persist_chunk = source[persist_idx:persist_idx + 900]
+    assert "id: 'person_root_seeds'" in persist_chunk
+    # Must write via _put so the whole record is PRF-encrypted (old helper no-op'd).
+    assert "await this._put('secrets'" in persist_chunk
+    assert "mod?.encryptStoredValue" not in persist_chunk
+
+    unlock_idx = source.index("async unlock(options = {})")
+    unlock_chunk = source[unlock_idx:unlock_idx + 12000]
+    assert "ensurePersonRootSeedsLoaded" in unlock_chunk
 
     link_html = (ROOT / "templates" / "wallet_link.html").read_text(encoding="utf-8")
     assert "finalizeIdentityAfterSeedTransfer" in link_html
+    manager = (ROOT / "templates" / "wallet_simple.html").read_text(encoding="utf-8")
+    assert "resolveCanonicalManagerPpid" in manager
 
 
 @pytest.mark.unit

@@ -6,7 +6,7 @@
 {% block preload_scripts %}
 <link rel="preload" href="{{ url_for('static', filename='js/lemma-keys.js') }}?v=8" as="script">
 <link rel="preload" href="{{ url_for('static', filename='js/wallet-at-rest-crypto.js') }}?v=2" as="script">
-<link rel="preload" href="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2701" as="script">
+<link rel="preload" href="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2702" as="script">
 <link rel="preload" href="{{ url_for('static', filename='js/lemma-credential-utils.js') }}?v=2" as="script">
 {% endblock %}
 
@@ -603,6 +603,32 @@ function relativeTime(epochSeconds) {
 
 let sessionFactsLoaded = false;
 
+async function resolveCanonicalManagerPpid(sessionPpid) {
+    // Prefer person-root / credential PPID from the unlocked wallet. After seed
+    // transfer the Flask session can still hold a divergent wallet_secret PPID.
+    try {
+        if (!wallet || typeof wallet.derivePPID !== 'function') return sessionPpid || null;
+        if (typeof wallet.ensurePersonRootSeedsLoaded === 'function') {
+            try { await wallet.ensurePersonRootSeedsLoaded(); } catch (_) { /* ignore */ }
+        }
+        if (wallet.isUnlocked && wallet.isUnlocked()) {
+            const derived = await wallet.derivePPID('lemma.id');
+            if (derived && String(derived).startsWith('did:lemma:ppid_')) {
+                if (sessionPpid && sessionPpid !== derived) {
+                    console.warn(
+                        '[Manager] Session PPID differs from person-root PPID; showing person-root value',
+                        { session: String(sessionPpid).slice(0, 28), canonical: String(derived).slice(0, 28) },
+                    );
+                }
+                return derived;
+            }
+        }
+    } catch (e) {
+        console.warn('[Manager] Canonical PPID resolve failed:', e?.message || e);
+    }
+    return sessionPpid || null;
+}
+
 async function loadSessionFacts() {
     if (sessionFactsLoaded) return;
     try {
@@ -611,7 +637,8 @@ async function loadSessionFacts() {
         if (!data.signed_in) return;
         sessionFactsLoaded = true;
 
-        document.getElementById('identity-ppid').textContent = truncatePpid(data.ppid);
+        const ppid = await resolveCanonicalManagerPpid(data.ppid);
+        document.getElementById('identity-ppid').textContent = truncatePpid(ppid);
         document.getElementById('identity-assurance').textContent =
             ASSURANCE_LABELS[data.assurance] || ASSURANCE_LABELS.passkey;
         document.getElementById('identity-signin-time').textContent = relativeTime(data.signed_in_at);
@@ -621,7 +648,8 @@ async function loadSessionFacts() {
             copyBtn.dataset.bound = '1';
             copyBtn.addEventListener('click', async () => {
                 if (!navigator.clipboard) return;
-                await navigator.clipboard.writeText(data.ppid || '');
+                const latest = await resolveCanonicalManagerPpid(data.ppid);
+                await navigator.clipboard.writeText(latest || '');
                 copyBtn.textContent = 'Copied';
                 setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1400);
             });

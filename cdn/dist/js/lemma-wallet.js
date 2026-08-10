@@ -91,7 +91,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.82.0';  // v2.82: personRootProxy PPID after seed transfer + platform role restore
+    static VERSION = '2.82.1';  // v2.82.1: reload person-root seeds on unlock so PPID stays stable after sync
 
     static DEVICE_IDB_NAMES = ['LemmaWallet', 'LemmaWalletWrap'];
 
@@ -1939,9 +1939,15 @@ class LemmaWallet {
                     expiresAt: storedSession.expiresAt,
                     walletId: storedSession.walletId,
                     walletSecret: storedSession.walletSecret,
+                    walletLocalSeed: storedSession.walletLocalSeed || undefined,
+                    personRootProxy: storedSession.personRootProxy || undefined,
                     source: storedSession.source || 'local'
                 };
                 console.log('[Lemma]  Session restored from IndexedDB - isUnlocked:', this.session.isUnlocked);
+                // Prefer at-rest seeds when available (session copy may be stale/missing).
+                try {
+                    await this.ensurePersonRootSeedsLoaded();
+                } catch (_) { /* ignore */ }
                 
                 // AUTO-START HEARTBEAT on third-party sites with existing session
                 // This ensures lock detection works even after page refresh
@@ -2563,18 +2569,67 @@ class LemmaWallet {
     async _persistPersonRootSeedsAtRest() {
         if (!this.session?.walletLocalSeed || !this.session?.personRootProxy) return;
         if (!this._atRestKey) return;
-        const mod = this._walletAtRest();
-        if (!mod?.encryptStoredValue) return;
         try {
+            // _put encrypts the whole secrets record under the PRF at-rest key.
             await this._put('secrets', {
                 id: 'person_root_seeds',
-                walletLocalSeed: await this._encryptStoredValue(this.session.walletLocalSeed, 'secrets', 'person_root_seeds:local'),
-                personRootProxy: await this._encryptStoredValue(this.session.personRootProxy, 'secrets', 'person_root_seeds:proxy'),
+                walletLocalSeed: this.session.walletLocalSeed,
+                personRootProxy: this.session.personRootProxy,
                 updatedAt: Date.now(),
             });
         } catch (err) {
             console.warn('[Lemma] Could not persist person-root seeds at rest:', err?.message || err);
         }
+    }
+
+    /**
+     * Reload person-root material into the unlocked session.
+     * Seed-transfer devices mint a fresh walletSecret; without this reload,
+     * derivePPID falls back to that secret and shows a divergent PPID.
+     */
+    async ensurePersonRootSeedsLoaded() {
+        if (!this.session) return false;
+        if (
+            /^[0-9a-fA-F]{64}$/.test(String(this.session.personRootProxy || ''))
+            && /^[0-9a-fA-F]{64}$/.test(String(this.session.walletLocalSeed || ''))
+        ) {
+            return true;
+        }
+
+        if (this._atRestKey) {
+            try {
+                const row = await this._get('secrets', 'person_root_seeds');
+                if (/^[0-9a-fA-F]{64}$/.test(String(row?.personRootProxy || ''))) {
+                    this.session.personRootProxy = String(row.personRootProxy);
+                }
+                if (/^[0-9a-fA-F]{64}$/.test(String(row?.walletLocalSeed || ''))) {
+                    this.session.walletLocalSeed = String(row.walletLocalSeed);
+                }
+            } catch (err) {
+                console.warn('[Lemma] person-root seed reload skipped:', err?.message || err);
+            }
+        }
+
+        if (
+            /^[0-9a-fA-F]{64}$/.test(String(this.session.personRootProxy || ''))
+            && /^[0-9a-fA-F]{64}$/.test(String(this.session.walletLocalSeed || ''))
+        ) {
+            return true;
+        }
+
+        // Best-effort: re-open server envelopes when this device still holds
+        // the encryption secret they were sealed to (not true after seed
+        // transfer mints a replacement walletSecret).
+        try {
+            await this.fetchAndStoreSeedEnvelopes();
+            if (/^[0-9a-fA-F]{64}$/.test(String(this.session.personRootProxy || ''))) {
+                await this._persistPersonRootSeedsAtRest();
+                return true;
+            }
+        } catch (err) {
+            console.warn('[Lemma] seed-envelope refetch skipped:', err?.message || err);
+        }
+        return /^[0-9a-fA-F]{64}$/.test(String(this.session.personRootProxy || ''));
     }
 
     _stashEnrollmentGrant(grant, walletId = null) {
@@ -2657,6 +2712,14 @@ class LemmaWallet {
         let masterRestored = false;
         let platformRoleRestored = false;
 
+        // Passkey/PRF is available now — persist transferred seeds so unlock
+        // can reload personRootProxy instead of falling back to wallet_secret.
+        try {
+            await this._persistPersonRootSeedsAtRest();
+        } catch (err) {
+            console.warn('[Lemma] person-root seed persist after transfer skipped:', err?.message || err);
+        }
+
         try {
             await this.reissueMasterCredential();
             masterRestored = true;
@@ -2665,6 +2728,7 @@ class LemmaWallet {
         }
 
         try {
+            await this.ensurePersonRootSeedsLoaded();
             const restored = await this._restorePlatformAccessForCurrentPpid({
                 siteId: 'lemma.id',
                 walletId,
@@ -2672,6 +2736,12 @@ class LemmaWallet {
             platformRoleRestored = !!restored;
         } catch (err) {
             console.warn('[Lemma] Platform role restore after seed transfer skipped:', err?.message || err);
+        }
+
+        if (this.session?.isUnlocked) {
+            try {
+                await this._put('session', { id: 'current', ...this.session });
+            } catch (_) { /* ignore */ }
         }
 
         return {
@@ -4209,6 +4279,9 @@ class LemmaWallet {
             source: 'daily_unlock_bundle',
         };
         this._isHumanLockRestored = true;
+        try {
+            await this.ensurePersonRootSeedsLoaded();
+        } catch (_) { /* ignore */ }
         // Re-import the PRF-derived at-rest key so encrypted credential
         // reads/writes work without a fresh passkey for the 24h window. This is
         // what makes "one passkey per day" cover the master storage and every
@@ -5480,6 +5553,7 @@ class LemmaWallet {
             walletSecret: walletSecretRecord.secret,
             serverSessionActive: this._isLemmaDomain(),
         };
+        await this.ensurePersonRootSeedsLoaded();
         await this._put('session', { id: 'current', ...this.session });
         console.log(' Wallet unlocked successfully (local passkey verification)');
         if (this._isLemmaDomain()) {
