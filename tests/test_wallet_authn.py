@@ -558,6 +558,59 @@ def test_list_wallet_devices_returns_active_and_optional_revoked(
     assert with_revoked[1]["status"] == "revoked"
 
 
+def test_refresh_wallet_device_label_upgrades_coarse_name(
+    wallet_fixture,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from api.database import WalletPasskey
+    from api.wallet_authn import (
+        issue_device_enrollment_grant,
+        list_wallet_devices,
+        refresh_wallet_device_label,
+        register_wallet_signing_key,
+    )
+    from api.wallet_keys import register_self_signature
+
+    monkeypatch.setattr("api.database.SessionLocal", fake_ishuman_db_session_factory.session_local)
+    wallet_id = wallet_fixture["wallet_id"]
+    pub, sig = register_self_signature(wallet_id, wallet_fixture["wallet_secret"])
+    assert register_wallet_signing_key(
+        wallet_id=wallet_id,
+        device_id="dev_laptop",
+        device_name="Windows",
+        pubkey_b64=pub,
+        signature_b64=sig,
+        enrollment_grant=issue_device_enrollment_grant(wallet_id=wallet_id, source="test"),
+    ).ok
+    db = fake_ishuman_db_session_factory.session_local()
+    db.add(
+        WalletPasskey(
+            wallet_id=wallet_id,
+            device_id="dev_laptop",
+            credential_id="cred_laptop",
+            public_key="pk",
+            sign_count=0,
+            device_name="Windows",
+        )
+    )
+    db.commit()
+    db.close()
+
+    refresh_wallet_device_label(
+        wallet_id=wallet_id,
+        device_id="dev_laptop",
+        device_name="Chrome on Windows",
+        credential_id="cred_laptop",
+    )
+    devices = list_wallet_devices(wallet_id)
+    assert devices[0]["device_name"] == "Chrome on Windows"
+    db = fake_ishuman_db_session_factory.session_local()
+    pk = db.query(WalletPasskey).filter_by(credential_id="cred_laptop").one()
+    assert pk.device_name == "Chrome on Windows"
+    db.close()
+
+
 def test_assertion_with_device_id_matches_wallet_sdk_binding(
     wallet_fixture,
     fake_ishuman_db_session_factory,

@@ -2401,37 +2401,70 @@ class LemmaWallet {
     }
 
     static friendlyDeviceLabel(raw = '', { fallback = 'Browser' } = {}) {
-        const source = String(raw || (typeof navigator !== 'undefined' ? navigator.userAgent : '') || '').trim();
+        const ua = String((typeof navigator !== 'undefined' ? navigator.userAgent : '') || '').trim();
+        const source = String(raw || ua || '').trim();
         if (!source) return fallback;
-        if (/iPhone/i.test(source)) return 'iPhone';
-        if (/iPad/i.test(source)) return 'iPad';
-        if (/Android/i.test(source)) return 'Android';
-        const browser =
-            /Edg\//i.test(source) ? 'Edge'
-                : /Chrome\//i.test(source) && !/Chromium/i.test(source) ? 'Chrome'
-                    : /Firefox\//i.test(source) ? 'Firefox'
-                        : /Safari\//i.test(source) && !/Chrome|Chromium|Edg/i.test(source) ? 'Safari'
-                            : null;
-        const os =
-            /Windows/i.test(source) ? 'Windows'
-                : /Mac OS X|Macintosh/i.test(source) ? 'macOS'
-                    : /Linux/i.test(source) ? 'Linux'
-                        : null;
-        if (browser && os) return `${browser} on ${os}`;
-        if (browser) return browser;
-        if (os) return os;
-        // Already a short human label (not a full UA).
-        if (source.length <= 48 && !/\(.*\)/.test(source)) return source;
-        return fallback;
+
+        const parseBrowserPlatform = (text) => {
+            const browser =
+                /Edg\//i.test(text) ? 'Edge'
+                    : /CriOS/i.test(text) ? 'Chrome'
+                        : /FxiOS/i.test(text) ? 'Firefox'
+                            : /Chrome\//i.test(text) && !/Chromium/i.test(text) ? 'Chrome'
+                                : /Firefox\//i.test(text) ? 'Firefox'
+                                    : /Safari\//i.test(text) && !/Chrome|Chromium|Edg|CriOS/i.test(text) ? 'Safari'
+                                        : null;
+            // Phone/tablet first — these are the device the user recognizes.
+            if (/iPhone/i.test(text)) return browser ? `${browser} on iPhone` : 'iPhone';
+            if (/iPad/i.test(text)) return browser ? `${browser} on iPad` : 'iPad';
+            if (/Android/i.test(text)) return browser ? `${browser} on Android` : 'Android';
+            const os =
+                /Windows/i.test(text) ? 'Windows'
+                    : /Mac OS X|Macintosh/i.test(text) ? 'macOS'
+                        : /CrOS/i.test(text) ? 'ChromeOS'
+                            : /Linux/i.test(text) ? 'Linux'
+                                : null;
+            if (browser && os) return `${browser} on ${os}`;
+            if (browser) return browser;
+            if (os) return os;
+            return null;
+        };
+
+        const parsed = parseBrowserPlatform(source);
+        if (parsed) return parsed;
+        // Already a short human label (not a full UA), e.g. a future custom name.
+        if (source.length <= 48 && !/\(.*\)/.test(source) && source !== ua) return source;
+        return parseBrowserPlatform(ua) || fallback;
+    }
+
+    /** Live browser/device label for this profile (never reuse a stale OS-only name). */
+    static currentDeviceLabel({ fallback = 'Browser' } = {}) {
+        return this.friendlyDeviceLabel(
+            (typeof navigator !== 'undefined' ? navigator.userAgent : '') || '',
+            { fallback },
+        );
     }
 
     async _getStoredDeviceName() {
+        const live = this.constructor.currentDeviceLabel();
+        await this._persistLocalDeviceLabel(live).catch(() => {});
+        return live;
+    }
+
+    async _persistLocalDeviceLabel(deviceName) {
+        const label = String(deviceName || '').trim();
+        if (!label) return;
         let record = await this._getRaw('secrets', 'device_meta').catch(() => null);
         if (!record) {
             record = await this._get('secrets', 'device_meta').catch(() => null);
         }
-        const stored = String(record?.deviceName || '').trim();
-        return this.constructor.friendlyDeviceLabel(stored);
+        if (!record?.deviceId) return;
+        if (String(record.deviceName || '').trim() === label) return;
+        await this._putRaw('secrets', {
+            ...record,
+            id: 'device_meta',
+            deviceName: label,
+        });
     }
 
     async _getOrCreateDeviceId() {
@@ -2440,14 +2473,24 @@ class LemmaWallet {
         if (!record) {
             record = await this._get('secrets', 'device_meta').catch(() => null);
         }
-        if (record?.deviceId) return record.deviceId;
+        const liveLabel = this.constructor.currentDeviceLabel();
+        if (record?.deviceId) {
+            if (String(record.deviceName || '').trim() !== liveLabel) {
+                await this._putRaw('secrets', {
+                    ...record,
+                    id: 'device_meta',
+                    deviceName: liveLabel,
+                }).catch(() => {});
+            }
+            return record.deviceId;
+        }
         const keys = this._getLemmaKeys();
         const idBytes = crypto.getRandomValues(new Uint8Array(16));
         const deviceId = 'dev_' + keys.base64urlEncode(idBytes);
         await this._putRaw('secrets', {
             id: 'device_meta',
             deviceId,
-            deviceName: this.constructor.friendlyDeviceLabel(),
+            deviceName: liveLabel,
             createdAt: Date.now(),
         });
         return deviceId;
@@ -2909,11 +2952,13 @@ class LemmaWallet {
                 }
             }
         }
+        const deviceLabel = await this._getStoredDeviceName().catch(() => this.constructor.currentDeviceLabel());
         const completeBody = {
             challenge_key: begin.challenge_key,
             credential: this._serializeCredential(credential),
             profile_id: activeProfile?.id || DEFAULT_PROFILE_ID,
             profile_name: activeProfile?.name || 'Personal',
+            device_name: deviceLabel || null,
         };
         if (begin.bootstrap_required) {
             if (!passkeyRecord?.publicKey) {
@@ -3043,15 +3088,23 @@ class LemmaWallet {
             this._throwWalletApiError(data, `list devices failed (${response.status})`);
         }
         const devices = Array.isArray(data.devices) ? data.devices : [];
+        const liveLabel = this.constructor.currentDeviceLabel({ fallback: 'Device' });
         return {
-            devices: devices.map((device) => ({
-                ...device,
-                label: this.constructor.friendlyDeviceLabel(
-                    device.device_name || '',
-                    { fallback: 'Device' },
-                ),
-                is_current: !!(device.is_current || device.device_id === deviceId),
-            })),
+            devices: devices.map((device) => {
+                const isCurrent = !!(device.is_current || device.device_id === deviceId);
+                return {
+                    ...device,
+                    // Current browser always uses a live UA label; others use what
+                    // that enrollment last reported (refreshed on its own unlock).
+                    label: isCurrent
+                        ? liveLabel
+                        : this.constructor.friendlyDeviceLabel(
+                            device.device_name || '',
+                            { fallback: 'Device' },
+                        ),
+                    is_current: isCurrent,
+                };
+            }),
             currentDeviceId: deviceId,
             activeCount: Number(data.active_count || 0),
         };

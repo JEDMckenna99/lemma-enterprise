@@ -740,6 +740,60 @@ def _touch_last_used(wallet_id: str, device_id: str = "legacy") -> None:
         db.close()
 
 
+def refresh_wallet_device_label(
+    wallet_id: str,
+    device_id: str,
+    device_name: str = "",
+    *,
+    credential_id: str = "",
+) -> None:
+    """Update the coarse browser/device label shown in the manager device list.
+
+    Called after a verified unlock so stale OS-only labels (e.g. "Windows")
+    upgrade to browser + platform (e.g. "Chrome on Windows") without storing
+    a raw User-Agent string.
+    """
+    from api.database import SessionLocal, WalletPasskey, WalletSigningKey
+
+    wallet_id = (wallet_id or "").strip()
+    device_id = (device_id or "").strip()
+    label = (device_name or "").strip()[:256]
+    credential_id = (credential_id or "").strip()
+    if not wallet_id or not device_id or not label:
+        return
+
+    db = SessionLocal()
+    try:
+        now = datetime.utcnow()
+        key_row = db.query(WalletSigningKey).filter_by(
+            wallet_id=wallet_id,
+            device_id=device_id,
+        ).first()
+        if key_row and not getattr(key_row, "revoked_at", None):
+            key_row.device_name = label
+            key_row.last_used_at = now
+
+        passkey_q = db.query(WalletPasskey).filter_by(wallet_id=wallet_id)
+        if credential_id:
+            pk_row = passkey_q.filter_by(credential_id=credential_id).first()
+        else:
+            pk_row = passkey_q.filter_by(device_id=device_id).order_by(
+                WalletPasskey.last_used_at.desc().nullslast()
+            ).first()
+        if pk_row and not getattr(pk_row, "revoked_at", None):
+            pk_row.device_name = label
+            if str(pk_row.device_id or "") != device_id:
+                pk_row.device_id = device_id
+            pk_row.last_used_at = now
+
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
 def assertion_error_response(result: Result) -> tuple:
     return (
         jsonify({

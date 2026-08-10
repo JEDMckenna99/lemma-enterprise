@@ -821,11 +821,13 @@ def wallet_session_unlock_complete():
         )
         if not ok:
             return jsonify({'success': False, 'error': reason}), 403
+        bootstrap_device_name = str(body.get('device_name') or '').strip()
         key_result = register_wallet_signing_key(
             wallet_id=wallet_id,
             device_id=device_id,
             pubkey_b64=pubkey_b64,
             signature_b64=signature_b64,
+            device_name=bootstrap_device_name,
             allow_first_device_bootstrap=True,
         )
         if not key_result.ok:
@@ -841,6 +843,7 @@ def wallet_session_unlock_complete():
             public_key=public_key,
             attestation_format=str(body.get('attestation_format') or '').strip() or None,
             sign_count=int(new_sign_count or 0),
+            device_name=bootstrap_device_name or None,
         )
         if not passkey_result.ok:
             return jsonify({
@@ -868,21 +871,33 @@ def wallet_session_unlock_complete():
             return jsonify({'success': False, 'error': reason}), 403
 
         update_wallet_passkey_sign_count(credential_id, new_sign_count)
-        # Keep server device_id aligned when the browser rotated device_id locally.
-        from api.database import SessionLocal, WalletPasskey
+        # Keep server device_id aligned when the browser rotated device_id locally,
+        # and refresh the coarse browser/device label for the manager list.
+        from api.wallet_authn import refresh_wallet_device_label
 
-        db = SessionLocal()
-        try:
-            row = db.query(WalletPasskey).filter_by(credential_id=credential_id).first()
-            if row and str(row.device_id or '') != device_id:
-                row.device_id = device_id
-                row.last_used_at = datetime.utcnow()
-                db.commit()
-        except Exception:
-            db.rollback()
-            raise
-        finally:
-            db.close()
+        device_name = str(body.get('device_name') or '').strip()
+        if device_name:
+            refresh_wallet_device_label(
+                wallet_id=wallet_id,
+                device_id=device_id,
+                device_name=device_name,
+                credential_id=credential_id,
+            )
+        else:
+            from api.database import SessionLocal, WalletPasskey
+
+            db = SessionLocal()
+            try:
+                row = db.query(WalletPasskey).filter_by(credential_id=credential_id).first()
+                if row and str(row.device_id or '') != device_id:
+                    row.device_id = device_id
+                    row.last_used_at = datetime.utcnow()
+                    db.commit()
+            except Exception:
+                db.rollback()
+                raise
+            finally:
+                db.close()
     return _issue_wallet_session_response(
         wallet_id=str(stored['wallet_id']),
         profile_id=str(body.get('profile_id') or 'default'),
