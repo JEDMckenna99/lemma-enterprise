@@ -125,7 +125,8 @@
                 <p class="card-intro">
                     Optionally link this lemma.id to a one-time identity check.
                     That adds a human proof some sites may require. You can keep using
-                    lemma.id without doing this.
+                    lemma.id without doing this. Human verification currently accepts
+                    a US or Canadian driver’s license or ID card.
                 </p>
                 <button id="anchor-wallet-btn" class="btn btn-primary btn-full" type="button">
                     Anchor this lemma.id
@@ -133,6 +134,7 @@
                 <aside class="anchor-disclaimer" aria-label="Privacy disclaimer">
                     <p><strong>What happens:</strong> you'll complete a private identity check. When it finishes, a human proof is stored on this device with your lemma.id.</p>
                     <ul>
+                        <li>Currently accepts a US or Canadian driver’s license or ID card.</li>
                         <li>No ID documents, selfies, or legal name are stored after verification.</li>
                         <li>Sites only see a proof that you're human — nothing that reveals who you are.</li>
                         <li>Each site gets its own private ID; they can't compare notes about you.</li>
@@ -143,11 +145,12 @@
 
         <!-- 2. WHO CAN ACT AS YOU -->
         <div class="card" id="devices-card">
-            <h2>Your devices</h2>
+            <h2>Your devices &amp; browsers</h2>
             <p class="card-intro">
-                Devices that can unlock this lemma.id. This is the only list lemma.id keeps about you,
-                and it exists so you can cut off a device you no longer have. Revoking stops a device
-                from unlocking or signing again; it does not erase files already on it.
+                Each row is a browser (or app) that holds a copy of this lemma.id and can unlock it.
+                This is the only list lemma.id keeps about you, and it exists so you can cut off a
+                browser or device you no longer have. Revoking stops that copy from unlocking or
+                signing again; it does not erase files already on it.
             </p>
             <div id="devices-list" class="devices-list" aria-live="polite">
                 <p class="devices-loading">Loading devices...</p>
@@ -767,10 +770,13 @@ function formatDeviceWhen(iso) {
 
 function deviceDisplayLabel(device) {
     if (device?.label) return String(device.label);
-    if (window.LemmaWallet?.friendlyDeviceLabel) {
-        return LemmaWallet.friendlyDeviceLabel(device?.device_name || '', { fallback: 'Device' });
+    if (device?.is_current && window.LemmaWallet?.currentDeviceLabel) {
+        return LemmaWallet.currentDeviceLabel({ fallback: 'Browser' });
     }
-    return String(device?.device_name || 'Device');
+    if (window.LemmaWallet?.friendlyDeviceLabel) {
+        return LemmaWallet.friendlyDeviceLabel(device?.device_name || '', { fallback: 'Browser' });
+    }
+    return String(device?.device_name || 'Browser');
 }
 
 async function loadDevicesList() {
@@ -778,7 +784,7 @@ async function loadDevicesList() {
     if (!container || !wallet) return;
     try {
         if (!wallet.isUnlocked || !wallet.isUnlocked()) {
-            container.innerHTML = '<p class="devices-empty">Unlock to see your devices.</p>';
+            container.innerHTML = '<p class="devices-empty">Unlock to see your devices and browsers.</p>';
             return;
         }
         const result = await wallet.listDevices();
@@ -787,14 +793,31 @@ async function loadDevicesList() {
             container.innerHTML = '<p class="devices-empty">Only this browser is enrolled so far.</p>';
             return;
         }
+        const labelCounts = devices.reduce((acc, device) => {
+            const key = deviceDisplayLabel(device);
+            acc[key] = (acc[key] || 0) + 1;
+            return acc;
+        }, {});
         container.innerHTML = devices.map((device) => {
-            const label = escapeHtml(deviceDisplayLabel(device));
+            const labelText = deviceDisplayLabel(device);
+            const label = escapeHtml(labelText);
             const when = formatDeviceWhen(device.last_used_at || device.created_at);
-            const meta = device.is_current
-                ? 'This device'
-                : (when ? `Last used ${escapeHtml(when)}` : 'Enrolled device');
+            const enrolled = formatDeviceWhen(device.created_at);
+            const duplicate = (labelCounts[labelText] || 0) > 1;
+            let meta;
+            if (device.is_current) {
+                meta = 'This browser';
+            } else if (duplicate && enrolled && when && enrolled !== when) {
+                meta = `Last used ${escapeHtml(when)} · added ${escapeHtml(enrolled)}`;
+            } else if (duplicate && enrolled) {
+                meta = `Added ${escapeHtml(enrolled)}`;
+            } else if (when) {
+                meta = `Last used ${escapeHtml(when)}`;
+            } else {
+                meta = 'Enrolled browser';
+            }
             const badge = device.is_current
-                ? '<span class="device-badge">This device</span>'
+                ? '<span class="device-badge">This browser</span>'
                 : '';
             const action = device.is_current
                 ? '<span class="device-action-note">Use Remove below to clear this browser</span>'
@@ -826,7 +849,9 @@ async function revokeOtherDevice(deviceId, button) {
         (el) => el.getAttribute('data-device-id') === targetId
     );
     const labelNode = row?.querySelector('.device-name');
-    const label = labelNode ? labelNode.textContent.replace(/This device/i, '').trim() : 'this device';
+    const label = labelNode
+        ? labelNode.textContent.replace(/This (device|browser)/i, '').trim()
+        : 'this browser';
     if (!confirm(`Revoke ${label}? It will no longer be able to unlock or sign for this lemma.id.`)) {
         return;
     }
@@ -1101,70 +1126,121 @@ async function returnWithExistingPasskey() {
     }
 }
 
+async function mintPlatformVerifyFlowState({ issueMode = '', redirectReturn = '/app' } = {}) {
+    try {
+        const resp = await fetch('/api/verify/flow-state', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                site_id: 'lemma.id',
+                issue_mode: issueMode || '',
+                redirect_return: redirectReturn || '',
+            }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data?.success || !data?.flow_state) {
+            console.warn('flow-state mint failed:', data?.error || resp.status);
+            return null;
+        }
+        return String(data.flow_state);
+    } catch (err) {
+        console.warn('flow-state mint error:', err?.message || err);
+        return null;
+    }
+}
+
 // Create or anchor a lemma.id through the canonical identity verification popup.
 // Existing wallets stay manageable; this flow only adds the optional identity anchor.
-function createWallet(triggerButton = null) {
+async function createWallet(triggerButton = null) {
     const btn = triggerButton || document.getElementById('create-wallet-btn');
     const confirmed = window.confirm(
         'Create a brand-new lemma.id on this device? If you already have one elsewhere, use Add this device instead.',
     );
     if (!confirmed) return;
 
-    const origText = btn.textContent;
+    const origText = btn?.textContent || 'Create a lemma.id';
+    const restoreBtn = () => {
+        if (!btn) return;
+        btn.textContent = origText;
+        btn.disabled = false;
+    };
+    if (btn) {
+        btn.textContent = 'Opening verification...';
+        btn.disabled = true;
+    }
 
-    btn.textContent = 'Opening verification...';
-    btn.disabled = true;
-
-    const popupUrl = new URL('/verify', window.location.origin);
-    popupUrl.searchParams.set('origin', window.location.origin);
-    popupUrl.searchParams.set('site_id', 'lemma.id');
-    popupUrl.searchParams.set('confirm_new_identity', '1');
-
+    // Open blank first (keeps the click gesture), then navigate only after a
+    // server-minted flow_state exists — never load /verify without it.
     const popup = window.open(
-        popupUrl.toString(),
+        'about:blank',
         'lemma_ishuman_idv',
         'popup=yes,width=520,height=760,resizable=yes,scrollbars=yes',
     );
 
-    // Popup blockers should not strand creation. The redirect flow returns to
-    // the manager after the proof is stored on this origin.
-    if (!popup) {
-        popupUrl.searchParams.set('flow_mode', 'redirect');
-        popupUrl.searchParams.set('redirect_return', '/app');
-        window.location.assign(popupUrl.toString());
-        return;
-    }
-
-    let settled = false;
-    const finish = async () => {
-        if (settled) return;
-        settled = true;
-        window.removeEventListener('message', onMessage);
-        clearInterval(closedTimer);
-        btn.textContent = origText;
-        btn.disabled = false;
-        let ready = await checkWalletState().catch((err) => {
-            console.warn('Wallet refresh after issuance failed:', err?.message || err);
-            return false;
+    try {
+        const flowState = await mintPlatformVerifyFlowState({
+            redirectReturn: '/app',
         });
-        if (!ready && await recoverMissingMasterFromServer()) {
-            ready = await checkWalletState().catch((err) => {
-                console.warn('Wallet refresh after master recovery failed:', err?.message || err);
+        if (!flowState) {
+            try { if (popup && !popup.closed) popup.close(); } catch (_) { /* non-fatal */ }
+            window.alert('Could not start verification. Refresh and try again.');
+            restoreBtn();
+            return;
+        }
+
+        const popupUrl = new URL('/verify', window.location.origin);
+        popupUrl.searchParams.set('flow_state', flowState);
+        popupUrl.searchParams.set('origin', window.location.origin);
+        popupUrl.searchParams.set('site_id', 'lemma.id');
+        popupUrl.searchParams.set('confirm_new_identity', '1');
+        popupUrl.searchParams.set('redirect_return', '/app');
+
+        // Popup blockers should not strand creation. The redirect flow returns to
+        // the manager after the proof is stored on this origin.
+        if (!popup) {
+            popupUrl.searchParams.set('flow_mode', 'redirect');
+            window.location.assign(popupUrl.toString());
+            return;
+        }
+
+        popup.location.replace(popupUrl.toString());
+
+        let settled = false;
+        const finish = async () => {
+            if (settled) return;
+            settled = true;
+            window.removeEventListener('message', onMessage);
+            clearInterval(closedTimer);
+            restoreBtn();
+            let ready = await checkWalletState().catch((err) => {
+                console.warn('Wallet refresh after issuance failed:', err?.message || err);
                 return false;
             });
-        }
-    };
-    const onMessage = (event) => {
-        if (event.origin !== window.location.origin) return;
-        const type = event.data?.type;
-        if (type === 'ISHUMAN_IDV_COMPLETE' || type === 'ISHUMAN_IDV_CANCELLED') {
-            finish();
-        }
-    };
-    const closedTimer = setInterval(() => {
-        if (popup.closed) finish();
-    }, 800);
-    window.addEventListener('message', onMessage);
+            if (!ready && await recoverMissingMasterFromServer()) {
+                ready = await checkWalletState().catch((err) => {
+                    console.warn('Wallet refresh after master recovery failed:', err?.message || err);
+                    return false;
+                });
+            }
+        };
+        const onMessage = (event) => {
+            if (event.origin !== window.location.origin) return;
+            const type = event.data?.type;
+            if (type === 'ISHUMAN_IDV_COMPLETE' || type === 'ISHUMAN_IDV_CANCELLED') {
+                finish();
+            }
+        };
+        const closedTimer = setInterval(() => {
+            if (popup.closed) finish();
+        }, 800);
+        window.addEventListener('message', onMessage);
+    } catch (err) {
+        try { if (popup && !popup.closed) popup.close(); } catch (_) { /* non-fatal */ }
+        console.warn('Could not open verification popup:', err?.message || err);
+        window.alert('Could not start verification. Refresh and try again.');
+        restoreBtn();
+    }
 }
 
 function anchorWalletIdentity(event) {

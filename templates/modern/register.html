@@ -463,13 +463,45 @@
         const REGISTER_RESULT_KEY = 'lemma_register_result_v1';
         const REGISTER_ERROR_KEY = 'lemma_register_error_v1';
 
-        function buildPlatformIdvUrl({ redirect = false } = {}) {
+        async function mintPlatformVerifyFlowState({ redirectReturn = '' } = {}) {
+            try {
+                const resp = await fetch('/api/verify/flow-state', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        site_id: 'lemma.id',
+                        issue_mode: '',
+                        redirect_return: redirectReturn || '',
+                    }),
+                });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok || !data?.success || !data?.flow_state) {
+                    console.warn('flow-state mint failed:', data?.error || resp.status);
+                    return null;
+                }
+                return String(data.flow_state);
+            } catch (err) {
+                console.warn('flow-state mint error:', err?.message || err);
+                return null;
+            }
+        }
+
+        async function buildPlatformIdvUrl({ redirect = false } = {}) {
+            const redirectReturn = window.location.pathname + window.location.search;
+            const flowState = await mintPlatformVerifyFlowState({
+                redirectReturn,
+            });
+            if (!flowState) {
+                throw new Error('flow_state_mint_failed');
+            }
             const url = new URL('/verify', window.location.origin);
+            url.searchParams.set('flow_state', flowState);
             url.searchParams.set('origin', window.location.origin);
             url.searchParams.set('site_id', 'lemma.id');
+            url.searchParams.set('redirect_return', redirectReturn);
             if (redirect) {
                 url.searchParams.set('flow_mode', 'redirect');
-                url.searchParams.set('redirect_return', window.location.pathname + window.location.search);
             }
             return url;
         }
@@ -490,8 +522,18 @@
             }
         }
 
-        function redirectToPlatformIdv() {
-            window.location.assign(buildPlatformIdvUrl({ redirect: true }).toString());
+        async function redirectToPlatformIdv() {
+            try {
+                const url = await buildPlatformIdvUrl({ redirect: true });
+                window.location.assign(url.toString());
+            } catch (err) {
+                console.warn('Could not start platform IDV:', err?.message || err);
+                setWalletStatus(
+                    'Could not start verification. Refresh and try again.',
+                    'locked',
+                    { showIdvAction: true },
+                );
+            }
         }
 
         function beginRegistration(data) {

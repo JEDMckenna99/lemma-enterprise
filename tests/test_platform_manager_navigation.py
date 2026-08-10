@@ -72,7 +72,11 @@ def test_brand_and_manager_creation_use_canonical_routes():
     assert '<a href="/home" class="nav-link" id="nav-product">' in layout
     assert "new URL('/verify', window.location.origin)" in manager
     assert "popupUrl.searchParams.set('site_id', 'lemma.id')" in manager
+    assert "popupUrl.searchParams.set('flow_state', flowState)" in manager
+    assert "mintPlatformVerifyFlowState" in manager
+    assert "/api/verify/flow-state" in manager
     assert "window.open(" in manager
+    assert "about:blank" in manager
     assert "async function hasCompleteLemmaId()" in manager
     assert "getWalletInfo({ lite: true })" in manager
     assert "globalLemmaWallet" in manager
@@ -107,7 +111,7 @@ def test_brand_and_manager_creation_use_canonical_routes():
     assert "removed-notice" in manager
     assert 'id="devices-card"' in manager
     assert 'id="devices-list"' in manager
-    assert "Your devices" in manager
+    assert "Your devices &amp; browsers" in manager or "Your devices & browsers" in manager
     assert "loadDevicesList" in manager
     assert "revokeOtherDevice" in manager
     wallet_js = (ROOT / "static" / "js" / "lemma-wallet.js").read_text(encoding="utf-8")

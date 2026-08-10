@@ -253,6 +253,19 @@ def test_sdk_mentions_flow_state_mint():
     assert "flow_state" in src
 
 
+def test_platform_manager_and_register_mint_flow_state_before_verify():
+    """Create/anchor and register must never open /verify without a minted token."""
+    manager = (REPO_ROOT / "templates" / "wallet_simple.html").read_text(encoding="utf-8")
+    register = (REPO_ROOT / "templates" / "modern" / "register.html").read_text(encoding="utf-8")
+    for src in (manager, register):
+        assert "mintPlatformVerifyFlowState" in src
+        assert "/api/verify/flow-state" in src
+        assert "flow_state" in src
+    assert "about:blank" in manager
+    assert "popupUrl.searchParams.set('flow_state', flowState)" in manager
+    assert "url.searchParams.set('flow_state', flowState)" in register
+
+
 def test_idv_template_prefers_server_flow_binding():
     src = (REPO_ROOT / "templates" / "wallet_ishuman_idv.html").read_text(encoding="utf-8")
     assert "SERVER_FLOW" in src
