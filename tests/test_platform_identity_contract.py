@@ -31,6 +31,9 @@ def test_credential_utils_exports_platform_contract(utils_js_source):
         "getCredentialSiteBinding",
         "isCompleteLemmaIdCredential",
         "isPlatformOperatorCredential",
+        "getCredentialSubjectPpid",
+        "findPlatformIdentityCredential",
+        "isPlatformOperatorCredentialForIdentity",
         "selectPlatformCredentials",
         "assessLemmaPlatformIdentity",
     ):
@@ -65,7 +68,7 @@ def test_wallet_skips_empty_site_before_canonicalization(wallet_js_source):
 
 @pytest.mark.unit
 def test_wallet_version_bumped_for_platform_identity(wallet_js_source):
-    assert "static VERSION = '2.81.0'" in wallet_js_source
+    assert "static VERSION = '2.82.0'" in wallet_js_source
 
 
 @pytest.mark.unit
@@ -211,11 +214,11 @@ def test_templates_use_shared_platform_helpers():
 @pytest.mark.unit
 def test_sdk_cache_bust_bumped_in_templates():
     expected_versions = {
-        "templates/modern/layout.html": "2700",
-        "templates/wallet_unlock.html": "2700",
-        "templates/wallet_popup.html": "2700",
-        "templates/wallet_ishuman_idv.html": "2700",
-        "templates/recover_complete.html": "2700",
+        "templates/modern/layout.html": "2701",
+        "templates/wallet_unlock.html": "2701",
+        "templates/wallet_popup.html": "2701",
+        "templates/wallet_ishuman_idv.html": "2701",
+        "templates/recover_complete.html": "2701",
     }
     for rel, version in expected_versions.items():
         text = (ROOT / rel).read_text(encoding="utf-8")
@@ -297,7 +300,7 @@ def test_device_link_bundles_ishuman_credentials_and_unlock_token(wallet_js_sour
     assert "sendLinkDepositFromScan" in wallet_js_source
     assert "beginLinkPush" in wallet_js_source
     assert "confirmLinkPushDeposit" in wallet_js_source
-    assert "2.81.0" in wallet_js_source
+    assert "2.82.0" in wallet_js_source
 
 
 @pytest.mark.unit

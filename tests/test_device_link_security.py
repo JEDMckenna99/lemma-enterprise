@@ -85,6 +85,56 @@ def test_device_link_exports_only_valid_ishuman_credentials():
 
 
 @pytest.mark.unit
+def test_seed_transfer_finalizes_person_root_ppid_and_platform_role():
+    source = WALLET_JS.read_text(encoding="utf-8")
+    assert "async _derivePPIDFromPersonRootProxy" in source
+    assert "lemma.id/site-ppid/v1" in source
+    assert "async finalizeIdentityAfterSeedTransfer" in source
+    assert "async _restorePlatformAccessForCurrentPpid" in source
+
+    derive_idx = source.index("async derivePPID(siteId)")
+    derive_chunk = source[derive_idx:derive_idx + 4500]
+    assert "_derivePPIDFromPersonRootProxy" in derive_chunk
+    # Person-root must win over minting a divergent wallet_secret PPID.
+    assert derive_chunk.index("_derivePPIDFromPersonRootProxy") < derive_chunk.index("getWalletSecret()")
+
+    enroll_idx = source.index("async ensureDeviceEnrollmentAfterSeedTransfer")
+    enroll_end = source.index("async finalizeIdentityAfterSeedTransfer", enroll_idx)
+    enroll_chunk = source[enroll_idx:enroll_end]
+    assert "reissueMasterCredential" not in enroll_chunk
+
+    finalize_idx = source.index("async finalizeIdentityAfterSeedTransfer")
+    finalize_chunk = source[finalize_idx:finalize_idx + 2200]
+    assert "reissueMasterCredential" in finalize_chunk
+    assert "_restorePlatformAccessForCurrentPpid" in finalize_chunk
+
+    link_html = (ROOT / "templates" / "wallet_link.html").read_text(encoding="utf-8")
+    assert "finalizeIdentityAfterSeedTransfer" in link_html
+
+
+@pytest.mark.unit
+def test_client_person_root_proxy_ppid_message_matches_server():
+    """Guard the domain-separator string used by wallet derivePPID."""
+    from api.identity_roots import SITE_PPID_MSG_PREFIX, derive_ppid_from_person_root_bytes
+
+    person_root = bytes.fromhex("33" * 32)
+    site = "lemma.id"
+    expected = derive_ppid_from_person_root_bytes(person_root, site)
+    # Mirror the client message construction exactly.
+    import hashlib
+    import hmac
+
+    client_hash = hmac.new(
+        person_root,
+        f"{SITE_PPID_MSG_PREFIX}{site}".encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    assert expected == f"did:lemma:ppid_{client_hash}"
+    source = WALLET_JS.read_text(encoding="utf-8")
+    assert f"`{SITE_PPID_MSG_PREFIX}${{site}}`" in source or f'"{SITE_PPID_MSG_PREFIX}"' in source
+
+
+@pytest.mark.unit
 def test_server_has_no_legacy_link_store_route():
     api_root = ROOT / "api"
     routes_text = "\n".join(p.read_text(encoding="utf-8") for p in api_root.rglob("*.py"))

@@ -4,6 +4,23 @@
 {% block title %}Admin Dashboard - lemma.id{% endblock %}
 
 {% block admin_content %}
+<!-- Admin auth gate (shown when API denies operator access) -->
+<div id="admin-unauthorized-banner" class="admin-card" style="display: none; margin-bottom: 20px; border-color: var(--admin-danger, #dc3545);">
+    <div class="admin-card-body">
+        <h2 class="admin-card-title" style="margin-bottom: 8px;">Platform admin required</h2>
+        <p class="admin-subtitle" style="margin: 0 0 12px 0;">
+            Your lemma.id is unlocked, but this browser is not presenting platform operator proof for your current identity PPID.
+            After a seed-only device transfer, restore the role lemma keyed to your person-root PPID, or complete platform bootstrap on
+            <a href="/admin/bootstrap">/admin/bootstrap</a>.
+        </p>
+        <button type="button" class="admin-btn admin-btn-primary" id="admin-restore-role-btn">
+            Restore platform access for this PPID
+        </button>
+        <p id="admin-restore-role-status" class="admin-subtitle" style="margin: 8px 0 0 0;"></p>
+    </div>
+</div>
+
+<div id="admin-dashboard-content">
 <div class="admin-header">
     <h1 class="admin-title">isHuman Overview</h1>
     <p class="admin-subtitle">Operator pulse for the lemma.id proof-of-humanity network</p>
@@ -204,7 +221,71 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     document.getElementById('refresh-health-btn').addEventListener('click', loadHealthStatus);
     document.getElementById('run-launch-gate-btn').addEventListener('click', runLaunchGateQuickChecks);
+    document.getElementById('admin-restore-role-btn')?.addEventListener('click', restorePlatformAccessFromBanner);
 });
+
+async function restorePlatformAccessFromBanner() {
+    const statusEl = document.getElementById('admin-restore-role-status');
+    const btn = document.getElementById('admin-restore-role-btn');
+    if (btn) btn.disabled = true;
+    if (statusEl) statusEl.textContent = 'Restoring role lemma for your person-root PPID…';
+    try {
+        if (typeof LemmaWallet === 'undefined') {
+            throw new Error('LemmaWallet not loaded');
+        }
+        const wallet = window.globalLemmaWallet || new LemmaWallet();
+        await wallet.init();
+        if (!wallet.isUnlocked || !wallet.isUnlocked()) {
+            const auth = await wallet.autoAuthenticate();
+            if (!auth?.authenticated) {
+                throw new Error('Unlock lemma.id first, then retry restore.');
+            }
+        }
+        if (typeof wallet.finalizeIdentityAfterSeedTransfer === 'function') {
+            const result = await wallet.finalizeIdentityAfterSeedTransfer();
+            if (!result?.platformRoleRestored && typeof wallet._restorePlatformAccessForCurrentPpid === 'function') {
+                await wallet._restorePlatformAccessForCurrentPpid({ siteId: 'lemma.id' });
+            }
+        } else if (typeof wallet._restorePlatformAccessForCurrentPpid === 'function') {
+            await wallet._restorePlatformAccessForCurrentPpid({ siteId: 'lemma.id' });
+        } else {
+            throw new Error('Update lemma-wallet.js and retry');
+        }
+        if (statusEl) statusEl.textContent = 'Restored. Reloading admin…';
+        window.location.reload();
+    } catch (err) {
+        console.warn('Admin role restore failed:', err);
+        if (statusEl) statusEl.textContent = err?.message || 'Restore failed';
+        if (btn) btn.disabled = false;
+    }
+}
+
+let adminApiAuthorized = false;
+
+function showAdminUnauthorized() {
+    adminApiAuthorized = false;
+    const banner = document.getElementById('admin-unauthorized-banner');
+    const content = document.getElementById('admin-dashboard-content');
+    if (banner) banner.style.display = 'block';
+    if (content) content.style.display = 'none';
+}
+
+function hideAdminUnauthorized() {
+    adminApiAuthorized = true;
+    const banner = document.getElementById('admin-unauthorized-banner');
+    const content = document.getElementById('admin-dashboard-content');
+    if (banner) banner.style.display = 'none';
+    if (content) content.style.display = 'block';
+}
+
+async function handleAdminApiResponse(response) {
+    if (response.status === 401 || response.status === 403) {
+        showAdminUnauthorized();
+        return false;
+    }
+    hideAdminUnauthorized();
+    return true;
+}
 
 async function checkAdminAuth() {
     // Check for agent session or token
@@ -235,6 +316,7 @@ async function checkAdminAuth() {
     
     try {
         const wallet = new LemmaWallet();
+        window.globalLemmaWallet = wallet;
         const authResult = await wallet.autoAuthenticate();
         
         if (authResult.authenticated) {
@@ -248,6 +330,23 @@ async function checkAdminAuth() {
             
             if (adminCredential) {
                 console.log('Admin credential found:', adminCredential.id);
+            } else if (
+                wallet.session?.personRootProxy
+                && typeof wallet._restorePlatformAccessForCurrentPpid === 'function'
+            ) {
+                // Seed-transfer devices keep person_root but not permission blobs.
+                try {
+                    await wallet._restorePlatformAccessForCurrentPpid({ siteId: 'lemma.id' });
+                    const refreshed = await wallet.getCredentials({ siteId: 'lemma.id' });
+                    adminCredential = refreshed.find(c => {
+                        const normalized = c.normalized || {};
+                        return normalized.permissionId === 'admin_access' ||
+                               normalized.accountType === 'admin' ||
+                               (normalized.type && normalized.type.includes('admin'));
+                    });
+                } catch (restoreErr) {
+                    console.warn('Auto platform role restore skipped:', restoreErr?.message || restoreErr);
+                }
             }
         }
     } catch (e) {
@@ -274,6 +373,7 @@ async function loadDashboardStats() {
     try {
         const headers = await getAuthHeadersAsync();
         const response = await fetch('/api/admin/ishuman-overview', { headers });
+        if (!(await handleAdminApiResponse(response))) return;
         if (!response.ok) throw new Error('Failed to load stats');
         const data = await response.json();
 
@@ -323,6 +423,7 @@ function updateStatValue(elementId, value) {
 async function loadHealthStatus() {
     try {
         const response = await fetch('/api/health/detailed', { headers: await getAuthHeadersAsync() });
+        if (!(await handleAdminApiResponse(response))) return;
         const data = await response.json();
         
         // Handle both nested and flat response formats
@@ -374,6 +475,7 @@ async function loadRecentActivity() {
     
     try {
         const response = await fetch('/api/admin/recent-activity', { headers: await getAuthHeadersAsync() });
+        if (!(await handleAdminApiResponse(response))) return;
         if (!response.ok) throw new Error('Failed to load activity');
         const data = await response.json();
         
@@ -535,4 +637,5 @@ async function runLaunchGateQuickChecks() {
     setLaunchGateOverall(allPassed ? 'pass' : 'fail', allPassed ? 'Pass' : 'Fail');
 }
 </script>
+</div>
 {% endblock %}

@@ -91,7 +91,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.81.0';  // v2.81: one site identity slot per hostname (prune + upgrade-in-place)
+    static VERSION = '2.82.0';  // v2.82: personRootProxy PPID after seed transfer + platform role restore
 
     static DEVICE_IDB_NAMES = ['LemmaWallet', 'LemmaWalletWrap'];
 
@@ -2645,14 +2645,81 @@ class LemmaWallet {
         if (!this._pendingEnrollmentGrant) {
             await this._registerSigningKeyIfNeeded();
         }
-        if (result?.masterCredentialId) {
-            try {
-                await this.reissueMasterCredential();
-            } catch (err) {
-                console.warn('[Lemma] Master credential refresh after seed transfer skipped:', err?.message || err);
-            }
-        }
         return { success: true, walletId: this.session?.walletId || result?.walletId || null };
+    }
+
+    /**
+     * After seed transfer + passkey: reissue master (person-root subject PPID)
+     * and restore platform role lemmas (admin_access keyed to that PPID).
+     */
+    async finalizeIdentityAfterSeedTransfer(result = null) {
+        const walletId = result?.walletId || this.session?.walletId || null;
+        let masterRestored = false;
+        let platformRoleRestored = false;
+
+        try {
+            await this.reissueMasterCredential();
+            masterRestored = true;
+        } catch (err) {
+            console.warn('[Lemma] Master credential refresh after seed transfer skipped:', err?.message || err);
+        }
+
+        try {
+            const restored = await this._restorePlatformAccessForCurrentPpid({
+                siteId: 'lemma.id',
+                walletId,
+            });
+            platformRoleRestored = !!restored;
+        } catch (err) {
+            console.warn('[Lemma] Platform role restore after seed transfer skipped:', err?.message || err);
+        }
+
+        return {
+            success: true,
+            walletId,
+            masterRestored,
+            platformRoleRestored,
+        };
+    }
+
+    /**
+     * Re-issue a site/platform permission lemma for the current person-root PPID.
+     * Used after device transfer so admin_access (keyed to PPID) returns without
+     * copying the old device's permission credential blob.
+     * @private
+     */
+    async _restorePlatformAccessForCurrentPpid({ siteId = 'lemma.id', walletId = null } = {}) {
+        const ppid = await this.derivePPID(siteId);
+        const wid = walletId || this.session?.walletId || null;
+        const origin = (typeof window !== 'undefined' && window.location?.origin)
+            ? window.location.origin
+            : 'https://lemma.id';
+        const issueResponse = await fetch(`${origin}/api/wallet-auth/restore-site-access`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ppid,
+                site_id: siteId,
+                wallet_id: wid,
+            }),
+        });
+        if (!issueResponse.ok) {
+            const err = await issueResponse.json().catch(() => ({}));
+            throw new Error(err.error || err.message || `restore_site_access_failed_${issueResponse.status}`);
+        }
+        const issueData = await issueResponse.json();
+        if (!issueData.success || !issueData.permission_lemma) {
+            throw new Error(issueData.error || 'no_permission_lemma');
+        }
+        await this.storeCredential(issueData.permission_lemma);
+        console.log(
+            '[Lemma] Restored role credential for',
+            siteId,
+            'role=',
+            issueData.restored_role || 'unknown',
+        );
+        return issueData.permission_lemma;
     }
 
     async _registerDevicePasskeyIfPossible(passkeyRecord, walletId) {
@@ -7660,28 +7727,39 @@ class LemmaWallet {
             .replace(/:\d+$/, '');
         const target = normalizeSite(siteId);
         if (!target) return null;
+        const targetIsPlatform = target === 'lemma.id';
 
         try {
             const lemmas = await this._getAll('lemmas');
             const candidates = lemmas.filter((lemma) => {
                 const claims = lemma.claims || lemma.credentialSubject || {};
+                const id = String(lemma.id || '');
+                const isMaster = id.startsWith('ishuman_master_') || claims.isHuman === true;
                 const assurance = String(claims.assurance || (claims.isHuman ? 'ishuman' : '')).toLowerCase();
-                if (assurance !== 'ishuman' && assurance !== 'passkey' && !claims.isHuman) return false;
+                if (assurance !== 'ishuman' && assurance !== 'passkey' && !claims.isHuman && !isMaster) {
+                    return false;
+                }
                 const lemmaSite = normalizeSite(
                     claims.siteId || claims.site_id || claims.siteDomain || claims.site_domain || claims.domain || ''
                 );
-                if (!lemmaSite) return false;
+                // Master identity VCs are platform-scoped even when site claims are sparse.
+                if (!lemmaSite) {
+                    return targetIsPlatform && isMaster;
+                }
                 return lemmaSite === target || target.endsWith('.' + lemmaSite);
             });
             candidates.sort((a, b) => Number(b.issuanceDate || b.issuedAt || 0) - Number(a.issuanceDate || a.issuedAt || 0));
             for (const lemma of candidates) {
                 const claims = lemma.claims || lemma.credentialSubject || {};
+                const id = String(lemma.id || '');
                 const personRoot = claims.ppidDerivation === 'person_root_v1'
                     || claims.assurance === 'passkey'
                     || claims.assurance === 'ishuman'
                     || claims.verificationMethod === 'stripe_identity'
                     || claims.verificationMethod === 'didit'
-                    || claims.verificationMethod === 'passkey';
+                    || claims.verificationMethod === 'passkey'
+                    || id.startsWith('ishuman_master_')
+                    || claims.isHuman === true;
                 if (!personRoot) continue;
                 const ppid = lemma.subject || claims.ppid || claims.id || claims.subject;
                 if (ppid && String(ppid).startsWith('did:lemma:ppid_')) {
@@ -7721,6 +7799,14 @@ class LemmaWallet {
             return ppidFromCredential;
         }
 
+        // Canonical person-root path: same HMAC as server
+        // HMAC(person_root_proxy, "lemma.id/site-ppid/v1" || site).
+        // Prefer this over wallet_secret after seed transfer / IDV.
+        const ppidFromPersonRoot = await this._derivePPIDFromPersonRootProxy(siteId);
+        if (ppidFromPersonRoot) {
+            return ppidFromPersonRoot;
+        }
+
         // Third-party-safe path: if a valid lemma is already present for this site,
         // use its bound subject PPID and avoid wallet_secret usage entirely.
         if (!this._canPersistWalletSecret()) {
@@ -7747,13 +7833,37 @@ class LemmaWallet {
             } catch (_) {}
         }
         
-        // Get wallet secret
+        // Legacy fallback: wallet_secret (pre person-root / provisional only)
         const walletSecret = await this.getWalletSecret();
         
         // Derive PPID using HMAC-SHA256
         const ppidHash = await this._hmacSha256(walletSecret, siteId);
         
         return `did:lemma:ppid_${ppidHash}`;
+    }
+
+    /**
+     * Derive site PPID from transferred/IDV person_root_proxy.
+     * Byte-compatible with server derive_ppid_from_person_root_bytes.
+     * @private
+     */
+    async _derivePPIDFromPersonRootProxy(siteId) {
+        const proxyHex = String(this.session?.personRootProxy || '').trim();
+        if (!/^[0-9a-fA-F]{64}$/.test(proxyHex)) {
+            return null;
+        }
+        const site = String(siteId || '').trim().toLowerCase()
+            .replace(/^www\./, '')
+            .replace(/:\d+$/, '');
+        if (!site || site === 'unknown') {
+            return null;
+        }
+        try {
+            const ppidHash = await this._hmacSha256(proxyHex, `lemma.id/site-ppid/v1${site}`);
+            return `did:lemma:ppid_${ppidHash}`;
+        } catch (_) {
+            return null;
+        }
     }
     
     /**
@@ -9015,27 +9125,17 @@ class LemmaWallet {
         console.log(`[Lemma] Device linked successfully with profile: ${profileName}`);
         
         let platformCredentialIssued = false;
-        if (!humanProofRestored) {
-            try {
-                console.log('[Lemma] Restoring lemma.id role credential for linked device...');
-                const ppid = await this.derivePPID('lemma.id');
-                const issueResponse = await fetch(`${window.location?.origin || 'https://lemma.id'}/api/wallet-auth/restore-site-access`, {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ppid, site_id: 'lemma.id' })
-                });
-                if (issueResponse.ok) {
-                    const issueData = await issueResponse.json();
-                    if (issueData.success && issueData.permission_lemma) {
-                        await this.storeCredential(issueData.permission_lemma);
-                        platformCredentialIssued = true;
-                        console.log('[Lemma]  Restored role credential issued and stored:', issueData.restored_role || 'unknown');
-                    }
-                }
-            } catch (e) {
-                console.warn('[Lemma] Could not auto-restore platform role credential:', e.message);
-            }
+        // Always attempt role restore after link: admin_access is keyed to
+        // person-root PPID server-side and is not copied in seed-only bundles.
+        try {
+            console.log('[Lemma] Restoring lemma.id role credential for linked device...');
+            await this._restorePlatformAccessForCurrentPpid({
+                siteId: 'lemma.id',
+                walletId: payload.walletId || this.session?.walletId || null,
+            });
+            platformCredentialIssued = true;
+        } catch (e) {
+            console.warn('[Lemma] Could not auto-restore platform role credential:', e.message);
         }
         
         let message;

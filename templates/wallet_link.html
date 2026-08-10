@@ -401,9 +401,20 @@ async function finishSyncSuccess(result, statusEl) {
     try {
         await wallet.ensureDeviceEnrollmentAfterSeedTransfer(result);
         await wallet.registerPasskey({ force: true, allowCreateAlongsideExisting: true });
+        let identityNote = '';
+        try {
+            const identity = await wallet.finalizeIdentityAfterSeedTransfer(result);
+            if (identity?.platformRoleRestored) {
+                identityNote = '<br><br>Platform access restored for your person-root PPID.';
+            } else if (identity?.masterRestored) {
+                identityNote = '<br><br>Human proof refreshed. Open admin if platform access still needs restore.';
+            }
+        } catch (identityErr) {
+            console.warn('Identity finalize after sync transfer:', identityErr);
+        }
         waitEl.innerHTML =
             '<strong>Device ready</strong><br><br>' +
-            'Passkey created — opening the manager…';
+            'Passkey created — opening the manager…' + identityNote;
         waitEl.className = 'status-box success';
         showManagerRedirect(actions, { auto: true });
     } catch (passkeyErr) {
