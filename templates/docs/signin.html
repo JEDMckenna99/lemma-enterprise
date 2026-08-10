@@ -2,8 +2,8 @@
 {% set active_product = 'ishuman' %}
 {% set active_page = 'signin' %}
 {% set hero_title = 'Proof continuity for your site' %}
-{% set hero_subtitle = 'Verify signed presentations locally and enforce policy on a site-private ppid + assurance level. One trial per human, bans that stick, optional action stamps — keep your existing login if you want.' %}
-{% set page_description = 'lemma.id proof layer: verify presentations on your backend, enforce one-human policy, site-block abusers. Free local verify; optional isHuman step-up.' %}
+{% set hero_subtitle = 'Verify signed presentations locally and enforce on a site-private ppid plus assurance. One trial per human and bans that stick need a human proof (IDV) on those actions. Keep your existing login if you want.' %}
+{% set page_description = 'lemma.id proof layer: verify presentations on your backend, enforce one-human policy, site-block abusers. Free local verify. Optional isHuman step-up.' %}
 
 {% block docs_content %}
 <div class="docs-section" id="quickstart">
@@ -81,9 +81,9 @@ app.post('/api/claim-trial', async (req, res) =&gt; {
 
 <div class="docs-section" id="sessions">
     <h2>Optional: sessions from the same presentation</h2>
-    <p>Many sites keep Google/OAuth/email login and use lemma only on gated actions. If you want passwordless sessions, issue your own cookie after verify — lemma.id is not in the request path afterward.</p>
+    <p>Many sites keep Google/OAuth/email login and use lemma only on gated actions. If you want passwordless sessions, issue your own cookie after verify. lemma.id is not in the request path afterward.</p>
     <div class="code-block">
-        <div class="code-header"><span>After verify — optional session</span><button class="copy-btn">Copy</button></div>
+        <div class="code-header"><span>After verify (optional session)</span><button class="copy-btn">Copy</button></div>
         <code>const user = await findOrCreateUser(result.ppid);
 res.cookie('session', signSession(user.id), {
   httpOnly: true, secure: true, sameSite: 'lax',
@@ -128,10 +128,10 @@ res.cookie('session', signSession(user.id), {
 <div class="docs-section" id="troubleshooting">
     <h2>Troubleshooting</h2>
     <ul>
-        <li><strong><code>siteId</code> hostname mismatch</strong> — staging and production subdomains derive different PPIDs.</li>
-        <li><strong>Persistent <code>no_credential</code></strong> — pass <code>{ autoProvision: true }</code> for first-time users.</li>
-        <li><strong><code>assurance_insufficient</code></strong> — match client and backend <code>requiredAssurance</code>.</li>
-        <li><strong>Popup blocked</strong> — call the SDK from a click handler.</li>
+        <li><strong><code>siteId</code> hostname mismatch:</strong> staging and production subdomains derive different PPIDs.</li>
+        <li><strong>Persistent <code>no_credential</code>:</strong> pass <code>{ autoProvision: true }</code> for first-time users.</li>
+        <li><strong><code>assurance_insufficient</code>:</strong> match client and backend <code>requiredAssurance</code>.</li>
+        <li><strong>Popup blocked:</strong> call the SDK from a click handler.</li>
     </ul>
 </div>
 
@@ -140,7 +140,7 @@ res.cookie('session', signSession(user.id), {
     <h3>Do I need to replace my login?</h3>
     <p>No. Gate specific actions; keep OAuth/email if you want. lemma returns <code>ppid</code> + assurance, not a session provider.</p>
     <h3>How do users recover?</h3>
-    <p>Passkeys sync (iCloud/Google); add a second device at <a href="https://lemma.id/link">lemma.id/link</a>. Single-device non-synced passkeys are not guaranteed recoverable — document honestly.</p>
+    <p>Passkey vault sync (iCloud/Google) may restore the WebAuthn credential on a new device, but it does <strong>not</strong> sync lemma.id contents. Same-person continuity requires <a href="https://lemma.id/link">lemma.id/link</a> (or isHuman / site-side recovery keyed to <code>ppid</code>). Single-device passkey-only lemma.id instances are not guaranteed recoverable. Say that plainly to users.</p>
     <h3>Why is there no API key for verify?</h3>
     <p>Verification is cryptographic and local. Keys are for server-side site-block enforcement only.</p>
     <h3>Using an AI coding agent?</h3>

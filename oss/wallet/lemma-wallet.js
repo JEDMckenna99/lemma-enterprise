@@ -258,6 +258,14 @@ class LemmaWallet {
             error: error.message || error.error,
         });
     }
+
+    static isIdentityForkGuardError(error) {
+        if (!error) return false;
+        const code = String(error.code || '').trim();
+        return code === 'existing_passkey_needs_device_link'
+            || code === 'confirm_new_identity_required'
+            || code === 'wallet_secret_missing_requires_recovery';
+    }
     
     constructor(options = {}) {
         this.db = null;
@@ -1958,6 +1966,78 @@ class LemmaWallet {
     // ========================================
 
     /**
+     * Discover whether a resident lemma.id passkey exists in the platform
+     * authenticator (e.g. synced via iCloud/Google) without local IndexedDB state.
+     */
+    async probeExistingResidentPasskey() {
+        if (typeof window === 'undefined' || !window.PublicKeyCredential) {
+            return { found: false, unsupported: true };
+        }
+        if (!this._isPasskeySupported()) {
+            return { found: false, unsupported: true };
+        }
+        try {
+            const rpId = this._getRpIdForWebAuthn();
+            const challenge = crypto.getRandomValues(new Uint8Array(32));
+            const credential = await navigator.credentials.get({
+                publicKey: {
+                    challenge,
+                    rpId,
+                    allowCredentials: [],
+                    userVerification: 'required',
+                    timeout: 60000,
+                },
+                mediation: 'optional',
+            });
+            if (credential?.rawId) {
+                return {
+                    found: true,
+                    credentialId: this._bufferToBase64url(credential.rawId),
+                };
+            }
+            return { found: false };
+        } catch (e) {
+            if (e?.name === 'NotAllowedError') {
+                return { found: false, cancelled: true };
+            }
+            console.warn('[Lemma] Resident passkey probe failed:', e?.message || e);
+            return { found: false, probeError: e?.message || String(e) };
+        }
+    }
+
+    /**
+     * Fail closed before minting a new lemma.id identity on an empty browser.
+     * Passkey vault sync moves the WebAuthn credential only — not IndexedDB contents.
+     */
+    async _assertNewIdentityCreationAllowed(options = {}) {
+        if (options.allowCreateAlongsideExisting) {
+            return;
+        }
+
+        const probe = await this.probeExistingResidentPasskey();
+        if (probe.found) {
+            const err = new Error(
+                'This device has a lemma.id passkey but not your lemma.id data. Add this device from your other device, or recover if you lost it.',
+            );
+            err.code = 'existing_passkey_needs_device_link';
+            err.linkUrl = 'https://lemma.id/link';
+            if (probe.credentialId) {
+                err.credentialId = probe.credentialId;
+            }
+            throw err;
+        }
+
+        if (!options.confirmNewIdentity) {
+            const err = new Error(
+                'Confirm that you want a new lemma.id on this device, or add this device from your other device.',
+            );
+            err.code = 'confirm_new_identity_required';
+            err.linkUrl = 'https://lemma.id/link';
+            throw err;
+        }
+    }
+
+    /**
      * Register a passkey for local wallet unlock
      * This stores the public key locally for future verification
      * 
@@ -2067,13 +2147,19 @@ class LemmaWallet {
             console.log('[Lemma] Existing passkey found - authenticating instead of creating new');
             return await this.unlock(options);
         }
+
+        const storedIdentity = await this._resolveStoredWalletIdentity();
+        const hasTransferredSecret = !!(storedIdentity?.walletId && storedIdentity?.walletSecret);
+        const hasPendingLinkSecret = !!(this.session?.walletSecret);
+        if (!hasTransferredSecret && !hasPendingLinkSecret) {
+            await this._assertNewIdentityCreationAllowed(options);
+        }
         
         // Reuse only a complete linked/handoff identity. A wallet_id left behind
         // without its wallet_secret is an orphan from an interrupted/legacy
         // clear; pairing a new secret with that old id causes a signing-key
         // conflict and must never be attempted.
         let walletId = await this._get('passkey', 'walletId');
-        const storedIdentity = await this._resolveStoredWalletIdentity();
         if (storedIdentity?.walletId && storedIdentity?.walletSecret) {
             walletId = { id: 'walletId', value: storedIdentity.walletId };
             await this._put('passkey', walletId);
@@ -2198,6 +2284,14 @@ class LemmaWallet {
         
         // Only generate new secret if NONE found anywhere
         if (!walletSecret?.secret) {
+            if (!options.allowCreateAlongsideExisting && !options.confirmNewIdentity) {
+                const err = new Error(
+                    'Confirm that you want a new lemma.id on this device, or add this device from your other device.',
+                );
+                err.code = 'confirm_new_identity_required';
+                err.linkUrl = 'https://lemma.id/link';
+                throw err;
+            }
             console.warn('[Lemma] No existing wallet secret found - generating new one');
             console.warn('[Lemma] This should NOT happen if device was linked!');
             
@@ -5247,19 +5341,12 @@ class LemmaWallet {
             }
         }
         if (!walletSecretRecord?.secret) {
-            console.warn('[Lemma] No wallet secret found - generating new one');
-            const secretBytes = crypto.getRandomValues(new Uint8Array(32));
-            const secretHex = Array.from(secretBytes)
-                .map(b => b.toString(16).padStart(2, '0'))
-                .join('');
-            walletSecretRecord = {
-                id: 'master',
-                secret: secretHex,
-                createdAt: Date.now(),
-                source: 'generated_legacy'
-            };
-            await this._put('secrets', walletSecretRecord);
-            console.log(' Generated wallet secret for legacy wallet');
+            const err = new Error(
+                'lemma.id data is missing on this device. Add this device from your other device, or recover if you lost it.',
+            );
+            err.code = 'wallet_secret_missing_requires_recovery';
+            err.linkUrl = 'https://lemma.id/link';
+            throw err;
         } else {
             console.log('[Lemma] Using existing wallet secret (source:', walletSecretRecord.source || 'stored', ')');
         }

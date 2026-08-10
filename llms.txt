@@ -2,10 +2,11 @@
 
 lemma.id is a **local-first proof layer** for relying sites: verify a signed
 presentation on your backend and get a site-private, stable `ppid` + assurance
-level. Use it for **person continuity under abuse** — one handle per human per
+level. Use it for **person continuity under abuse**: one handle per human per
 site, optional **isHuman** step-up (one verified human per account on the same
 PPID), action stamps, and site-block so bans survive new accounts. Users mint
-presentations with a passkey; passkey unlock is the free pipe, not the product.
+presentations with a passkey. Passkey continuity is free and is not Sybil
+resistance by itself; require `ishuman` (IDV) when one human per account matters.
 
 Keep your existing login if you want; gate sensitive actions with lemma proofs.
 
@@ -40,7 +41,7 @@ await fetch('/api/claim-trial', {
 ```
 
 Backend: verify the presentation locally with `@lemma.id/proof-verifier` or
-`lemma_proof_verifier.py` — no per-request call to lemma.id. Enforce policy on
+`lemma_proof_verifier.py`. No per-request call to lemma.id. Enforce policy on
 `result.ppid` and `result.assurance`; optionally call site-block APIs.
 
 ## Mint a presentation (browser UX)
@@ -61,8 +62,8 @@ Drop-in button (same SDK; use on gated actions or optional login):
 
 ## Assurance ladder (same PPID)
 
-- `passkey` — continuity proof (daily unlock)
-- `ishuman` — IDV-backed one human per account (Sybil-sensitive actions: trials,
+- `passkey`: continuity proof (daily unlock). Not Sybil-resistant alone.
+- `ishuman`: IDV-backed one human per account (Sybil-sensitive actions: trials,
   tickets, payouts, post-ban recovery)
 
 Request per action on client and backend; PPID does not change when upgrading tiers.

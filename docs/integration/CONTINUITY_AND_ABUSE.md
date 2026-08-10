@@ -3,7 +3,7 @@
 lemma.id gives your backend a **verified, site-private `ppid` and assurance
 level** so you can enforce one-human policy, stamp sensitive actions, and block
 abusers so bans survive new accounts. Users mint presentations with a passkey;
-you verify locally. **Keep your existing login** if you want — use lemma on gated
+you verify locally. **Keep your existing login** if you want. Use lemma on gated
 actions only.
 
 Canonical contract: [ISHUMAN Agent Integration Guide](ISHUMAN_AGENT_INTEGRATION.md)
@@ -20,7 +20,9 @@ Canonical contract: [ISHUMAN Agent Integration Guide](ISHUMAN_AGENT_INTEGRATION.
 | **Action stamp** | Bind a mutation to PPID + assurance + nonce/time (T2+) |
 | **Site-block** | Persistent ban keyed to PPID (survives browser clears) |
 
-Passkey unlock mints presentations — it is the free pipe, not the product you sell.
+Passkey unlock mints presentations. That tier is free and is not Sybil resistance
+by itself. Anyone can create another lemma.id. For one human per account, require
+`ishuman` (document + liveness) on the actions that promise it.
 
 ---
 
@@ -33,7 +35,7 @@ Use lemma when you need **person continuity under abuse**:
 - Fraud-sensitive mutations with auditable proof
 - Pairwise-private account keys (no email from lemma, no cross-site correlation by RPs)
 
-Do **not** need lemma for every page view. Gate specific actions; verify once per
+You do **not** need lemma for every page view. Gate specific actions. Verify once per
 action or per session policy.
 
 ---
@@ -67,10 +69,10 @@ Request `requiredAssurance` on **both** client and backend. PPID does not change
 
 ## Integration pattern
 
-1. **Identify gated actions** — claim, checkout, post, vote, payout, etc.
-2. **Set `siteId`** — canonical hostname (`app.example.com`), not internal `site_...` ids.
+1. **Identify gated actions:** claim, checkout, post, vote, payout, etc.
+2. **Set `siteId`:** canonical hostname (`app.example.com`), not internal `site_...` ids.
 3. **Client:** `verifyForBackend({ autoProvision: true, requiredAssurance: 'ishuman' })` from a user gesture.
-4. **Server:** verify presentation with `@lemma.id/proof-verifier` or `lemma_proof_verifier.py` — **no per-request call to lemma.id**.
+4. **Server:** verify presentation with `@lemma.id/proof-verifier` or `lemma_proof_verifier.py`. No per-request call to lemma.id.
 5. **Enforce:** policy on `result.ppid` + `result.assurance`; optional `stampAction` for mutations.
 6. **Optional:** `POST /api/ishuman/site-block` when bans must persist across IDV/recovery.
 
@@ -82,8 +84,8 @@ Fail closed when verification fails. Never trust a bare client `ppid`.
 
 Do **not** rely on the abuser's browser to enforce bans.
 
-1. **Immediate deny** — 403 in your app.
-2. **Site block (canonical)** — server-side, with API key:
+1. **Immediate deny:** 403 in your app.
+2. **Site block (canonical):** server-side, with API key:
 
 ```bash
 curl -X POST https://lemma.id/api/ishuman/site-block \
@@ -117,8 +119,8 @@ const event = await verifier.stampAction(payload, {
 // Send event to your backend; verify with verifyActionStamp() + nonce store
 ```
 
-Stamps prove possession of the site signing key over canonical action fields —
-use alongside presentation verify, not instead of it.
+Stamps prove possession of the site signing key over canonical action fields.
+Use them alongside presentation verify, not instead of it.
 
 ---
 
@@ -138,7 +140,7 @@ See [Presale demo script](../demo/PRESALE_DEMO_SCRIPT.md).
 If you want passwordless login, verify the same presentation and issue your own
 HttpOnly session cookie keyed by `ppid`. See
 [Quick start](QUICK_START_SIMPLE_LOGIN.md) and
-[Integration guide — sessions appendix](SIMPLE_INTEGRATION_GUIDE.md#4-session-layer-your-responsibility).
+[Integration guide (sessions appendix)](SIMPLE_INTEGRATION_GUIDE.md#4-session-layer-your-responsibility).
 
 ---
 
@@ -146,7 +148,7 @@ HttpOnly session cookie keyed by `ppid`. See
 
 | Doc | Purpose |
 |-----|---------|
-| [Quick start: verify a lemma proof](QUICK_START_SIMPLE_LOGIN.md) | Gate an action end-to-end |
+| [Quick start: verify a lemma proof](QUICK_START_SIMPLE_LOGIN.md) | Gate an action end to end |
 | [Integration guide](SIMPLE_INTEGRATION_GUIDE.md) | Assurance, stamps, abuse, sessions |
 | [Trust & availability](SIGN_IN_TRUST_AND_RECOVERY.md) | Recovery, outage, honest limits |
 | [Assurance tiers + input burn](../product/PASSKEY_STAMP_INPUT_BURN.md) | One PPID, site-local burn policy |

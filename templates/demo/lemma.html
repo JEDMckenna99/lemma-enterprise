@@ -30,7 +30,7 @@
       <img class="demo-hero-logo" src="/static/img/lemma_logo.svg" alt="lemma.id" width="56" height="56">
       <p class="demo-eyebrow">lemma.id demo</p>
       <h1 class="demo-title">One lemma.id. Enforce one person per site.</h1>
-      <p class="demo-lead" id="ih-intro-lead"><strong>Create</strong> a passkey-protected lemma.id on your device. <strong>Enforce</strong> one-human policy: one code per person, bans that stick, human proof when Sybil matters. <strong>Sign in</strong> on demo sites and get a different private ID on each hostname — sites can't link them. Proofs stay on your device; sites verify offline.</p>
+      <p class="demo-lead" id="ih-intro-lead"><strong>Create</strong> a passkey-protected lemma.id on your device. <strong>Enforce</strong> one-human policy: one code per person, bans that stick, human proof when Sybil matters. <strong>Sign in</strong> on demo sites and get a different private ID on each hostname. Sites can't link them. Proofs stay on your device; sites verify offline.</p>
       <div class="demo-hero-cta">
         <button class="demo-btn demo-btn-primary" id="ih-get-started" type="button">Get started</button>
         <a class="demo-btn demo-btn-secondary demo-btn-outline" href="/developer">View developer docs</a>
@@ -145,12 +145,12 @@
   <section class="demo-try-lane" id="ih-try-lane" hidden>
     <div class="demo-try-card">
       <h2>Operate the full flow on this page</h2>
-      <p class="demo-muted">Create a lemma.id, sign in to the two demo sites from here, then Enforce — without leaving this hub. Live third-party sites stay optional.</p>
+      <p class="demo-muted">Create a lemma.id, sign in to the two demo sites from here, then Enforce without leaving this hub. Live third-party sites stay optional.</p>
       <ol class="demo-try-steps">
         <li>Create your passkey-protected lemma.id</li>
         <li>Sign in on Presale and SaaS trial (popups return here)</li>
         <li>Compare the two private IDs</li>
-        <li>Doubt, ban, or require human proof — site-scoped</li>
+        <li>Doubt, ban, or require human proof (site-scoped)</li>
         <li>Optional: open a live demo site in another tab</li>
       </ol>
       <button type="button" class="demo-btn demo-btn-primary" id="ih-try-lane-start">Start on this hub →</button>
@@ -190,11 +190,11 @@
       </div>
       <div class="demo-lifecycle-item">
         <span class="result-label">Ticketing PPID</span>
-        <span class="demo-lifecycle-value" id="ih-lifecycle-tickets-ppid">—</span>
+        <span class="demo-lifecycle-value" id="ih-lifecycle-tickets-ppid">-</span>
       </div>
       <div class="demo-lifecycle-item">
         <span class="result-label">Trials PPID</span>
-        <span class="demo-lifecycle-value" id="ih-lifecycle-trials-ppid">—</span>
+        <span class="demo-lifecycle-value" id="ih-lifecycle-trials-ppid">-</span>
       </div>
       <div class="demo-lifecycle-item">
         <span class="result-label">Ticketing policy</span>
@@ -202,11 +202,11 @@
       </div>
       <div class="demo-lifecycle-item">
         <span class="result-label">Ticketing verdict</span>
-        <span class="demo-lifecycle-value" id="ih-lifecycle-tickets-verdict">—</span>
+        <span class="demo-lifecycle-value" id="ih-lifecycle-tickets-verdict">-</span>
       </div>
       <div class="demo-lifecycle-item">
         <span class="result-label">Trials verdict</span>
-        <span class="demo-lifecycle-value" id="ih-lifecycle-trials-verdict">—</span>
+        <span class="demo-lifecycle-value" id="ih-lifecycle-trials-verdict">-</span>
       </div>
     </div>
   </aside>
@@ -320,15 +320,15 @@
             </div>
             <div class="site-card-field assurance-only is-withheld">
               <span class="result-label">Proof level</span>
-              <span class="result-value" id="ih-tickets-assurance">—</span>
+              <span class="result-value" id="ih-tickets-assurance">-</span>
             </div>
             <div class="site-card-field is-withheld">
               <span class="result-label">Status</span>
-              <span class="result-value" id="ih-tickets-reason">—</span>
+              <span class="result-value" id="ih-tickets-reason">-</span>
             </div>
             <div class="site-card-field is-withheld">
               <span class="result-label">Latency</span>
-              <span class="result-value" id="ih-tickets-latency">—</span>
+              <span class="result-value" id="ih-tickets-latency">-</span>
             </div>
             <div class="site-card-actions">
               <button class="demo-btn demo-btn-secondary demo-btn-quiet demo-site-verify-btn" id="ih-verify-tickets-step2" type="button">Sign in</button>
@@ -354,15 +354,15 @@
             </div>
             <div class="site-card-field assurance-only is-withheld">
               <span class="result-label">Proof level</span>
-              <span class="result-value" id="ih-trials-assurance">—</span>
+              <span class="result-value" id="ih-trials-assurance">-</span>
             </div>
             <div class="site-card-field is-withheld">
               <span class="result-label">Status</span>
-              <span class="result-value" id="ih-trials-reason">—</span>
+              <span class="result-value" id="ih-trials-reason">-</span>
             </div>
             <div class="site-card-field is-withheld">
               <span class="result-label">Latency</span>
-              <span class="result-value" id="ih-trials-latency">—</span>
+              <span class="result-value" id="ih-trials-latency">-</span>
             </div>
             <div class="site-card-actions">
               <button class="demo-btn demo-btn-secondary demo-btn-quiet demo-site-verify-btn" id="ih-verify-trials-step2" type="button">Sign in</button>
@@ -373,16 +373,16 @@
 
           <div class="ppid-compare ppid-compare-privacy" id="ih-ppid-compare-panel">
             <p class="ppid-compare-title">These sites can't compare notes about you.</p>
-            <p class="demo-muted ppid-compare-desc" id="ih-ppid-compare-desc">Same lemma.id signed in on both demos — each site sees a different private ID.</p>
+            <p class="demo-muted ppid-compare-desc" id="ih-ppid-compare-desc">Same lemma.id signed in on both demos. Each site sees a different private ID.</p>
             <div class="ppid-compare-grid">
               <div class="ppid-slot ppid-badge ppid-badge-tickets">
                 <span class="result-label">Tickets sees</span>
-                <span class="ppid-val" id="ih-tickets-ppid-compare">—</span>
+                <span class="ppid-val" id="ih-tickets-ppid-compare">-</span>
               </div>
               <div class="ppid-diff" id="ih-ppid-diff">Sign in on both sites</div>
               <div class="ppid-slot ppid-badge ppid-badge-trials">
                 <span class="result-label">Trials sees</span>
-                <span class="ppid-val" id="ih-trials-ppid-compare">—</span>
+                <span class="ppid-val" id="ih-trials-ppid-compare">-</span>
               </div>
             </div>
           </div>
@@ -429,7 +429,7 @@
         <div class="workflow-head">
           <div>
             <h2 id="ih-block-step-title">Enforce</h2>
-            <p class="demo-muted demo-hat-switch"><strong>Put on the site-owner hat.</strong> Each site decides — require human proof, doubt for a fresh check, or ban. Action on presale does not affect SaaS trial.</p>
+            <p class="demo-muted demo-hat-switch"><strong>Put on the site-owner hat.</strong> Each site decides: require human proof, doubt for a fresh check, or ban. Action on presale does not affect SaaS trial.</p>
           </div>
         </div>
 
@@ -437,7 +437,7 @@
           <article class="enforce-row" id="ih-enforce-row-tickets" data-site="tickets">
             <div class="enforce-row-main">
               <span class="enforce-row-label">Presale</span>
-              <code class="enforce-row-ppid" id="ih-enforce-tickets-ppid">—</code>
+              <code class="enforce-row-ppid" id="ih-enforce-tickets-ppid">-</code>
               <span class="demo-pill enforce-row-status" id="ih-enforce-tickets-status">Not verified</span>
             </div>
             <div class="enforce-row-actions">
@@ -449,7 +449,7 @@
           <article class="enforce-row" id="ih-enforce-row-trials" data-site="trials">
             <div class="enforce-row-main">
               <span class="enforce-row-label">SaaS trial</span>
-              <code class="enforce-row-ppid" id="ih-enforce-trials-ppid">—</code>
+              <code class="enforce-row-ppid" id="ih-enforce-trials-ppid">-</code>
               <span class="demo-pill enforce-row-status" id="ih-enforce-trials-status">Not verified</span>
             </div>
             <div class="enforce-row-actions">
@@ -555,7 +555,7 @@
       </article>
       <article>
         <h3>For site operators</h3>
-        <p class="demo-muted">Require human proof, doubt a user, or ban — scoped per site.</p>
+        <p class="demo-muted">Require human proof, doubt a user, or ban, scoped per site.</p>
         <button type="button" class="demo-btn demo-btn-secondary" id="ih-end-enforce-link">Open Enforce chapter</button>
       </article>
       <article>
@@ -704,7 +704,7 @@ const { ok, ppid, assurance, presentation } = await new ProofVerifier({
   requiredAssurance: 'passkey',
 }).verifyForBackend({ requiredAssurance: 'passkey' });
 // Human proof step-up: requiredAssurance: 'ishuman', same ppid, assurance: ishuman</div>
-        <p class="demo-muted" id="ih-integration-latency">Last verify: —</p>
+        <p class="demo-muted" id="ih-integration-latency">Last verify: -</p>
       </section>
 
       <section class="demo-advanced-section">
@@ -721,7 +721,7 @@ const { ok, ppid, assurance, presentation } = await new ProofVerifier({
           <button class="demo-btn demo-btn-danger" id="ih-force-reverify-btn" type="button">Force fresh verification</button>
         </div>
         <div class="dev-detail-row">
-          <span class="result-label">Server enforcement</span><span class="result-value" id="ih-abuse-derive">—</span>
+          <span class="result-label">Server enforcement</span><span class="result-value" id="ih-abuse-derive">-</span>
         </div>
         <div class="code-block" id="ih-master-json">{}</div>
         <div class="demo-log" id="ih-log"></div>

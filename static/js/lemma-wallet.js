@@ -258,6 +258,14 @@ class LemmaWallet {
             error: error.message || error.error,
         });
     }
+
+    static isIdentityForkGuardError(error) {
+        if (!error) return false;
+        const code = String(error.code || '').trim();
+        return code === 'existing_passkey_needs_device_link'
+            || code === 'confirm_new_identity_required'
+            || code === 'wallet_secret_missing_requires_recovery';
+    }
     
     constructor(options = {}) {
         this.db = null;
@@ -1958,6 +1966,78 @@ class LemmaWallet {
     // ========================================
 
     /**
+     * Discover whether a resident lemma.id passkey exists in the platform
+     * authenticator (e.g. synced via iCloud/Google) without local IndexedDB state.
+     */
+    async probeExistingResidentPasskey() {
+        if (typeof window === 'undefined' || !window.PublicKeyCredential) {
+            return { found: false, unsupported: true };
+        }
+        if (!this._isPasskeySupported()) {
+            return { found: false, unsupported: true };
+        }
+        try {
+            const rpId = this._getRpIdForWebAuthn();
+            const challenge = crypto.getRandomValues(new Uint8Array(32));
+            const credential = await navigator.credentials.get({
+                publicKey: {
+                    challenge,
+                    rpId,
+                    allowCredentials: [],
+                    userVerification: 'required',
+                    timeout: 60000,
+                },
+                mediation: 'optional',
+            });
+            if (credential?.rawId) {
+                return {
+                    found: true,
+                    credentialId: this._bufferToBase64url(credential.rawId),
+                };
+            }
+            return { found: false };
+        } catch (e) {
+            if (e?.name === 'NotAllowedError') {
+                return { found: false, cancelled: true };
+            }
+            console.warn('[Lemma] Resident passkey probe failed:', e?.message || e);
+            return { found: false, probeError: e?.message || String(e) };
+        }
+    }
+
+    /**
+     * Fail closed before minting a new lemma.id identity on an empty browser.
+     * Passkey vault sync moves the WebAuthn credential only — not IndexedDB contents.
+     */
+    async _assertNewIdentityCreationAllowed(options = {}) {
+        if (options.allowCreateAlongsideExisting) {
+            return;
+        }
+
+        const probe = await this.probeExistingResidentPasskey();
+        if (probe.found) {
+            const err = new Error(
+                'This device has a lemma.id passkey but not your lemma.id data. Add this device from your other device, or recover if you lost it.',
+            );
+            err.code = 'existing_passkey_needs_device_link';
+            err.linkUrl = 'https://lemma.id/link';
+            if (probe.credentialId) {
+                err.credentialId = probe.credentialId;
+            }
+            throw err;
+        }
+
+        if (!options.confirmNewIdentity) {
+            const err = new Error(
+                'Confirm that you want a new lemma.id on this device, or add this device from your other device.',
+            );
+            err.code = 'confirm_new_identity_required';
+            err.linkUrl = 'https://lemma.id/link';
+            throw err;
+        }
+    }
+
+    /**
      * Register a passkey for local wallet unlock
      * This stores the public key locally for future verification
      * 
@@ -2067,13 +2147,19 @@ class LemmaWallet {
             console.log('[Lemma] Existing passkey found - authenticating instead of creating new');
             return await this.unlock(options);
         }
+
+        const storedIdentity = await this._resolveStoredWalletIdentity();
+        const hasTransferredSecret = !!(storedIdentity?.walletId && storedIdentity?.walletSecret);
+        const hasPendingLinkSecret = !!(this.session?.walletSecret);
+        if (!hasTransferredSecret && !hasPendingLinkSecret) {
+            await this._assertNewIdentityCreationAllowed(options);
+        }
         
         // Reuse only a complete linked/handoff identity. A wallet_id left behind
         // without its wallet_secret is an orphan from an interrupted/legacy
         // clear; pairing a new secret with that old id causes a signing-key
         // conflict and must never be attempted.
         let walletId = await this._get('passkey', 'walletId');
-        const storedIdentity = await this._resolveStoredWalletIdentity();
         if (storedIdentity?.walletId && storedIdentity?.walletSecret) {
             walletId = { id: 'walletId', value: storedIdentity.walletId };
             await this._put('passkey', walletId);
@@ -2198,6 +2284,14 @@ class LemmaWallet {
         
         // Only generate new secret if NONE found anywhere
         if (!walletSecret?.secret) {
+            if (!options.allowCreateAlongsideExisting && !options.confirmNewIdentity) {
+                const err = new Error(
+                    'Confirm that you want a new lemma.id on this device, or add this device from your other device.',
+                );
+                err.code = 'confirm_new_identity_required';
+                err.linkUrl = 'https://lemma.id/link';
+                throw err;
+            }
             console.warn('[Lemma] No existing wallet secret found - generating new one');
             console.warn('[Lemma] This should NOT happen if device was linked!');
             
@@ -2307,37 +2401,70 @@ class LemmaWallet {
     }
 
     static friendlyDeviceLabel(raw = '', { fallback = 'Browser' } = {}) {
-        const source = String(raw || (typeof navigator !== 'undefined' ? navigator.userAgent : '') || '').trim();
+        const ua = String((typeof navigator !== 'undefined' ? navigator.userAgent : '') || '').trim();
+        const source = String(raw || ua || '').trim();
         if (!source) return fallback;
-        if (/iPhone/i.test(source)) return 'iPhone';
-        if (/iPad/i.test(source)) return 'iPad';
-        if (/Android/i.test(source)) return 'Android';
-        const browser =
-            /Edg\//i.test(source) ? 'Edge'
-                : /Chrome\//i.test(source) && !/Chromium/i.test(source) ? 'Chrome'
-                    : /Firefox\//i.test(source) ? 'Firefox'
-                        : /Safari\//i.test(source) && !/Chrome|Chromium|Edg/i.test(source) ? 'Safari'
-                            : null;
-        const os =
-            /Windows/i.test(source) ? 'Windows'
-                : /Mac OS X|Macintosh/i.test(source) ? 'macOS'
-                    : /Linux/i.test(source) ? 'Linux'
-                        : null;
-        if (browser && os) return `${browser} on ${os}`;
-        if (browser) return browser;
-        if (os) return os;
-        // Already a short human label (not a full UA).
-        if (source.length <= 48 && !/\(.*\)/.test(source)) return source;
-        return fallback;
+
+        const parseBrowserPlatform = (text) => {
+            const browser =
+                /Edg\//i.test(text) ? 'Edge'
+                    : /CriOS/i.test(text) ? 'Chrome'
+                        : /FxiOS/i.test(text) ? 'Firefox'
+                            : /Chrome\//i.test(text) && !/Chromium/i.test(text) ? 'Chrome'
+                                : /Firefox\//i.test(text) ? 'Firefox'
+                                    : /Safari\//i.test(text) && !/Chrome|Chromium|Edg|CriOS/i.test(text) ? 'Safari'
+                                        : null;
+            // Phone/tablet first — these are the device the user recognizes.
+            if (/iPhone/i.test(text)) return browser ? `${browser} on iPhone` : 'iPhone';
+            if (/iPad/i.test(text)) return browser ? `${browser} on iPad` : 'iPad';
+            if (/Android/i.test(text)) return browser ? `${browser} on Android` : 'Android';
+            const os =
+                /Windows/i.test(text) ? 'Windows'
+                    : /Mac OS X|Macintosh/i.test(text) ? 'macOS'
+                        : /CrOS/i.test(text) ? 'ChromeOS'
+                            : /Linux/i.test(text) ? 'Linux'
+                                : null;
+            if (browser && os) return `${browser} on ${os}`;
+            if (browser) return browser;
+            if (os) return os;
+            return null;
+        };
+
+        const parsed = parseBrowserPlatform(source);
+        if (parsed) return parsed;
+        // Already a short human label (not a full UA), e.g. a future custom name.
+        if (source.length <= 48 && !/\(.*\)/.test(source) && source !== ua) return source;
+        return parseBrowserPlatform(ua) || fallback;
+    }
+
+    /** Live browser/device label for this profile (never reuse a stale OS-only name). */
+    static currentDeviceLabel({ fallback = 'Browser' } = {}) {
+        return this.friendlyDeviceLabel(
+            (typeof navigator !== 'undefined' ? navigator.userAgent : '') || '',
+            { fallback },
+        );
     }
 
     async _getStoredDeviceName() {
+        const live = this.constructor.currentDeviceLabel();
+        await this._persistLocalDeviceLabel(live).catch(() => {});
+        return live;
+    }
+
+    async _persistLocalDeviceLabel(deviceName) {
+        const label = String(deviceName || '').trim();
+        if (!label) return;
         let record = await this._getRaw('secrets', 'device_meta').catch(() => null);
         if (!record) {
             record = await this._get('secrets', 'device_meta').catch(() => null);
         }
-        const stored = String(record?.deviceName || '').trim();
-        return this.constructor.friendlyDeviceLabel(stored);
+        if (!record?.deviceId) return;
+        if (String(record.deviceName || '').trim() === label) return;
+        await this._putRaw('secrets', {
+            ...record,
+            id: 'device_meta',
+            deviceName: label,
+        });
     }
 
     async _getOrCreateDeviceId() {
@@ -2346,14 +2473,24 @@ class LemmaWallet {
         if (!record) {
             record = await this._get('secrets', 'device_meta').catch(() => null);
         }
-        if (record?.deviceId) return record.deviceId;
+        const liveLabel = this.constructor.currentDeviceLabel();
+        if (record?.deviceId) {
+            if (String(record.deviceName || '').trim() !== liveLabel) {
+                await this._putRaw('secrets', {
+                    ...record,
+                    id: 'device_meta',
+                    deviceName: liveLabel,
+                }).catch(() => {});
+            }
+            return record.deviceId;
+        }
         const keys = this._getLemmaKeys();
         const idBytes = crypto.getRandomValues(new Uint8Array(16));
         const deviceId = 'dev_' + keys.base64urlEncode(idBytes);
         await this._putRaw('secrets', {
             id: 'device_meta',
             deviceId,
-            deviceName: this.constructor.friendlyDeviceLabel(),
+            deviceName: liveLabel,
             createdAt: Date.now(),
         });
         return deviceId;
@@ -2815,11 +2952,13 @@ class LemmaWallet {
                 }
             }
         }
+        const deviceLabel = await this._getStoredDeviceName().catch(() => this.constructor.currentDeviceLabel());
         const completeBody = {
             challenge_key: begin.challenge_key,
             credential: this._serializeCredential(credential),
             profile_id: activeProfile?.id || DEFAULT_PROFILE_ID,
             profile_name: activeProfile?.name || 'Personal',
+            device_name: deviceLabel || null,
         };
         if (begin.bootstrap_required) {
             if (!passkeyRecord?.publicKey) {
@@ -2949,15 +3088,23 @@ class LemmaWallet {
             this._throwWalletApiError(data, `list devices failed (${response.status})`);
         }
         const devices = Array.isArray(data.devices) ? data.devices : [];
+        const liveLabel = this.constructor.currentDeviceLabel({ fallback: 'Device' });
         return {
-            devices: devices.map((device) => ({
-                ...device,
-                label: this.constructor.friendlyDeviceLabel(
-                    device.device_name || '',
-                    { fallback: 'Device' },
-                ),
-                is_current: !!(device.is_current || device.device_id === deviceId),
-            })),
+            devices: devices.map((device) => {
+                const isCurrent = !!(device.is_current || device.device_id === deviceId);
+                return {
+                    ...device,
+                    // Current browser always uses a live UA label; others use what
+                    // that enrollment last reported (refreshed on its own unlock).
+                    label: isCurrent
+                        ? liveLabel
+                        : this.constructor.friendlyDeviceLabel(
+                            device.device_name || '',
+                            { fallback: 'Device' },
+                        ),
+                    is_current: isCurrent,
+                };
+            }),
             currentDeviceId: deviceId,
             activeCount: Number(data.active_count || 0),
         };
@@ -5247,19 +5394,12 @@ class LemmaWallet {
             }
         }
         if (!walletSecretRecord?.secret) {
-            console.warn('[Lemma] No wallet secret found - generating new one');
-            const secretBytes = crypto.getRandomValues(new Uint8Array(32));
-            const secretHex = Array.from(secretBytes)
-                .map(b => b.toString(16).padStart(2, '0'))
-                .join('');
-            walletSecretRecord = {
-                id: 'master',
-                secret: secretHex,
-                createdAt: Date.now(),
-                source: 'generated_legacy'
-            };
-            await this._put('secrets', walletSecretRecord);
-            console.log(' Generated wallet secret for legacy wallet');
+            const err = new Error(
+                'lemma.id data is missing on this device. Add this device from your other device, or recover if you lost it.',
+            );
+            err.code = 'wallet_secret_missing_requires_recovery';
+            err.linkUrl = 'https://lemma.id/link';
+            throw err;
         } else {
             console.log('[Lemma] Using existing wallet secret (source:', walletSecretRecord.source || 'stored', ')');
         }

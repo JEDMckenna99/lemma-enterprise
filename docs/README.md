@@ -14,7 +14,7 @@ Served without auth per `api/public_docs.py`:
 
 | URL | Source file | Description |
 |-----|-------------|-------------|
-| [integration/CONTINUITY_AND_ABUSE.md](https://lemma.id/docs/integration/CONTINUITY_AND_ABUSE.md) | `integration/CONTINUITY_AND_ABUSE.md` | Continuity, assurance, site-block, stamps — start here |
+| [integration/CONTINUITY_AND_ABUSE.md](https://lemma.id/docs/integration/CONTINUITY_AND_ABUSE.md) | `integration/CONTINUITY_AND_ABUSE.md` | Continuity, assurance, site-block, stamps: start here |
 | [integration/QUICK_START_SIMPLE_LOGIN.md](https://lemma.id/docs/integration/QUICK_START_SIMPLE_LOGIN.md) | `integration/QUICK_START_SIMPLE_LOGIN.md` | Quick start: verify a lemma proof / gate an action |
 | [integration/SIMPLE_INTEGRATION_GUIDE.md](https://lemma.id/docs/integration/SIMPLE_INTEGRATION_GUIDE.md) | `integration/SIMPLE_INTEGRATION_GUIDE.md` | Full guide: assurance, stamps, abuse, optional sessions |
 | [integration/SIGN_IN_TRUST_AND_RECOVERY.md](https://lemma.id/docs/integration/SIGN_IN_TRUST_AND_RECOVERY.md) | `integration/SIGN_IN_TRUST_AND_RECOVERY.md` | Trust, recovery, availability for the proof dependency |
@@ -56,8 +56,8 @@ Issue your own session cookie from a verified presentation if you want passwordl
 
 | Document | Description |
 |----------|-------------|
-| [Integration guide — sessions appendix](integration/SIMPLE_INTEGRATION_GUIDE.md) | Session cookies, account linking, sign-out |
-| [Quick start — mint a presentation](integration/QUICK_START_SIMPLE_LOGIN.md) | `<lemma-signin>` drop-in for presentation mint |
+| [Integration guide: sessions appendix](integration/SIMPLE_INTEGRATION_GUIDE.md) | Session cookies, account linking, sign-out |
+| [Quick start: mint a presentation](integration/QUICK_START_SIMPLE_LOGIN.md) | `<lemma-signin>` drop-in for presentation mint |
 
 ## 4. Reference
 

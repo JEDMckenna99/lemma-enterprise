@@ -29,7 +29,7 @@ lemma.id is not in the hot path after trust-list refresh. Your server verifies s
 
 ## 1. Embed the SDK
 
-**Recommended — drop-in button (mint a presentation):**
+**Recommended: drop-in button (mint a presentation)**
 
 ```html
 <script src="https://lemma.id/sdk/proof-verifier.js"></script>
@@ -39,7 +39,7 @@ lemma.id is not in the hot path after trust-list refresh. Your server verifies s
 
 Listen for `lemma-signin-success` / `lemma-signin-error` events (see [Quick start](QUICK_START_SIMPLE_LOGIN.md)).
 
-**Advanced — SDK only:**
+**Advanced: SDK only:**
 
 ```html
 <script src="https://lemma.id/sdk/proof-verifier.js"></script>
@@ -62,7 +62,7 @@ const { ok, presentation, ppid, assurance, reason } = await verifier.verifyForBa
 });
 
 if (!ok) {
-  // Fail closed — show retry UI
+  // Fail closed: show retry UI
   console.error(reason);
   return;
 }
@@ -142,7 +142,7 @@ Use for signup bonuses, trials, tickets, payouts, or one-human-per-account polic
 
 ---
 
-## 7. Session layer (optional — your responsibility)
+## 7. Session layer (optional: your responsibility)
 
 Lemma does not issue relying-site session cookies. If you want passwordless login,
 after verification:
@@ -170,7 +170,9 @@ See runnable examples under [`examples/`](../../examples/).
 
 ## 9. Recovery policy
 
-- **Passkey continuity:** best-effort across synced passkeys; encourage second device at [lemma.id/link](https://lemma.id/link).
+- **Passkey continuity:** passkey vault sync does **not** sync lemma.id contents.
+  Same-person cross-device continuity requires [lemma.id/link](https://lemma.id/link)
+  (or isHuman / site-side recovery). Encourage second device for everyone.
 - **isHuman step-up:** same PPID, stronger recovery assurances.
 
 Do not promise email/password-style recovery for passkey-only accounts. See [Trust & availability](SIGN_IN_TRUST_AND_RECOVERY.md).
@@ -179,7 +181,7 @@ Do not promise email/password-style recovery for passkey-only accounts. See [Tru
 
 ## 10. Profile data (you own it)
 
-lemma.id returns **`ppid`** and **`assurance`** — not email, name, or avatar. Collect profile fields in your app and key them to the verified `ppid`.
+lemma.id returns **`ppid`** and **`assurance`**: not email, name, or avatar. Collect profile fields in your app and key them to the verified `ppid`.
 
 ---
 
@@ -219,11 +221,11 @@ Document both for support: logging out of your site does not delete the user's l
 
 | Expectation | Reality | Alternative |
 |-------------|---------|-------------|
-| User management dashboard | No — privacy by design | Your DB is the user list; key rows by `ppid` |
-| Webhooks on login/revoke | No — hard product rule | Poll bloom snapshot / use SDK `checkStatus()` for revocation |
+| User management dashboard | No: privacy by design | Your DB is the user list; key rows by `ppid` |
+| Webhooks on login/revoke | No: hard product rule | Poll bloom snapshot / use SDK `checkStatus()` for revocation |
 | Email/name from lemma.id | No | Collect after verify in your UI |
 | Site registration for basic verify | No | Optional API keys only for abuse APIs |
-| Replace your login stack | No — optional | Gate actions only; keep OAuth/email |
+| Replace your login stack | No: optional | Gate actions only; keep OAuth/email |
 
 ---
 

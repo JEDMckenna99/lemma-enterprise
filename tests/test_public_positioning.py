@@ -118,7 +118,7 @@ def test_docs_split_continuity_first(public_client):
 @pytest.mark.unit
 def test_index_template_ties_rotation_resistance_to_ishuman():
     index = (ROOT / "templates" / "modern" / "index.html").read_text(encoding="utf-8")
-    assert "doesn't stop someone from making another" in index
+    assert "does not stop someone from making another" in index
     assert "anyone can create another lemma.id" in index
 
 

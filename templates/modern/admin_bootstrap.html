@@ -304,7 +304,7 @@ async function runPlatformOwnerBootstrap() {
         setOwnerStatus('Unlock your lemma.id with passkey to continue...', 'locked');
         const unlocked = await ensureWalletUnlocked(wallet);
         if (!unlocked) {
-            setOwnerStatus('lemma.id locked — unlock with passkey to detect your platform owner PPID.', 'locked');
+            setOwnerStatus('lemma.id locked. Unlock with passkey to detect your platform owner PPID.', 'locked');
             document.getElementById('manual-bootstrap-section').style.display = 'block';
             return;
         }

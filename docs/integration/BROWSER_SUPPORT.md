@@ -1,4 +1,4 @@
-# Browser support — lemma.id proof minting
+# Browser support: lemma.id proof minting
 
 Passkey unlock (presentation minting) requires a browser with WebAuthn and (for encrypted local lemma.id storage on lemma.id) PRF support.
 
@@ -18,7 +18,7 @@ PRF extends WebAuthn and is required when the user's local lemma.id encrypts sto
 |----------|-----|
 | Chrome 118+ | Supported |
 | Safari 17+ | Supported |
-| Firefox | Not yet — use supported browsers for first-time lemma.id creation |
+| Firefox | Not yet: use supported browsers for first-time lemma.id creation |
 
 ## SDK stable outcomes
 

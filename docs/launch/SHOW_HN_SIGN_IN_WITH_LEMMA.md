@@ -61,10 +61,12 @@ Recommended: the first. It front-loads the job developers pay for.
 >
 > Honest about the hard parts:
 >
-> - **Recovery.** We don't collect email or phone at the passkey tier. Passkeys sync
->   (iCloud/Google), users can add a second device, and you hold the `ppid` for
->   site-side recovery. A **single-device, non-synced** passkey that's lost is not
->   guaranteed recoverable — we say so in the docs and in the UI.
+> - **Recovery.** We don't collect email or phone at the passkey tier. Passkey vault
+>   sync (iCloud/Google) moves the unlock key only — not lemma.id contents. Users
+>   add a second device via `/link` for same-person continuity; you hold the `ppid`
+>   for site-side recovery. A **single-device, passkey-only** lemma.id that's lost
+>   without `/link` or isHuman is not guaranteed recoverable — we say so in the docs
+>   and in the UI.
 > - **If lemma.id is down:** local verification and your sessions keep working, but
 >   *new presentation mints* are blocked because the popup needs us online. Pin/vendor
 >   the verifier and you're insulated from everything except new proof creation.
@@ -113,9 +115,11 @@ button for one app and don't care about abuse continuity, plain WebAuthn may be 
 
 ### "Passkeys mean my users will lose their accounts."
 
-Passkeys sync in the common case. The wrinkle is we don't hold email for reset at
-the passkey tier. Mitigations: sync, second device, site-side recovery keyed to
-`ppid`, and isHuman for identity-backed recovery (same PPID).
+Passkey vault sync may restore the WebAuthn credential on a new device, but it
+does not sync lemma.id contents — empty-browser create without `/link` can mint a
+different person. We don't hold email for reset at the passkey tier. Mitigations:
+second device via `/link`, site-side recovery keyed to `ppid`, and isHuman for
+identity-backed recovery (same PPID).
 
 ### "Do you see my users / can you track them across sites?"
 

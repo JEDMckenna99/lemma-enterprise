@@ -195,3 +195,44 @@ def test_register_passkey_requires_prf_before_secrets(wallet_js):
     assert "if (!prfBound)" in body
     assert "throw new Error('prf_required_for_encrypted_storage')" in body
     assert body.index("await this._migratePlaintextStores();") < body.index("_put('secrets'")
+
+
+@pytest.mark.unit
+def test_identity_fork_guard_exports(wallet_js):
+    assert "static isIdentityForkGuardError(error)" in wallet_js
+    assert "async probeExistingResidentPasskey(" in wallet_js
+    assert "async _assertNewIdentityCreationAllowed(" in wallet_js
+    assert "existing_passkey_needs_device_link" in wallet_js
+    assert "confirm_new_identity_required" in wallet_js
+    assert "wallet_secret_missing_requires_recovery" in wallet_js
+    assert "allowCreateAlongsideExisting" in wallet_js
+
+
+@pytest.mark.unit
+def test_register_passkey_blocks_silent_fork_before_wallet_id(wallet_js):
+    body = _method_body(
+        wallet_js,
+        "async registerPasskey(",
+        "\n    async unlock(",
+    )
+    assert "_assertNewIdentityCreationAllowed(options)" in body
+    assert body.index("_assertNewIdentityCreationAllowed(options)") < body.index("this._generateId()")
+    assert "source: 'generated'" in body
+    assert "if (!options.allowCreateAlongsideExisting && !options.confirmNewIdentity)" in body
+
+
+@pytest.mark.unit
+def test_unlock_refuses_legacy_secret_mint(wallet_js):
+    body = _method_body(
+        wallet_js,
+        "async unlock(",
+        "\n    // NOTE: On lemma.id, unlock requires server session-unlock after local",
+    )
+    assert "generated_legacy" not in body
+    assert "wallet_secret_missing_requires_recovery" in body
+
+
+@pytest.mark.unit
+def test_device_link_allows_passkey_alongside_existing_resident_key():
+    link_html = (ROOT / "templates" / "wallet_link.html").read_text(encoding="utf-8")
+    assert "allowCreateAlongsideExisting: true" in link_html

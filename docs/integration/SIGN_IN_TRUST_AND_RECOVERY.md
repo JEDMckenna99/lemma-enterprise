@@ -5,12 +5,15 @@ dependency** on their critical path: **What happens if a user loses their
 device? What happens if lemma.id goes down? And is this a crypto/blockchain
 thing?** Short answers first, detail below.
 
-- **Recovery:** passkeys sync across a user's devices (iCloud/Google), users
-  can add a second device at [lemma.id/link](https://lemma.id/link), and your
-  site always owns the account row keyed by `ppid` so you can add your own
-  recovery. Guaranteed account recovery for a **single-device, passkey-only**
-  lemma.id is not promised — see the honest matrix below.
-- **Availability:** the verifier runs **on your backend, offline** — there is no
+- **Recovery:** passkey vault sync (iCloud/Google) may make the **same WebAuthn
+  credential** available on another device, but it does **not** sync lemma.id
+  contents (identity seed, site proofs, isHuman material). Cross-device
+  continuity for the **same person** requires [lemma.id/link](https://lemma.id/link)
+  (or isHuman / site-side recovery keyed to `ppid`). Your site always owns the
+  account row keyed by `ppid` so you can add your own recovery. Guaranteed
+  account recovery for a **single-device, passkey-only** lemma.id is not
+  promised: see the honest matrix below.
+- **Availability:** the verifier runs **on your backend, offline**: there is no
   per-request call to lemma.id, so verification and your own sessions do not
   depend on lemma being up. A lemma.id outage blocks **new presentation mints**
   (the popup), not your active sessions or already-verified policy.
@@ -52,7 +55,7 @@ moment a user signs in, and its failure mode is spelled out below.
 
 | Scenario | Active sessions (already logged in) | New sign-in / re-auth | Your data |
 |----------|-------------------------------------|-----------------------|-----------|
-| lemma.id API/popup **down** | ✅ Unaffected — validated by your own cookie / prior verify | ❌ Blocked while down (popup can't mint a presentation) | ✅ Your `ppid`→account rows are in **your** DB |
+| lemma.id API/popup **down** | ✅ Unaffected: validated by your own cookie / prior verify | ❌ Blocked while down (popup can't mint a presentation) | ✅ Your `ppid`→account rows are in **your** DB |
 | lemma.id **verifier/SDK CDN down** | ✅ Unaffected | ✅ Pin/self-host the verifier (npm/PyPI/vendored) and it keeps working | ✅ Unaffected |
 | Issuer key rotation | ✅ Unaffected | ✅ Trust list carries `previous_keys`; verifiers refresh automatically, no site action | ✅ Unaffected |
 | lemma.id **shuts down permanently** | ✅ Sessions persist until expiry | ⚠️ New logins stop; migrate via a dual-run window to another method | ✅ You keep every `ppid` and all site-scoped state |
@@ -75,23 +78,24 @@ Practical hardening you control:
 ## Recovery: the honest matrix
 
 lemma.id does **not** collect email, phone, or any recovery contact for the
-passkey tier — which is a privacy feature and a recovery constraint. Be honest
+passkey tier: which is a privacy feature and a recovery constraint. Be honest
 with your users about which row they're in.
 
 | Situation | Recovery path | Guarantee |
 |-----------|---------------|-----------|
-| Passkey **synced** (iCloud Keychain / Google Password Manager / synced manager) | New device inherits the passkey automatically | Strong — this is the common case |
-| **Second device added** via [lemma.id/link](https://lemma.id/link) | Sign in / re-link from the other device | Strong — recommended for everyone |
-| **Single device, non-synced** passkey, device lost | Site-side recovery (below) or start over | **Not guaranteed** — state this to users |
-| Needs guaranteed, identity-backed recovery | Step up to **isHuman** (IDV-backed, same `ppid`) | Strong — paid tier |
+| Passkey **synced** (iCloud Keychain / Google Password Manager / synced manager) | Synced credential unlocks on the new device; **lemma.id data must still be transferred** via `/link` (or isHuman recovery) | **Partial:** passkey only; same person requires explicit transfer |
+| **Second device added** via [lemma.id/link](https://lemma.id/link) | Sign in / re-link from the other device | Strong: recommended for everyone |
+| **Single device, non-synced** passkey, device lost | Site-side recovery (below) or start over | **Not guaranteed**: state this to users |
+| Needs guaranteed, identity-backed recovery | Step up to **isHuman** (IDV-backed, same `ppid`) | Strong: paid tier |
 
 ### What the SDK/flow already does
 
 - **Second-device nudge on first sign-in.** After a lemma.id is created, the popup
   shows a one-tap "add a second device" screen linking to `/link`. Encourage
   users to take it; a two-device user is a recoverable user.
-- **Passkey sync is the happy path.** Most users on Apple/Google ecosystems get
-  cross-device continuity for free.
+- **Passkey sync is not lemma.id sync.** Vault sync moves the unlock key only.
+  The manager and popup block silent identity forks on empty browsers and route
+  users to `/link` when a synced passkey exists without local lemma.id data.
 
 ### What you (the site) can add
 
@@ -100,14 +104,14 @@ reintroducing PII to lemma:
 
 - **Require a second device** before treating an account as durable for
   high-value use.
-- **Site-side recovery** on your own terms — e.g. a support-verified re-link, a
-  user-held recovery code you issue, or linking a second login method — all keyed
+- **Site-side recovery** on your own terms: e.g. a support-verified re-link, a
+  user-held recovery code you issue, or linking a second login method: all keyed
   to the `ppid` you already store.
 - **Offer isHuman** for users who want identity-backed recovery; it's the same
   `ppid`, so nothing about their account changes.
 
 > Rule of thumb: treat a **single-device, non-synced passkey** the way you'd
-> treat a user who set a password and refused to give a recovery email — usable,
+> treat a user who set a password and refused to give a recovery email: usable,
 > but tell them plainly to add a second device.
 
 ---
@@ -123,7 +127,7 @@ common misreads:
 - **No biometric database.** The passkey tier uses standard WebAuthn passkeys;
   the biometric (if any) never leaves the user's device and lemma.id never
   receives it. (isHuman IDV is a separate, opt-in, paid step-up.)
-- **No profile data from lemma.** Sign-in returns `ppid` + `assurance` only —
+- **No profile data from lemma.** Sign-in returns `ppid` + `assurance` only  - 
   no email, name, or avatar. You own the profile; lemma owns the proof.
 - **No cross-site tracking by relying sites.** PPIDs are **pairwise**: the id a
   user gets on your site is derived from your hostname and cannot be correlated
@@ -144,12 +148,12 @@ we **do** by policy and what **relying sites** can do.
 
 | Actor | Can correlate a user across sites? |
 |-------|-------------------------------------|
-| **Your site + other relying sites** | No — PPIDs are pairwise; you never receive a global user id |
+| **Your site + other relying sites** | No: PPIDs are pairwise; you never receive a global user id |
 | **lemma.id operator (today)** | Could derive site PPIDs from server-held person roots at issuance; we don't, and there is no cross-site remap API |
 | **lemma.id operator (roadmap)** | Client-side-only derivation from sealed roots; issuance transparency log so forged credentials are detectable |
 
 **What we observe at issuance:** hostname, wallet id, and the target site's
-`ppid` — enough to bind a proof to your site, not enough for relying sites to
+`ppid`: enough to bind a proof to your site, not enough for relying sites to
 link accounts. We do not receive your profile data, and we do not sell or share
 cross-site user lists.
 

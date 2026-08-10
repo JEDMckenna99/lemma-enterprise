@@ -2,7 +2,7 @@
 {% set is_public_page = true %}
 
 {% block title %}lemma.id | One account per verified human{% endblock %}
-{% block description %}Bans that survive account rotation, one trial per human, and audit stamps on verified actions. Verify presentations locally on your backend; free passkey continuity; step up to human proofs where abuse hurts.{% endblock %}
+{% block description %}Bans that survive account rotation, one trial per human, and audit stamps on verified actions. Verify presentations locally on your backend. Passkey continuity is free. Step up to human proofs (IDV) where abuse shows up.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -231,7 +231,7 @@
             </svg>
             <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary-light); margin-bottom: 16px;">lemma.id</p>
             <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 20px;">When you ban someone,<br>they stay banned.</h1>
-            <p class="home-hero-lede">Verify a signed presentation on your backend and enforce on a site-private ID. One human per account on the actions that matter — trials, tickets, payouts, bans that stick. Passkey unlock mints proofs for free.</p>
+            <p class="home-hero-lede">Verify a signed presentation on your backend and enforce on a site-private ID. On trials, tickets, payouts, and bans, require one human per account. Passkey unlock mints proofs for free; Sybil resistance needs a human proof (IDV) on those actions.</p>
             <div class="home-hero-ctas">
                 <a href="/docs" class="btn btn-primary">Add to Your Site</a>
                 <a href="/demo" class="btn btn-secondary">See the Demo</a>
@@ -249,7 +249,7 @@
         </p>
         <div class="home-example">
             <p style="margin: 0 0 10px 0; font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--primary);">What enforcement looks like</p>
-            <p style="margin: 0; font-size: var(--font-size-base); color: var(--gray-700); line-height: 1.65;">A visitor signs in with a passkey and your backend verifies a signed proof carrying a stable account ID that only your site ever sees. On the actions that matter — a ban appeal, a presale claim, a payout — you require a human proof on that same ID. Now the account is backed by one verified person, and coming back after a ban means passing identity verification again, not opening a new inbox.</p>
+            <p style="margin: 0; font-size: var(--font-size-base); color: var(--gray-700); line-height: 1.65;">A visitor unlocks with a passkey and your backend verifies a signed proof. You get a stable account ID that only your site ever sees. On a ban appeal, presale claim, or payout, you require a human proof on that same ID. The account is then backed by one verified person. Coming back after a ban means passing identity verification again, not opening a new inbox.</p>
         </div>
     </div>
 </section>
@@ -260,12 +260,12 @@
         <div class="home-section-head">
             <p class="eyebrow">The assurance ladder</p>
             <h2>Passkey for continuity. Human proof for consequences.</h2>
-            <p class="text-gray">One integration, three strengths of claim. Start free, then turn up assurance per action — same account ID, no migration, nothing about your login changes.</p>
+            <p class="text-gray">One integration, three strengths of claim. Start free, then raise assurance per action. Same account ID, no migration, and your login stack can stay as it is.</p>
         </div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; max-width: 960px; margin: 0 auto;">
             <div class="card">
                 <h3 class="card-title">Passkey continuity · free</h3>
-                <p>Local verify of a signed presentation gives you a stable, site-private account ID. The same person returns as the same ID every time. This is the default pipe — it doesn't stop someone from making another account, since anyone can create another lemma.id.</p>
+                <p>Local verify of a signed presentation gives you a stable, site-private account ID. The same person returns as the same ID every time. This is the default tier. It does not stop someone from making another account, because anyone can create another lemma.id.</p>
             </div>
             <div class="card">
                 <h3 class="card-title">Presence proof</h3>
@@ -307,13 +307,13 @@
     </div>
 </section>
 
-<!-- The free pipe: passkey continuity -->
+<!-- Passkey continuity (included) -->
 <section class="section" id="why-lemma" style="background: var(--gray-100);">
     <div class="container">
         <div class="home-section-head">
-            <p class="eyebrow">The free pipe</p>
+            <p class="eyebrow">Included at no charge</p>
             <h2>Local verify. No user data to store.</h2>
-            <p class="text-gray">lemma.id gives your backend a verified, site-private ID and assurance level — not email, not profile data. Keep your existing login if you want; gate the actions where abuse actually hurts. Verification runs on your servers, not ours.</p>
+            <p class="text-gray">lemma.id gives your backend a verified, site-private ID and an assurance level. No email, no profile data. Keep your existing login if you want, and gate the actions where abuse shows up. Verification runs on your servers, not ours.</p>
         </div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; max-width: 960px; margin: 0 auto;">
             <div class="card">
@@ -450,11 +450,11 @@
         <div class="home-section-head">
             <p class="eyebrow">Developer integration</p>
             <h2>Gate an action in one call</h2>
-            <p class="text-gray">Call <code>verifyForBackend</code> before a trial, claim, or checkout — or use the drop-in button to mint a presentation. Your backend verifies locally and enforces on the site-private ID. Stepping up is the same call with <code>requiredAssurance: 'ishuman'</code>.</p>
+            <p class="text-gray">Call <code>verifyForBackend</code> before a trial, claim, or checkout, or use the drop-in button to mint a presentation. Your backend verifies locally and enforces on the site-private ID. Stepping up is the same call with <code>requiredAssurance: 'ishuman'</code>.</p>
         </div>
 
         <div class="home-code">
-            <div class="home-code-label">Verify locally — no registration or API key required</div>
+            <div class="home-code-label">Verify locally. No registration or API key required.</div>
             <pre><code>&lt;script src="https://lemma.id/sdk/proof-verifier.js"&gt;&lt;/script&gt;
 &lt;script src="https://lemma.id/sdk/lemma-signin.js"&gt;&lt;/script&gt;
 
@@ -486,7 +486,7 @@
         <div class="home-section-head">
             <p class="eyebrow">Product boundaries</p>
             <h2>What lemma.id is not</h2>
-            <p class="text-gray">Honest edges. It replaces the password and the signup form, not your whole account system.</p>
+            <p class="text-gray">It can replace the password and the signup form. It does not replace your whole account system.</p>
         </div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; max-width: 960px; margin: 0 auto;">
             <div class="card">

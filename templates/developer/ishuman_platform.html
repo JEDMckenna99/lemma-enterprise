@@ -42,7 +42,7 @@
             <p class="dev-subtitle">
                 Local presentation verify needs nothing from this dashboard: no account, no site
                 registration, no API key. Integrate from the docs and enforce on <code>ppid</code>
-                locally. This dashboard is for the enforcement tier — human proofs, site-block
+                locally. This dashboard is for the enforcement tier: human proofs, site-block
                 APIs, site registration, API keys, and billing.
             </p>
         </div>
@@ -128,7 +128,7 @@
 <div class="dev-site-grid">
     <div class="dev-card" style="margin-bottom: 0;">
         <div class="dev-card-header">
-            <h2 class="dev-card-title">1) Verify proofs — free</h2>
+            <h2 class="dev-card-title">1) Verify proofs (free)</h2>
         </div>
         <div class="dev-card-body">
             <p style="margin: 0 0 16px; color: var(--dev-text-muted); font-size: 14px; line-height: 1.55;">
@@ -139,7 +139,7 @@
             <ul class="dev-hub-list">
                 <li>Set <code>siteId</code> to your canonical hostname (for example <code>app.example.com</code>).</li>
                 <li>Add <code>proof-verifier.js</code> and fail closed when verification fails.</li>
-                <li>Enforce on verified <code>ppid</code> + assurance — no KYC fields on your servers.</li>
+                <li>Enforce on verified <code>ppid</code> + assurance. No KYC fields on your servers.</li>
             </ul>
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:16px;">
                 <a href="/docs#quickstart" class="dev-btn dev-btn-secondary dev-btn-sm">Quickstart</a>
@@ -154,7 +154,7 @@
         </div>
         <div class="dev-card-body">
             <p style="margin: 0 0 16px; color: var(--dev-text-muted); font-size: 14px; line-height: 1.55;">
-                When a ban has to stick, require <code>ishuman</code> on that action — same PPID,
+                When a ban has to stick, require <code>ishuman</code> on that action. Same PPID,
                 stronger assurance. The SDK handles IDV in a Lemma-hosted popup; no webhooks.
             </p>
             <ul class="dev-hub-list">
@@ -171,7 +171,7 @@
 
     <div class="dev-card" style="margin-bottom: 0;">
         <div class="dev-card-header">
-            <h2 class="dev-card-title">3) Enforce bans — API key</h2>
+            <h2 class="dev-card-title">3) Enforce bans (API key)</h2>
         </div>
         <div class="dev-card-body">
             <p style="margin: 0 0 16px; color: var(--dev-text-muted); font-size: 14px; line-height: 1.55;">

@@ -11,7 +11,7 @@
     vc_valid: 'Credential verified.',
     ok: 'Success.',
     site_proof_required: "This site wants proof it's really you before letting you in.",
-    idv_cancelled: 'Identity check was cancelled — nothing was shared.',
+    idv_cancelled: 'Identity check was cancelled. Nothing was shared.',
     popup_closed: 'Sign-in window closed before finishing.',
     doubt_required: 'This site wants a fresh check that it is still you.',
     site_ppid_revoked: 'This site has banned this account.',
@@ -23,33 +23,33 @@
     not_ishuman: 'This action requires verified human proof.',
     no_credential: 'No lemma.id found on this device yet.',
     wallet_locked: 'Unlock your lemma.id with your passkey to continue.',
-    expired: 'Your session expired — sign in again.',
+    expired: 'Your session expired. Sign in again.',
     untrusted_issuer: 'This site does not trust the credential issuer.',
-    allocation_already_claimed: "You already got your code — it's one per person.",
-    trial_already_used: 'You already activated your free workspace — free trials are one per person.',
+    allocation_already_claimed: "You already got your code. It's one per person.",
+    trial_already_used: 'You already activated your free workspace. Free trials are one per person.',
     registration_required: 'Sign up for the drop first.',
     action_nonce_reused: 'Blocked: someone tried to reuse an old approval.',
-    rate_limited: 'Too many attempts — wait a moment and try again.',
+    rate_limited: 'Too many attempts. Wait a moment and try again.',
     fresh_passkey_missing: 'Unlock with Face ID, Touch ID, or Windows Hello to claim your code.',
-    fresh_passkey_expired: 'Your passkey check timed out — try again.',
-    fresh_passkey_too_old: 'Your passkey check timed out — try again.',
-    fresh_passkey_invalid_signature: 'Passkey check failed — try again.',
-    fresh_passkey_signature_missing: 'Passkey check failed — try again.',
-    fresh_passkey_server_nonce_missing: 'Server security check failed — refresh and try again.',
+    fresh_passkey_expired: 'Your passkey check timed out. Try again.',
+    fresh_passkey_too_old: 'Your passkey check timed out. Try again.',
+    fresh_passkey_invalid_signature: 'Passkey check failed. Try again.',
+    fresh_passkey_signature_missing: 'Passkey check failed. Try again.',
+    fresh_passkey_server_nonce_missing: 'Server security check failed. Refresh and try again.',
     passkey_not_registered_on_server: 'Set up your lemma.id passkey first, then try again.',
-    passkey_server_binding_failed: 'Passkey setup incomplete — unlock your lemma.id and try again.',
-    fresh_passkey_webauthn_invalid: 'Passkey check failed — unlock your lemma.id and try again.',
-    redirect_started: 'Continuing on lemma.id — you will return here automatically.',
-    session_bloom_sequence_mismatch: 'Session sync hiccup — try once more.',
-    verify_error: 'Verification failed — try again.',
+    passkey_server_binding_failed: 'Passkey setup incomplete. Unlock your lemma.id and try again.',
+    fresh_passkey_webauthn_invalid: 'Passkey check failed. Unlock your lemma.id and try again.',
+    redirect_started: 'Continuing on lemma.id. You will return here automatically.',
+    session_bloom_sequence_mismatch: 'Session sync hiccup. Try once more.',
+    verify_error: 'Verification failed. Try again.',
     drop_id_missing: 'Drop not found.',
     ppid_missing: 'Sign in first so this site knows who you are.',
-    unknown: 'Something went wrong — try again.',
+    unknown: 'Something went wrong. Try again.',
   };
 
   var ASSURANCE = {
     passkey: 'Signed in with a passkey.',
-    ishuman: 'Verified human — one account per person.',
+    ishuman: 'Verified human. One account per person.',
   };
 
   var FIELD_LABELS = {
@@ -74,17 +74,17 @@
 
   function reason(code) {
     var key = String(code || '').trim();
-    if (!key) return '—';
+    if (!key) return '-';
     if (REASON[key]) return REASON[key];
     if (key.indexOf('fresh_passkey_') === 0) {
-      return 'Passkey check failed — try again.';
+      return 'Passkey check failed. Try again.';
     }
     return key.replace(/_/g, ' ');
   }
 
   function assurance(tier) {
     var key = String(tier || '').trim().toLowerCase();
-    if (!key) return '—';
+    if (!key) return '-';
     return ASSURANCE[key] || ('Proof level: ' + key);
   }
 

@@ -5,11 +5,14 @@ auth dependency on their critical path: **What happens if a user loses their
 device? What happens if lemma.id goes down? And is this a crypto/blockchain
 thing?** Short answers first, detail below.
 
-- **Recovery:** passkeys sync across a user's devices (iCloud/Google), users
-  can add a second device at [lemma.id/link](https://lemma.id/link), and your
-  site always owns the account row keyed by `ppid` so you can add your own
-  recovery. Guaranteed account recovery for a **single-device, passkey-only**
-  lemma.id is not promised — see the honest matrix below.
+- **Recovery:** passkey vault sync (iCloud/Google) may make the **same WebAuthn
+  credential** available on another device, but it does **not** sync lemma.id
+  contents (identity seed, site proofs, isHuman material). Cross-device
+  continuity for the **same person** requires [lemma.id/link](https://lemma.id/link)
+  (or isHuman / site-side recovery keyed to `ppid`). Your site always owns the
+  account row keyed by `ppid` so you can add your own recovery. Guaranteed
+  account recovery for a **single-device, passkey-only** lemma.id is not
+  promised — see the honest matrix below.
 - **Availability:** the verifier runs **on your backend, offline** — there is no
   per-request call to lemma.id, so verification and your own sessions do not
   depend on lemma being up. A lemma.id outage blocks **new** sign-ins (the popup
@@ -80,7 +83,7 @@ with your users about which row they're in.
 
 | Situation | Recovery path | Guarantee |
 |-----------|---------------|-----------|
-| Passkey **synced** (iCloud Keychain / Google Password Manager / synced manager) | New device inherits the passkey automatically | Strong — this is the common case |
+| Passkey **synced** (iCloud Keychain / Google Password Manager / synced manager) | Synced credential unlocks on the new device; **lemma.id data must still be transferred** via `/link` (or isHuman recovery) | **Partial:** passkey only; same person requires explicit transfer |
 | **Second device added** via [lemma.id/link](https://lemma.id/link) | Sign in / re-link from the other device | Strong — recommended for everyone |
 | **Single device, non-synced** passkey, device lost | Site-side recovery (below) or start over | **Not guaranteed** — state this to users |
 | Needs guaranteed, identity-backed recovery | Step up to **isHuman** (IDV-backed, same `ppid`) | Strong — paid tier |
@@ -90,8 +93,9 @@ with your users about which row they're in.
 - **Second-device nudge on first sign-in.** After a lemma.id is created, the popup
   shows a one-tap "add a second device" screen linking to `/link`. Encourage
   users to take it; a two-device user is a recoverable user.
-- **Passkey sync is the happy path.** Most users on Apple/Google ecosystems get
-  cross-device continuity for free.
+- **Passkey sync is not lemma.id sync.** Vault sync moves the unlock key only.
+  The manager and popup block silent identity forks on empty browsers and route
+  users to `/link` when a synced passkey exists without local lemma.id data.
 
 ### What you (the site) can add
 

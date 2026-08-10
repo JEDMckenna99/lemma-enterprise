@@ -1,4 +1,4 @@
-# lemma.id — verifiable source
+# lemma.id: verifiable source
 
 This repository contains every artifact a relying site or auditor needs to
 verify lemma.id's claims **without trusting the lemma.id service**: the
@@ -9,11 +9,11 @@ protocol specs. Apache-2.0 licensed.
 lemma.id is a **proof layer** for site-private person continuity: verify a
 signed presentation, get a stable site-private `ppid`, and optionally step up
 to **isHuman** (one verified human per account, same PPID) for Sybil-resistant
-enforcement — no usernames, passwords, or email collection on the default path.
+enforcement: no usernames, passwords, or email collection on the default path.
 
 ## What is here, and what each piece lets you verify
 
-### `packages/` — server-side verifiers (the trust core)
+### `packages/`: server-side verifiers (the trust core)
 
 The code your backend runs to accept a lemma.id presentation. Verification
 is entirely local: Ed25519 signature checks against pinned network root
@@ -21,45 +21,45 @@ keys plus a signed Bloom revocation snapshot refreshed every 15 minutes.
 lemma.id is never contacted on the hot path and never sees an individual
 verification.
 
-- `proof-verifier-js/` — published as [`@lemma.id/proof-verifier`](https://www.npmjs.com/package/@lemma.id/proof-verifier).
+- `proof-verifier-js/`: published as [`@lemma.id/proof-verifier`](https://www.npmjs.com/package/@lemma.id/proof-verifier).
   Zero dependencies; only requires WebCrypto. Node 19+, Deno, Bun, edge runtimes.
-- `proof-verifier-py/` — published as [`lemma-proof-verifier`](https://pypi.org/project/lemma-proof-verifier/).
+- `proof-verifier-py/`: published as [`lemma-proof-verifier`](https://pypi.org/project/lemma-proof-verifier/).
 
 Both ship offline testing helpers that mint valid test presentations
 locally, so you can audit the accept/reject logic end to end without any
 network access.
 
-### `sdk/` — browser SDK
+### `sdk/`: browser SDK
 
 Byte-identical to what `https://lemma.id/sdk/` serves.
 
-- `proof-verifier.js` — the `ProofVerifier` client (legacy alias
+- `proof-verifier.js`: the `ProofVerifier` client (legacy alias
   `IsHumanVerifier`): local Ed25519 verification, revocation checks, and the
   sign-in popup flow.
-- `lemma-signin.js` — the drop-in `<lemma-signin>` button component.
+- `lemma-signin.js`: the drop-in `<lemma-signin>` button component.
 
-### `wallet/` — the client-held credential store
+### `wallet/`: the client-held credential store
 
 The code behind the claim that **signing keys never leave the user's
 device**. Credentials live in IndexedDB, unlocked by a passkey; at-rest
 encryption keys are derived from the WebAuthn PRF extension.
 
-- `lemma-keys.js` — HKDF key derivation and Ed25519 signing.
-- `wallet-at-rest-crypto.js` — PRF-derived AES-GCM envelope encryption for
+- `lemma-keys.js`: HKDF key derivation and Ed25519 signing.
+- `wallet-at-rest-crypto.js`: PRF-derived AES-GCM envelope encryption for
   everything stored at rest.
-- `lemma-wallet.js` — the credential store itself: storage, passkey unlock,
+- `lemma-wallet.js`: the credential store itself: storage, passkey unlock,
   site-private PPID derivation, presentation signing.
 
-### `specs/` — protocol and trust contracts
+### `specs/`: protocol and trust contracts
 
-- `LEMMA_ID_PRESENTATION_MODEL.md` — presentation format and PPID
+- `LEMMA_ID_PRESENTATION_MODEL.md`: presentation format and PPID
   derivation. PPIDs are derived per site (person root + canonical
   hostname), which is the basis of the cross-site unlinkability claim.
-- `HUMAN_AUTH_SECURITY_CONTRACT.md` — precisely what each proof type does
+- `HUMAN_AUTH_SECURITY_CONTRACT.md`: precisely what each proof type does
   and does not establish (passkey, isHuman, stamps, recovery).
-- `SIGN_IN_TRUST_AND_RECOVERY.md` — the trust and recovery model, stated
+- `SIGN_IN_TRUST_AND_RECOVERY.md`: the trust and recovery model, stated
   plainly, including what lemma.id can and cannot do to your accounts.
-- `NETWORK_ROOT_PUBKEYS.json` — the network root public keys pinned by the
+- `NETWORK_ROOT_PUBKEYS.json`: the network root public keys pinned by the
   verifiers.
 
 ## What is deliberately not here

@@ -1,4 +1,4 @@
-# lemma.id proof continuity — relying-site demo apps
+# lemma.id proof continuity: relying-site demo apps
 
 These tiny Flask apps simulate real third-party relying sites for the lemma.id proof-layer demo.
 
@@ -18,8 +18,8 @@ Use `lemma-origin` when `LEMMA_ORIGIN` is not production `https://lemma.id` (sta
   - `LEMMA_DEMO_SITE_ID=lemma-demo-tickets-1d3d7411af33.herokuapp.com`
   - `LEMMA_DEMO_SITE_NAME=Lemma Ticketing Demo`
   - `LEMMA_DEMO_SITE_KIND=ticketing`
-  - Default `/` — mint a presentation with `<lemma-signin>` → optional session cookie
-  - `/?tour=presale` — Sybil-resistant presale enforcement demo
+  - Default `/`: mint a presentation with `<lemma-signin>` → optional session cookie
+  - `/?tour=presale`: Sybil-resistant presale enforcement demo
   - `LEMMA_PRESALE_DROP_ID=artist-presale-2026` (optional)
   - `LEMMA_PRESALE_CODE_CLAIM_ASSURANCE=ishuman` (default; optional)
   - `LEMMA_PRESALE_ESCALATED_ASSURANCE=ishuman` (optional, IDV penalty on site doubt)
@@ -45,14 +45,14 @@ Both demo sites use lemma.id proof continuity:
 
 Session endpoints:
 
-- `POST /api/login` — verify presentation, set HttpOnly `lemma_demo_session` cookie
-- `GET /api/me` / `POST /api/logout` — session introspection and logout
-- `POST /api/demo/action` — soft action via session cookie or presentation
+- `POST /api/login`: verify presentation, set HttpOnly `lemma_demo_session` cookie
+- `GET /api/me` / `POST /api/logout`: session introspection and logout
+- `POST /api/demo/action`: soft action via session cookie or presentation
 
 ## Demo hub return URL
 
 `LEMMA_DEMO_HUB_URL` defaults to `{LEMMA_ORIGIN}/demo/how-it-works` (the builder
-hub). Do not point it at `/demo` — that dogfood front door redirects signed-in
+hub). Do not point it at `/demo`: that dogfood front door redirects signed-in
 users to `/app` and breaks “Return to demo hub”.
 
 ## Hub verify bridge
@@ -66,7 +66,7 @@ This page runs the ceremony on the demo Origin, optionally establishes a local
 session via `POST /api/login`, then `postMessage`s `LEMMA_HUB_VERIFY_RESULT` to
 `window.opener` at the validated `hub_origin` and closes.
 
-## Presale reference flow (secondary — tickets `/?tour=presale`)
+## Presale reference flow (secondary: tickets `/?tour=presale`)
 
 Low-friction passkey proof by default; fresh IDV only when the site flags a fan.
 

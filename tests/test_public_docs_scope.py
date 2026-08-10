@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.mark.integration
@@ -190,3 +194,37 @@ def test_public_doc_path_normalization_unit():
 
     allowed, _ = is_public_doc_allowed("operations/ENVIRONMENT_CONFIG.md")
     assert allowed is False
+
+
+@pytest.mark.integration
+def test_trust_recovery_doc_does_not_overclaim_passkey_sync(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    monkeypatch.setenv("SESSION_SECRET", "test-session-secret")
+
+    from app import create_app
+
+    app = create_app()
+    app.config["TESTING"] = True
+    with app.test_client() as client:
+        response = client.get("/docs/integration/SIGN_IN_TRUST_AND_RECOVERY.md")
+
+    body = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert "not** sync lemma.id" in body
+    assert "continuity for free" not in body.lower()
+    assert "Passkey sync is not lemma.id sync" in body
+
+
+@pytest.mark.unit
+def test_signin_docs_faq_honest_about_passkey_sync():
+    signin = (ROOT / "templates" / "docs" / "signin.html").read_text(encoding="utf-8")
+    assert "does <strong>not</strong> sync lemma.id contents" in signin
+    assert "lemma.id/link" in signin
+
+
+@pytest.mark.unit
+def test_verify_popup_includes_identity_recovery_ui():
+    verify = (ROOT / "templates" / "wallet_ishuman_idv.html").read_text(encoding="utf-8")
+    assert 'id="identity-recovery-actions"' in verify
+    assert "prepareEmptyStoreForkUi" in verify
+    assert "confirm_new_identity" in verify

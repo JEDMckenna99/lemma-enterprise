@@ -44,7 +44,7 @@
   /**
    * Hub cannot mint flow-state for remote demo siteIds (opener origin must
    * match site hostname). Open /hub-verify on the demo Origin and await a
-   * typed postMessage result — ceremony stays honest; hub stays the control UI.
+   * typed postMessage result. Ceremony stays honest; hub stays the control UI.
    */
   function verifySiteViaHubBridge(slug, {
     requiredAssurance = 'passkey',
@@ -68,7 +68,7 @@
     const height = 720;
     const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
     const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
-    // Do NOT use noopener — the demo page must retain window.opener for postMessage.
+    // Do NOT use noopener. The demo page must retain window.opener for postMessage.
     const popup = window.open(
       popupUrl.toString(),
       `lemma_hub_verify_${slug}`,
@@ -158,7 +158,7 @@
     ? window.LemmaDemoPlain.REASON
     : {
     valid: 'Verified locally',
-    session_valid: 'Session valid — verified locally',
+    session_valid: 'Session valid. Verified locally',
     vc_valid: 'Credential valid',
     ok: 'Verified',
     site_proof_required: 'No site proof yet',
@@ -189,12 +189,12 @@
     if (window.LemmaDemoPlain && typeof window.LemmaDemoPlain.assurance === 'function') {
       return window.LemmaDemoPlain.assurance(tier);
     }
-    return tier || '—';
+    return tier || '-';
   }
 
   function formatReasonLabel(reason) {
     const code = String(reason || '').trim();
-    if (!code) return '—';
+    if (!code) return '-';
     return REASON_LABELS[code] || code.replace(/_/g, ' ');
   }
 
@@ -318,7 +318,7 @@
         const site = SITE_IDS[slug] || slug;
         const assurance = plainAssurance(result.assurance);
         const reason = plainReason(result.reason);
-        const ms = Number.isFinite(result.timeMs) ? `${result.timeMs.toFixed(1)}ms` : '—';
+        const ms = Number.isFinite(result.timeMs) ? `${result.timeMs.toFixed(1)}ms` : '-';
         return `<div class="demo-proof-receipt-row"><span class="demo-proof-receipt-site">${site}</span><span class="demo-proof-receipt-assurance">${assurance}</span><span class="demo-proof-receipt-reason">${reason}</span><span class="demo-proof-receipt-ms">${ms}</span></div>`;
       })
       .filter(Boolean);
@@ -747,7 +747,7 @@
 
   function isSiteBlocked(slug, result = null) {
     // Only this session's site PPIDs count. Demo /status returns every active
-    // ban on the shared demo sites — treating localBlocks.size as blocked left
+    // ban on the shared demo sites. Treating localBlocks.size as blocked left
     // visitors stuck in a red Ban/Unban state from other users' residue.
     if (state.sessionBanFlags[slug]) return true;
     const known = knownSitePpids(slug, result);
@@ -779,7 +779,7 @@
 
   function shouldShowUnban(slug, result = null) {
     // Keep Unban available for sticky session bans, live localBlocks, or the
-    // last verify ban reason — even after a later popup cancel masks the reason.
+    // last verify ban reason. Even after a later popup cancel masks the reason.
     return !!state.sessionBanFlags[slug]
       || isSiteBlocked(slug, result)
       || isSiteBanReason(result?.reason);
@@ -1000,7 +1000,7 @@
   }
 
   function maskPpid(slug, ppid) {
-    if (!ppid) return PPID_PLACEHOLDER[slug] || '—';
+    if (!ppid) return PPID_PLACEHOLDER[slug] || '-';
     const text = String(ppid);
     if (text.length <= 24) return text;
     return `${text.slice(0, 18)}••••${text.slice(-6)}`;
@@ -1408,7 +1408,7 @@
     const parts = [];
     if (state.lastVerifyMs.tickets != null) parts.push(`tickets ${state.lastVerifyMs.tickets.toFixed(0)}ms`);
     if (state.lastVerifyMs.trials != null) parts.push(`trials ${state.lastVerifyMs.trials.toFixed(0)}ms`);
-    el.textContent = parts.length ? `Last verify: ${parts.join(' · ')}` : 'Last verify: —';
+    el.textContent = parts.length ? `Last verify: ${parts.join(' · ')}` : 'Last verify: -';
   }
 
   function updatePpidCompare() {
@@ -1420,11 +1420,11 @@
     const rCmp = $('ih-trials-ppid-compare');
     if (tCmp) {
       if (tPpid) tCmp.innerHTML = ppidCompareHtml(tPpid);
-      else tCmp.textContent = '—';
+      else tCmp.textContent = '-';
     }
     if (rCmp) {
       if (rPpid) rCmp.innerHTML = ppidCompareHtml(rPpid);
-      else rCmp.textContent = '—';
+      else rCmp.textContent = '-';
     }
     const diff = $('ih-ppid-diff');
     if (!diff || !tPpid || !rPpid) {
@@ -1432,7 +1432,7 @@
       return;
     }
     diff.textContent = tPpid !== rPpid
-      ? "Different IDs — these sites can't compare notes about you."
+      ? "Different IDs. These sites can't compare notes about you."
       : 'Same ID (unexpected in demo)';
     diff.className = tPpid !== rPpid ? 'ppid-diff ppid-diff-ok' : 'ppid-diff deny';
   }
@@ -1441,7 +1441,7 @@
     const ppid = resolveSitePpid(slug);
     if (!ppid) return false;
     // Authoritative policy is localDoubts (hydrated from status / set by enforce).
-    // Do not treat a stale doubt_required reason alone as active — that would
+    // Do not treat a stale doubt_required reason alone as active. That would
     // re-open the ceremony after Undoubt cleared the server row.
     return !!state.localDoubts[slug]?.has(ppid);
   }
@@ -1455,7 +1455,7 @@
     const presenceBtn = $(`ih-doubt-${slug}-presence-btn`);
     const humanBtn = $(`ih-doubt-${slug}-human-btn`);
     const tier = activeDoubtTier(slug);
-    // Keep both actions visible — Fresh presence and Doubt humanity are
+    // Keep both actions visible. Fresh presence and Doubt humanity are
     // separate policies, not one shared Undoubt slot.
     if (presenceBtn) {
       presenceBtn.hidden = false;
@@ -1475,7 +1475,7 @@
       const result = state.results[slug];
       const ppid = resolveSitePpid(slug);
       if (ppidEl) {
-        ppidEl.textContent = ppid ? maskPpid(slug, ppid) : '—';
+        ppidEl.textContent = ppid ? maskPpid(slug, ppid) : '-';
       }
       const fmt = formatBlockResult(slug, result);
       if (statusEl) {
@@ -1488,7 +1488,7 @@
         banBtn.textContent = showUnban ? 'Unban' : 'Ban';
         banBtn.classList.toggle('enforce-chip--danger', !showUnban);
         banBtn.classList.toggle('enforce-chip--quiet', showUnban);
-        // Never gate Ban/Unban on a prior verify or mid-flight busy flag —
+        // Never gate Ban/Unban on a prior verify or mid-flight busy flag : 
         // a hung bloom/verify refresh used to leave Unban permanently disabled.
         banBtn.disabled = !!state.wizardRunning;
         banBtn.setAttribute('aria-busy', state.blockToggleBusy ? 'true' : 'false');
@@ -1508,7 +1508,7 @@
       if (!ticketsPpid && !trialsPpid) {
         doubtStatus.textContent = 'Sign in on both sites above, then enforce on a row.';
       } else if (state.localDoubts.tickets?.size || state.localDoubts.trials?.size) {
-        doubtStatus.textContent = 'Active doubt — Sign in opens the matching ceremony (presence or humanity). Undoubt clears without verifying.';
+        doubtStatus.textContent = 'Active doubt. Sign in opens the matching ceremony (presence or humanity). Undoubt clears without verifying.';
       } else if (isSiteBlocked('tickets', state.results.tickets) && isSiteVerified(state.results.trials)) {
         doubtStatus.textContent = 'Presale banned; SaaS trial still verified.';
       } else {
@@ -1893,7 +1893,7 @@
         renderWalletSlots();
         updateStepLocks();
         scrollToPanel('ih-step-2');
-        setQuickInsight('Sign in', 'lemma.id ready — sign in on the two demo sites below.');
+        setQuickInsight('Sign in', 'lemma.id ready. Sign in on the two demo sites below.');
       }
     };
     const onMessage = (event) => {
@@ -2274,7 +2274,7 @@
   }
 
   /**
-   * When a site is doubted, Sign in must open the deliberate ceremony — never
+   * When a site is doubted, Sign in must open the deliberate ceremony. Never
    * treat a cached session as verified. Humanity doubt → fresh_idv popup;
    * Fresh presence → passkey site_proof popup.
    */
@@ -2286,8 +2286,8 @@
     setQuickInsight(
       'Sign in',
       tier === 'ishuman'
-        ? `${label} humanity was doubted — complete fresh human proof…`
-        : `${label} requires fresh presence — confirm with passkey…`,
+        ? `${label} humanity was doubted. Complete fresh human proof…`
+        : `${label} requires fresh presence. Confirm with passkey…`,
     );
 
     // Suspend local doubt during apply so a mid-flow status check cannot
@@ -2302,8 +2302,8 @@
         setQuickInsight(
           'Sign in',
           tier === 'ishuman'
-            ? `${label} humanity was doubted — complete fresh human proof in the site popup…`
-            : `${label} requires fresh presence — confirm in the site popup…`,
+            ? `${label} humanity was doubted. Complete fresh human proof in the site popup…`
+            : `${label} requires fresh presence. Confirm in the site popup…`,
         );
         backend = await verifySiteViaHubBridge(slug, { requiredAssurance, mode });
         if (!backend?.ok && !backend?.human) {
@@ -2446,7 +2446,7 @@
     if (!window.IsHumanVerifier) throw new Error('IsHumanVerifier SDK not loaded');
 
     // Active doubt: open the challenge ceremony instead of succeeding from cache.
-    // SDK deliberately omits doubt_required from autoProvision popupReasons —
+    // SDK deliberately omits doubt_required from autoProvision popupReasons : 
     // sites must call verifyFreshForBackend (or a presence popup) on purpose.
     if (
       isSiteDoubted(slug)
@@ -2467,12 +2467,12 @@
     if (derivedPpid && isSiteBlocked(slug)) {
       const result = applyBannedVerifyResult(slug, derivedPpid, 'site_ppid_revoked');
       log(`${SITE_IDS[slug]} verifier result`, 'site_ppid_revoked (status hydrate, no popup)');
-      setQuickInsight('Enforce', 'This site PPID is banned — use Unban or Clear my bans.');
+      setQuickInsight('Enforce', 'This site PPID is banned. Use Unban or Clear my bans.');
       return result;
     }
 
     // Probe without popups first. Only sticky site-policy reasons (or a known
-    // localBlocks hit) mark Unban — generic bloom `revoked` alone must not
+    // localBlocks hit) mark Unban. Generic bloom `revoked` alone must not
     // re-ban right after a successful Unban while caches catch up.
     if (options.autoProvision !== false && options.freshIdv !== true) {
       const probe = await verifier.checkStatus({ requiredAssurance }).catch(() => null);
@@ -2488,12 +2488,12 @@
           { assurance: probe.assurance, timeMs: probe.timeMs },
         );
         log(`${SITE_IDS[slug]} verifier result`, `${result.reason} (ban probe, no popup)`);
-        setQuickInsight('Enforce', 'This site PPID is banned — use Unban or Clear my bans.');
+        setQuickInsight('Enforce', 'This site PPID is banned. Use Unban or Clear my bans.');
         return result;
       }
     }
 
-    // Hub is lemma.id — never mint /verify flow-state for a remote siteId here.
+    // Hub is lemma.id. Never mint /verify flow-state for a remote siteId here.
     // Open /hub-verify on the demo Origin and receive the result via postMessage.
     let backend;
     if (isPlatformHubHost() && options.autoProvision !== false) {
@@ -2501,7 +2501,7 @@
       const mode = options.freshIdv === true ? 'fresh_idv' : 'signin';
       setQuickInsight(
         'Sign in',
-        `${label} ceremony opens on ${SITE_IDS[slug]} — complete it in the popup…`,
+        `${label} ceremony opens on ${SITE_IDS[slug]}. Complete it in the popup…`,
       );
       try {
         backend = await verifySiteViaHubBridge(slug, { requiredAssurance, mode });
@@ -2558,7 +2558,7 @@
         `${SITE_IDS[slug]} verifier result`,
         `${result.reason}${result.assurance ? ` · ${result.assurance}` : ''} in ${(result.timeMs || 0).toFixed(1)}ms`,
       );
-      setQuickInsight('Enforce', 'This site PPID is banned — use Unban or Clear my bans.');
+      setQuickInsight('Enforce', 'This site PPID is banned. Use Unban or Clear my bans.');
       await refreshStatus().catch(() => {});
       return result;
     }
@@ -2639,21 +2639,21 @@
     if (ppidEl) ppidEl.textContent = showFields ? maskPpid(slug, result.ppid) : PPID_PLACEHOLDER[slug];
     const assuranceEl = $(`ih-${slug}-assurance`);
     if (assuranceEl) {
-      assuranceEl.textContent = showFields ? plainAssurance(result.assurance) : '—';
+      assuranceEl.textContent = showFields ? plainAssurance(result.assurance) : '-';
       assuranceEl.closest('.site-card-field')?.classList.toggle('is-withheld', !showFields);
     }
     const reasonEl = $(`ih-${slug}-reason`);
     if (reasonEl) {
       reasonEl.textContent = showFields
         ? (humanityDoubted ? plainReason('doubt_required') : plainReason(result.reason))
-        : '—';
+        : '-';
       reasonEl.closest('.site-card-field')?.classList.toggle('is-withheld', !showFields);
     }
     const latEl = $(`ih-${slug}-latency`);
     if (latEl) {
       latEl.textContent = verified && Number.isFinite(result.timeMs)
         ? `${result.timeMs.toFixed(1)}ms`
-        : '—';
+        : '-';
       latEl.closest('.site-card-field')?.classList.toggle('is-withheld', !verified);
     }
     updatePpidCompare();
@@ -2749,7 +2749,7 @@
 
   /**
    * Demo enforce APIs authorize via a signed site presentation. After reload
-   * (or expiry) the PPID/doubt can still hydrate while presentation is gone —
+   * (or expiry) the PPID/doubt can still hydrate while presentation is gone : 
    * mint a fresh one without running the doubt-resolve ceremony.
    */
   async function ensureControlPresentation(slug, { force = false } = {}) {
@@ -2892,7 +2892,7 @@
     };
     renderSite(slug, state.results[slug]);
     if (!options.skipRecheck) {
-      // Snapshot only — do not open the resolve ceremony when setting doubt.
+      // Snapshot only. Do not open the resolve ceremony when setting doubt.
       await verifySite('tickets', { autoProvision: false, resolveDoubt: false });
       await verifySite('trials', { autoProvision: false, resolveDoubt: false });
     }
@@ -2922,7 +2922,7 @@
     await clearActiveDoubtQuiet(slug);
     log(`${slug} doubt cleared`, short(ppid));
     if (!options.skipRecheck) {
-      // Snapshot only — do not open a new popup after Undoubt.
+      // Snapshot only. Do not open a new popup after Undoubt.
       await verifySite('tickets', { autoProvision: false, resolveDoubt: false });
       await verifySite('trials', { autoProvision: false, resolveDoubt: false });
     }
@@ -2950,8 +2950,8 @@
     setQuickInsight(
       'Enforce',
       tier === 'ishuman'
-        ? `${label}: humanity doubted — next Sign in opens fresh human proof.`
-        : `${label}: fresh presence required — next Sign in opens passkey presence.`,
+        ? `${label}: humanity doubted. Next Sign in opens fresh human proof.`
+        : `${label}: fresh presence required. Next Sign in opens passkey presence.`,
     );
     await createSiteDoubt(slug, tier, { skipRecheck: true });
   }
@@ -3028,7 +3028,7 @@
     const ppids = await collectUnbanPpids(slug);
     for (const extra of state.localBlocks[slug]) ppids.add(extra);
     if (!ppids.size) {
-      throw new Error(`${slug} PPID unavailable — Sign in on the site once, then Unban.`);
+      throw new Error(`${slug} PPID unavailable. Sign in on the site once, then Unban.`);
     }
 
     let unblockedAny = false;
@@ -3118,7 +3118,7 @@
     log(`${slug} site block removed`, [...ppids].map(short).join(', '));
     try {
       // Force a new bloom snapshot (sequence now changes on delete). Do NOT
-      // call verifySite here — a stale bloom `revoked` used to immediately
+      // call verifySite here. A stale bloom `revoked` used to immediately
       // re-mark the session as banned and make Unban look broken.
       clearClientBloomCaches();
       await forceVerifierBloomRefresh('tickets');
@@ -3167,7 +3167,7 @@
     updateBlockResultsTable();
     try {
       await ensureSitePpid(slug);
-      // Re-probe before deciding — a masked idv_cancelled must not re-ban.
+      // Re-probe before deciding. A masked idv_cancelled must not re-ban.
       // Prefer sticky Unban when Enforce already knows a site ban. Do not let a
       // stale bloom `revoked` flip Unban → Ban mid-click.
       updateBlockResultsTable();
@@ -3231,7 +3231,7 @@
       'Enforce',
       batch?.lifted_any
         ? 'Demo bans cleared on both sites. Click Sign in to mint a fresh site proof.'
-        : 'Clear requested, but no matching ban rows were lifted. Try Sign in — if still banned, refresh and Clear my bans again.',
+        : 'Clear requested, but no matching ban rows were lifted. Try Sign in. If still banned, refresh and Clear my bans again.',
     );
   }
 

@@ -1,5 +1,5 @@
 /**
- * lemma.id proof continuity — dogfooded demo flow state machine.
+ * lemma.id proof continuity. Dogfooded demo flow state machine.
  *
  * States: create -> signin -> manager   plus a standalone `gate`
  * used when /app is opened without a session. After sign-in, open the manager
@@ -64,17 +64,17 @@
   }
 
   var PLAIN_OVERRIDES = {
-    popup_blocked: 'Your browser blocked the lemma.id window — allow popups for this site and try again.',
-    popup_closed: 'The window was closed — try again whenever you\u2019re ready.',
+    popup_blocked: 'Your browser blocked the lemma.id window. Allow popups for this site and try again.',
+    popup_closed: 'The window was closed. Try again whenever you\u2019re ready.',
     passkey_unsupported: 'This browser doesn\u2019t support passkeys. Try Chrome, Edge, or Safari.',
-    presentation_required: 'Something went wrong preparing your proof — try again.',
+    presentation_required: 'Something went wrong preparing your proof. Try again.',
   };
 
   function plain(reason) {
     if (reason && PLAIN_OVERRIDES[reason]) return PLAIN_OVERRIDES[reason];
     var p = window.LemmaDemoPlain;
     if (p && typeof p.reason === 'function' && reason) return p.reason(reason);
-    return 'Something went wrong — try again.';
+    return 'Something went wrong. Try again.';
   }
 
   function getCookie(name) {
@@ -292,7 +292,7 @@
           return;
         }
         if (result && result.ok) {
-          // Local credential exists but session mint failed — offer explicit sign-in.
+          // Local credential exists but session mint failed. Offer explicit sign-in.
           setStatus('sf-create-status', '');
           show('signin');
           return;

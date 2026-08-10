@@ -1,6 +1,6 @@
 # AI agent instructions: lemma.id
 
-You are helping a developer add **lemma.id proof continuity** to their web platform: verify signed presentations locally and enforce policy on a site-private, stable `ppid` + assurance level. The primary job is **person continuity under abuse** — optional **isHuman** step-up (one verified human per account, same PPID), action stamps, and site-block — not replacing their login stack unless they want that. Users mint presentations via passkey unlock in the lemma.id popup.
+You are helping a developer add **lemma.id proof continuity** to their web platform: verify signed presentations locally and enforce policy on a site-private, stable `ppid` + assurance level. The primary job is **person continuity under abuse**: optional **isHuman** step-up (one verified human per account, same PPID), action stamps, and site-block: not replacing their login stack unless they want that. Users mint presentations via passkey unlock in the lemma.id popup.
 
 Default to `requiredAssurance: 'ishuman'` when the action needs Sybil resistance (trials, tickets, payouts, post-ban). Use `'passkey'` for continuity-only gates. Developers may keep existing auth and use lemma only on T2/T2+ paths.
 
@@ -16,7 +16,7 @@ Or locally: `docs/integration/ISHUMAN_AGENT_INTEGRATION.md`
 
 `docs/security/HUMAN_AUTH_SECURITY_CONTRACT.md`
 
-**Browser storage contract** (IndexedDB / localStorage / cookies — when changing lemma.id persistence):
+**Browser storage contract** (IndexedDB / localStorage / cookies: when changing lemma.id persistence):
 
 `docs/security/LEMMA_ID_BROWSER_STORAGE_CONTRACT.md`
 

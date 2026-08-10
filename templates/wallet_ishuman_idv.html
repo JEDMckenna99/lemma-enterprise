@@ -225,6 +225,10 @@
             <button id="return-btn" class="btn btn-primary hidden" type="button">Return to site</button>
             <button id="cancel-btn" class="btn btn-secondary" type="button">Not now</button>
         </div>
+        <div id="identity-recovery-actions" class="hidden" style="margin-top: 12px; display: none;">
+            <a id="identity-recovery-link-btn" class="btn btn-primary" href="/link" style="display: block; text-align: center; text-decoration: none; margin-bottom: 10px;">Add this device</a>
+            <button id="identity-recovery-create-btn" class="btn btn-secondary" type="button" style="width: 100%;">Create new lemma.id instead</button>
+        </div>
     </div>
 
     <script src="/static/js/demo/ishuman-idv-preview-scenes.js?v=20" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
@@ -239,10 +243,11 @@
         const REGISTER_RESULT_KEY = 'lemma_register_result_v1';
         const REGISTER_ERROR_KEY = 'lemma_register_error_v1';
         const params = new URLSearchParams(window.location.search);
+        const urlConfirmNewIdentity = params.get('confirm_new_identity') === '1';
         const PLATFORM_SITE_IDS = new Set(['lemma.id', 'lemma_platform']);
         const platformHost = /^lemma\.id$/i.test(window.location.hostname.replace(/^www\./i, ''));
         // Server-minted flow binding (Wave 3). When present, opener origin + site
-        // come only from this object — never from independently attacker-controlled
+        // come only from this object  -  never from independently attacker-controlled
         // query params.
         const SERVER_FLOW = {{ verify_flow_binding|default(none)|tojson }};
         const FLOW_STATE_ERROR = {{ verify_flow_state_error|default(none)|tojson }};
@@ -660,7 +665,7 @@
             applyConsumerShell({
                 eyebrow: 'Sign in unavailable',
                 headline: 'Passkey sign-in is not available yet',
-                documentTitle: 'Sign in unavailable — lemma.id',
+                documentTitle: 'Sign in unavailable  -  lemma.id',
                 hideHeadline: true,
                 hideSteps: true,
                 hidePrivacy: true,
@@ -684,6 +689,90 @@
             await ensureWalletInitialized();
             const info = await wallet.getWalletInfo({ lite: true });
             return !info.hasWallet;
+        }
+
+        function walletIssuanceOpts(extra = {}) {
+            const opts = { ...extra };
+            if (extra.confirmNewIdentity === true || urlConfirmNewIdentity) {
+                opts.confirmNewIdentity = true;
+            }
+            return opts;
+        }
+
+        function isIdentityForkGuardError(err) {
+            return typeof LemmaWallet !== 'undefined'
+                && typeof LemmaWallet.isIdentityForkGuardError === 'function'
+                && LemmaWallet.isIdentityForkGuardError(err);
+        }
+
+        async function presentIdentityForkGuard(err, retryFn) {
+            if (!isIdentityForkGuardError(err)) {
+                return false;
+            }
+            const code = err?.code || '';
+            const linkUrl = err?.linkUrl || `${window.location.origin}/link`;
+            const recovery = document.getElementById('identity-recovery-actions');
+            const linkBtn = document.getElementById('identity-recovery-link-btn');
+            const createBtn = document.getElementById('identity-recovery-create-btn');
+            const primary = document.getElementById('primary-btn');
+
+            setStatus(err.message || 'Add this device from your other device.', 'error');
+            primary?.classList.add('hidden');
+            if (recovery) {
+                recovery.classList.remove('hidden');
+                recovery.style.display = 'block';
+            }
+            if (linkBtn) {
+                linkBtn.href = linkUrl;
+            }
+            if (createBtn) {
+                const showCreate = code === 'existing_passkey_needs_device_link'
+                    || code === 'confirm_new_identity_required';
+                createBtn.classList.toggle('hidden', !showCreate);
+                createBtn.style.display = showCreate ? 'block' : 'none';
+                createBtn.onclick = async (event) => {
+                    event.preventDefault();
+                    const confirmed = window.confirm(
+                        'Create a brand-new lemma.id on this device? This will be a different person from your existing lemma.id unless you add this device instead.',
+                    );
+                    if (!confirmed) return;
+                    createBtn.disabled = true;
+                    recovery?.classList.add('hidden');
+                    if (recovery) recovery.style.display = 'none';
+                    primary?.classList.remove('hidden');
+                    try {
+                        if (typeof retryFn === 'function') {
+                            await retryFn({ confirmNewIdentity: true });
+                        }
+                    } catch (retryErr) {
+                        if (!presentIdentityForkGuard(retryErr, retryFn)) {
+                            setStatus(retryErr?.message || 'Something went wrong.', 'error');
+                        }
+                    } finally {
+                        createBtn.disabled = false;
+                    }
+                };
+            }
+            return true;
+        }
+
+        async function prepareEmptyStoreForkUi() {
+            await ensureWalletInitialized();
+            const info = await wallet.getWalletInfo({ lite: true });
+            if (info.hasWallet) return false;
+            if (typeof wallet.probeExistingResidentPasskey !== 'function') return false;
+            const probe = await wallet.probeExistingResidentPasskey();
+            if (!probe?.found) return false;
+            setStatus(
+                'This device has your lemma.id passkey, but not your lemma.id data. Add this device from your other device.',
+                'info',
+            );
+            await presentIdentityForkGuard({
+                code: 'existing_passkey_needs_device_link',
+                message: 'This device has your lemma.id passkey, but not your lemma.id data. Add this device from your other device.',
+                linkUrl: `${window.location.origin}/link`,
+            });
+            return true;
         }
 
         async function probeSessionWalletState() {
@@ -750,7 +839,7 @@
             setBrandLogoUnlocked(tone === 'success');
             if (tone === 'loading') {
                 // Fresh humanity-doubt keeps the yellow caution mark until
-                // success/blocked — do not drop is-caution while working.
+                // success/blocked  -  do not drop is-caution while working.
                 mark?.classList.remove('is-blocked');
                 if (!isFreshIdv) mark?.classList.remove('is-caution');
             }
@@ -1414,7 +1503,7 @@
             }
         }
 
-        async function ensureWalletUnlocked() {
+        async function ensureWalletUnlocked(options = {}) {
             return withIdvBusy(async () => {
             await ensureWalletInitialized();
             const walletInfo = await wallet.getWalletInfo();
@@ -1427,7 +1516,10 @@
                     : (consumerCopy().status?.unlocking || 'Unlocking with your passkey…'),
                 'loading',
             );
-            const result = await wallet.ensureIsHumanIssuanceReady({ isHumanIssuance: true });
+            const result = await wallet.ensureIsHumanIssuanceReady(walletIssuanceOpts({
+                isHumanIssuance: true,
+                confirmNewIdentity: options.confirmNewIdentity === true,
+            }));
             if (!result.ready) {
                 throw new Error('Wallet unlock failed. Complete the passkey prompt or try again.');
             }
@@ -1436,13 +1528,16 @@
             });
         }
 
-        async function ensureWalletReadyForSiteProof() {
+        async function ensureWalletReadyForSiteProof(options = {}) {
             await ensureWalletInitialized();
             if (wallet.isIsHumanLockValid && wallet.isIsHumanLockValid()) {
                 await wallet._restoreIsHumanLockBundleIfValid();
             }
             if (siteProofUsesContinuityOnly()) {
-                const result = await wallet.ensureIsHumanIssuanceReady({ isHumanIssuance: false });
+                const result = await wallet.ensureIsHumanIssuanceReady(walletIssuanceOpts({
+                    isHumanIssuance: false,
+                    confirmNewIdentity: options.confirmNewIdentity === true,
+                }));
                 if (!result.ready) {
                     throw new Error('Wallet unlock failed. Complete the passkey prompt or try again.');
                 }
@@ -1450,7 +1545,7 @@
                 if (!walletId) throw new Error('Wallet unlock failed');
                 return;
             }
-            await ensureWalletUnlocked();
+            await ensureWalletUnlocked(options);
         }
 
         async function performPasskeyUnlock({
@@ -1461,7 +1556,10 @@
             return withIdvBusy(async () => {
                 setStatus('Unlocking with your passkey…', 'loading');
                 await ensureWalletInitialized();
-                const result = await wallet.ensureIsHumanIssuanceReady({ isHumanIssuance: true });
+                const result = await wallet.ensureIsHumanIssuanceReady(walletIssuanceOpts({
+                    isHumanIssuance: true,
+                    confirmNewIdentity: true,
+                }));
                 if (!result.ready) {
                     throw new Error('Wallet unlock failed. Complete the passkey prompt or try again.');
                 }
@@ -2084,17 +2182,23 @@
                     await presentBlockedState(detail);
                     return;
                 }
+                if (presentIdentityForkGuard(err, issueSiteProofAndClose)) {
+                    return;
+                }
                 console.warn('[isHuman IDV] site proof auto-issue skipped:', err?.message || err);
             }
 
             if (siteProofUsesContinuityOnly()) {
+                if (await prepareEmptyStoreForkUi()) {
+                    return;
+                }
                 const isNewUser = await isNewWalletUser();
                 btn.textContent = isNewUser ? 'Create your lemma.id' : 'Continue';
                 btn.disabled = false;
                 btn.classList.remove('hidden');
                 setStatus(
                     isNewUser
-                        ? 'Create a passkey on this device to sign in - no email or password.'
+                        ? 'First time here? Tap create after confirming, or add this device if you already have a lemma.id elsewhere.'
                         : 'Tap continue and your passkey unlocks this device for the day.',
                     'info',
                 );
@@ -2299,13 +2403,13 @@
             return false;
         }
 
-        async function issueSiteProofAndClose() {
+        async function issueSiteProofAndClose(options = {}) {
             return withIdvBusy(async () => {
             setStatus(consumerCopy().status?.siteProofIssuing || 'Confirming you\u2019re human…', 'loading');
             if (await needsMobileHandoffClaim()) {
                 await claimMobileHandoffIfPresent();
             }
-            await ensureWalletReadyForSiteProof();
+            await ensureWalletReadyForSiteProof(options);
 
             // v2 (Phase 1.1): pull + open person-root seed envelopes so site
             // signing keys derive from wallet_local_seed. No-op when the flag is
@@ -2318,7 +2422,7 @@
 
             // Prefer deriving the site-scoped VC from the local master (or from
             // server reissue if the local copy was lost). One human proof per
-            // person — full IDV only when the wallet was never verified
+            // person  -  full IDV only when the wallet was never verified
             // (wallet_not_verified via ensureMasterProofForIssuance fallback).
             const pkg = await resolveSiteProofPackageForClose();
             if (!pkg) {
@@ -2434,10 +2538,10 @@
             );
         }
 
-        async function runFreshIdvAndClose() {
+        async function runFreshIdvAndClose(options = {}) {
             return withIdvBusy(async () => {
             setStatus(consumerCopy().status?.freshStarting || 'Starting a fresh verification…', 'loading');
-            await ensureWalletUnlocked();
+            await ensureWalletUnlocked(options);
 
             // 1. If we returned from a previous IDV attempt, try
             //    to use that session first, but if it failed/expired, fall
@@ -2523,12 +2627,12 @@
             });
         }
 
-        async function runVerification() {
+        async function runVerification(options = {}) {
             if (isFreshIdv) {
-                return runFreshIdvAndClose();
+                return runFreshIdvAndClose(options);
             }
             if (isSiteProofIssue) {
-                return issueSiteProofAndClose();
+                return issueSiteProofAndClose(options);
             }
 
             if (await needsMobileHandoffClaim()) {
@@ -2539,7 +2643,7 @@
             }
 
             setStatus(consumerCopy().status?.checking || 'One moment…', 'loading');
-            await ensureWalletUnlocked();
+            await ensureWalletUnlocked(options);
 
             if (await hasMasterProof()) {
                 setStatus(consumerCopy().status?.alreadyVerified || 'You\u2019re already verified.', 'success');
@@ -2616,12 +2720,20 @@
                     await runActionSignAndClose();
                     return;
                 }
-                await runVerification();
+                await runVerification({ confirmNewIdentity: true });
             } catch (err) {
                 console.error('[isHuman IDV] primary action failed:', err);
                 const detail = err?.message || err?.toString() || 'Verification failed';
                 if (isBlockedStatusMessage(detail)) {
                     await presentBlockedState(detail);
+                    return;
+                }
+                if (presentIdentityForkGuard(err, (opts) => {
+                    if (isSiteProofIssue) {
+                        return issueSiteProofAndClose(opts);
+                    }
+                    return ensureWalletUnlocked(opts);
+                })) {
                     return;
                 }
                 if (detail.includes('wallet_id') || detail.includes('challenge')) {

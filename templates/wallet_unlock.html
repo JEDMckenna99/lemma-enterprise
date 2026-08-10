@@ -315,10 +315,10 @@
             
             <!-- No Wallet Options -->
             <div class="no-wallet-section" id="no-wallet-section">
-                <p>No lemma.id on this device</p>
+                <p>No lemma.id data on this device</p>
                 <div class="alt-actions">
-                    <button class="alt-btn alt-btn-create" id="create-wallet-btn">Create your lemma.id</button>
-                    <a href="/wallet/link" class="alt-btn alt-btn-link">Link Existing</a>
+                    <a href="/wallet/link" class="alt-btn alt-btn-link">Add this device</a>
+                    <button class="alt-btn alt-btn-create" id="create-wallet-btn">Create new lemma.id</button>
                 </div>
             </div>
             
@@ -566,13 +566,18 @@ async function getStoredSecretDirectly() {
 
 // Create new wallet
 async function createWallet() {
-    const btn = document.getElementById('unlock-btn');
+    const confirmed = window.confirm(
+        'Create a brand-new lemma.id on this device? If you already have one elsewhere, use Add this device instead.',
+    );
+    if (!confirmed) return;
+
+    const btn = document.getElementById('create-wallet-btn');
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span>Creating lemma.id...';
     
     try {
         await wallet.init();
-        const result = await wallet.registerPasskey();
+        const result = await wallet.registerPasskey({ confirmNewIdentity: true });
         
         if (result.success) {
             showStatus('lemma.id created!', 'success');
@@ -583,12 +588,16 @@ async function createWallet() {
             }
         } else {
             showStatus(result.message || 'Failed to create lemma.id', 'error');
-            btn.innerHTML = 'Unlock with Passkey';
+            btn.textContent = 'Create new lemma.id';
             btn.disabled = false;
         }
     } catch (e) {
-        showStatus(e.message, 'error');
-        btn.innerHTML = 'Unlock with Passkey';
+        if (LemmaWallet.isIdentityForkGuardError?.(e)) {
+            showStatus(e.message, 'error');
+        } else {
+            showStatus(e.message, 'error');
+        }
+        btn.textContent = 'Create new lemma.id';
         btn.disabled = false;
     }
 }
@@ -738,7 +747,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.log('[Unlock Debug] SDK missed wallet but direct access found it!');
                 showStatus('lemma.id detected - click to authenticate', 'info');
             } else {
-                showStatus('No lemma.id found - create one or link an existing lemma.id', 'info');
+                showStatus('No lemma.id data on this device — add this device or create a new one', 'info');
                 document.getElementById('no-wallet-section').style.display = 'block';
                 return; // No wallet, nothing more to check
             }

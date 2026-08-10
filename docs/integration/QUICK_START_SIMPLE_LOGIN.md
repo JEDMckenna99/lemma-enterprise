@@ -1,7 +1,7 @@
 # Quick start: verify a lemma proof
 
 Gate a sensitive action with a locally verified presentation. Your backend gets a
-site-private **`ppid`** + **`assurance`** and enforces policy — one trial per
+site-private **`ppid`** + **`assurance`** and enforces policy: one trial per
 human, one code per person, post-ban blocks, etc. Users mint presentations via
 passkey unlock in the lemma.id popup; you verify with `@lemma.id/proof-verifier`
 or `lemma_proof_verifier.py`.
@@ -25,12 +25,12 @@ server-side block/unblock APIs.
 
 ---
 
-## Step 1: Gate an action (SDK — recommended)
+## Step 1: Gate an action (SDK, recommended)
 
 ```html
 <script src="https://lemma.id/sdk/proof-verifier.js"></script>
 <script>
-  const SITE_ID = 'app.example.com'; // canonical hostname — not site_... ids
+  const SITE_ID = 'app.example.com'; // canonical hostname, not site_... ids
 
   async function claimTrial() {
     const verifier = new ProofVerifier({ siteId: SITE_ID });
@@ -79,7 +79,7 @@ Same SDK; use for gated actions or optional login UX:
 </script>
 ```
 
-Attributes: `site-id` (required), `required-assurance` (default `passkey`), `auto-provision` (default `true`), `label` (button text), `lemma-origin` (optional — override the lemma.id API/popup host for staging or local demos; omit in production).
+Attributes: `site-id` (required), `required-assurance` (default `passkey`), `auto-provision` (default `true`), `label` (button text), `lemma-origin` (optional: override the lemma.id API/popup host for staging or local demos; omit in production).
 
 ```html
 <!-- Staging demo site pointing at demo.lemma.id -->
@@ -155,7 +155,7 @@ const user = await findOrCreateUserByPpid(result.ppid);
 res.cookie('session', signSession(user.id), { httpOnly: true, secure: true, sameSite: 'lax' });
 ```
 
-See [Integration guide — sessions](SIMPLE_INTEGRATION_GUIDE.md#4-session-layer-your-responsibility).
+See [Integration guide: sessions](SIMPLE_INTEGRATION_GUIDE.md#4-session-layer-your-responsibility).
 
 ---
 
@@ -178,7 +178,7 @@ canonical hostname deliberately before launch (apex vs `app.` subdomain; `www.` 
 stripped) and keep it stable.
 
 **If you later change domains, every user derives a new PPID on the new hostname.**
-There is deliberately no "remap my users" API — such an endpoint would let sites
+There is deliberately no "remap my users" API: such an endpoint would let sites
 correlate users across hostnames, which the pairwise design exists to prevent.
 Migrate by linking accounts yourself during a dual-run window:
 
@@ -200,7 +200,7 @@ to know both IDs.
 
 | Tier | Recovery |
 |------|----------|
-| `passkey` (continuity) | Durable across device upgrades when passkeys sync (iCloud/Google). Adding a second device via [lemma.id/link](https://lemma.id/link) improves continuity. Guaranteed account recovery is not promised for passkey-only lemma.id instances. |
+| `passkey` (continuity) | Passkey vault sync (iCloud/Google) may restore the WebAuthn credential on a new device, but **not** lemma.id contents. Same-person continuity requires [lemma.id/link](https://lemma.id/link) or site-side recovery keyed to `ppid`. Guaranteed account recovery is not promised for passkey-only lemma.id instances. |
 | `ishuman` (step-up) | Same PPID; IDV-backed recovery on the paid tier. |
 
 Document this honestly to users. For the full recovery matrix, lemma.id outage/failure behavior, and a "what this is not"
@@ -226,7 +226,7 @@ Backend: match `requiredAssurance` in your verifier config.
 
 ## What verify returns (profile data)
 
-Verification returns **`ppid`** + **`assurance`** only — no email, name, or avatar from lemma.id. lemma owns the proof; you own the profile.
+Verification returns **`ppid`** + **`assurance`** only: no email, name, or avatar from lemma.id. lemma owns the proof; you own the profile.
 
 If you also issue sessions, collect display names in **your** database keyed by `ppid` after first successful verify.
 
@@ -292,10 +292,10 @@ For server paths that read `TRUSTED_ISSUER_DIDS`, set it to the test issuer DID 
 
 ## Examples in this repo
 
-- [`examples/flask_ishuman_signup/`](../../examples/flask_ishuman_signup/) — Flask verify + optional session
-- [`examples/express_ishuman_signup/`](../../examples/express_ishuman_signup/) — Express
-- [`examples/fastapi_ishuman_signup/`](../../examples/fastapi_ishuman_signup/) — FastAPI
-- [`examples/nextjs_ishuman_signup/`](../../examples/nextjs_ishuman_signup/) — Next.js App Router
+- [`examples/flask_ishuman_signup/`](../../examples/flask_ishuman_signup/): Flask verify + optional session
+- [`examples/express_ishuman_signup/`](../../examples/express_ishuman_signup/): Express
+- [`examples/fastapi_ishuman_signup/`](../../examples/fastapi_ishuman_signup/): FastAPI
+- [`examples/nextjs_ishuman_signup/`](../../examples/nextjs_ishuman_signup/): Next.js App Router
 
 ---
 
@@ -313,6 +313,6 @@ Site API keys are **not** required for local verify. Register a site and issue k
 | `site_id_mismatch` | Same hostname in browser `siteId` and backend verifier |
 | `assurance_insufficient` | Match client and backend `requiredAssurance` |
 | `derive_site_proof_rate_limited` | Back off; see [ERROR_CODES.md](../ERROR_CODES.md) |
-| `passkey_unsupported`, `popup_blocked`, `user_cancelled`, `rate_limited` | SDK stable outcomes — see [BROWSER_SUPPORT.md](BROWSER_SUPPORT.md) |
+| `passkey_unsupported`, `popup_blocked`, `user_cancelled`, `rate_limited` | SDK stable outcomes: see [BROWSER_SUPPORT.md](BROWSER_SUPPORT.md) |
 
 Full reference: [ERROR_CODES.md](../ERROR_CODES.md)

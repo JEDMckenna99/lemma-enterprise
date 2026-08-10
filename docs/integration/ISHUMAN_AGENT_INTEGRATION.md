@@ -30,7 +30,7 @@
 
 1. **Browser:** Load `proof-verifier.js` (and optionally `lemma-signin.js`), then call `verifyForBackend({ autoProvision: true, requiredAssurance: 'ishuman' })` before gated actions (or `'passkey'` for continuity-only).
 2. **Backend:** Accept the signed `presentation`, verify it locally with `@lemma.id/proof-verifier` or `lemma-proof-verifier`, and use **`result.ppid`** + **`result.assurance`** from the verified result.
-3. **Enforcement:** Policy on PPID — one-per-human claims, site-block, stamps on mutations.
+3. **Enforcement:** Policy on PPID: one-per-human claims, site-block, stamps on mutations.
 4. **Assurance policy:** Default Sybil-sensitive actions to `ishuman`. Use `passkey` for continuity-only gates.
 5. **Optional:** Issue your own session cookie from the same verified presentation.
 6. **Optional:** Register a site API key for server-side PPID blocks.
@@ -421,7 +421,7 @@ result = ctx.verify_action_stamp(
 **Replay protection:** configure `nonceStoreMode: 'required'` in production and use
 `InMemoryNonceStore` only for tests. For multi-process deployments, inject
 `RedisNonceStore` from `lemma_ishuman_nonce_store` and **await**
-`nonceStore.consume(...)` — the Redis store is async and uses atomic `SET NX`.
+`nonceStore.consume(...)`: the Redis store is async and uses atomic `SET NX`.
 
 **Live presale reference:** The tickets demo at [tickets-demo.lemma.id/?tour=presale](https://tickets-demo.lemma.id/?tour=presale) walks through challenge → `stampAction` register → fresh-passkey claim with a site-local one-code-per-PPID ledger. See the [public demo walkthrough](https://lemma.id/docs/demo/PRESALE_DEMO_SCRIPT.md).
 
@@ -647,7 +647,7 @@ Confirm with the developer:
 
 ## Privacy summary (for developer communication)
 
-- Default login is **passkey** — no IDV required.
+- Default login is **passkey**: no IDV required.
 - Optional **isHuman** step-up runs live IDV once in a Lemma popup when the site requests it.
 - Relying site receives `{ ok, ppid, assurance }` (and related proof fields), never government ID, selfie, or legal name.
 - Each site gets a **pairwise-unlinkable** PPID; sites own profile fields and sessions.

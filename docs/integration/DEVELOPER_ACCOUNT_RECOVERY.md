@@ -111,7 +111,7 @@ This recovery system is for **developer accounts** on Lemma.id.
 
 For end-users on your platform who lose their passkeys:
 
-1. **Primary recovery**: Users link lemma.id across multiple devices (passkeys sync automatically)
+1. **Primary recovery**: Users link lemma.id across multiple devices at [lemma.id/link](https://lemma.id/link). Passkey vault sync alone does not transfer lemma.id contents.
 2. **Custom recovery**: Build your own email-based recovery using your internal user IDs
 
 ### Building Custom Recovery

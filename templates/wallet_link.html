@@ -338,7 +338,7 @@ async function finishPasskeyOnNewDevice(result, waitEl, mode) {
     }
 
     try {
-        await wallet.registerPasskey({ force: true });
+        await wallet.registerPasskey({ force: true, allowCreateAlongsideExisting: true });
         if (typeof wallet.fetchAndStoreSeedEnvelopes === 'function') {
             try { await wallet.fetchAndStoreSeedEnvelopes(); } catch (_) {}
         }
@@ -400,7 +400,7 @@ async function finishSyncSuccess(result, statusEl) {
     }
     try {
         await wallet.ensureDeviceEnrollmentAfterSeedTransfer(result);
-        await wallet.registerPasskey({ force: true });
+        await wallet.registerPasskey({ force: true, allowCreateAlongsideExisting: true });
         waitEl.innerHTML =
             '<strong>Device ready</strong><br><br>' +
             'Passkey created — opening the manager…';
