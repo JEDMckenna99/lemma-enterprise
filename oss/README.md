@@ -1,5 +1,7 @@
 # lemma.id: verifiable source
 
+[![OSS public surface](https://github.com/JEDMckenna99/lemma-enterprise/actions/workflows/oss-public-surface.yml/badge.svg)](https://github.com/JEDMckenna99/lemma-enterprise/actions/workflows/oss-public-surface.yml)
+
 This repository contains every artifact a relying site or auditor needs to
 verify lemma.id's claims **without trusting the lemma.id service**: the
 verifier code sites run on their own backends, the browser SDK served from
@@ -8,8 +10,41 @@ protocol specs. Apache-2.0 licensed.
 
 lemma.id is a **proof layer** for site-private person continuity: verify a
 signed presentation, get a stable site-private `ppid`, and optionally step up
-to **isHuman** (one verified human per account, same PPID) for Sybil-resistant
-enforcement: no usernames, passwords, or email collection on the default path.
+to **isHuman** (IDV-backed person / document uniqueness, same PPID) for
+Sybil-hardened enforcement: no usernames, passwords, or email collection on the
+default path. isHuman is not biometric unique-human.
+
+## Quick start (five minutes, offline)
+
+No network, API keys, or WebAuthn required:
+
+```bash
+cd oss   # when working inside the monorepo staging tree
+python demo/five_minute.py
+# or
+node demo/five_minute.mjs
+```
+
+See [`demo/README.md`](demo/README.md).
+
+## Documentation index
+
+| Doc | Purpose |
+|-----|---------|
+| [`DESIGN_DECISIONS.md`](DESIGN_DECISIONS.md) | Why PPIDs, Ed25519, pinned roots, Bloom snapshots |
+| [`SECURITY_LIMITATIONS.md`](SECURITY_LIMITATIONS.md) | Precisely what lemma.id does not prove |
+| [`docs/TRUST_BOUNDARIES.md`](docs/TRUST_BOUNDARIES.md) | Architecture and trust-boundary diagram |
+| [`docs/CASE_STUDY_TRUST_LIST_PIN.md`](docs/CASE_STUDY_TRUST_LIST_PIN.md) | Vulnerability, exploit condition, fix, regression test |
+| [`specs/HUMAN_AUTH_SECURITY_CONTRACT.md`](specs/HUMAN_AUTH_SECURITY_CONTRACT.md) | Full proof semantics |
+
+## Tests and fixtures
+
+Cross-language protocol fixtures live in [`fixtures/protocol/`](fixtures/protocol/).
+Run the harness from `oss/`:
+
+```bash
+pytest tests/ -q
+```
 
 ## What is here, and what each piece lets you verify
 
@@ -81,5 +116,6 @@ curl -s https://lemma.id/sdk/proof-verifier.js | diff - sdk/proof-verifier.js
 ## Provenance
 
 This tree is assembled from the lemma.id monorepo by
-`scripts/build_oss_repo.py`; each file's canonical source path is listed
-there. Issues and audits welcome.
+`scripts/build_oss_repo.py`. Generated paths (packages, sdk, wallet, specs)
+are rebuilt from canonical sources; docs, demo, fixtures, and tests are
+hand-maintained under `oss/`. Issues and audits welcome.

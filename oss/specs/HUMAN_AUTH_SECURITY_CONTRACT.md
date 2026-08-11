@@ -28,7 +28,7 @@ security meaning of the proofs used to implement that contract.
 |---|---|---|---|
 | Passkey WebAuthn assertion | User verification and possession of the registered authenticator for the exact RP ID, origin, and challenge | Unique humanity, legal identity, site membership, or permission | Server verifies challenge, origin, RP ID, signature, sign counter policy, user verification, purpose, and expiry |
 | Passkey-tier credential | Continuity with a lemma.id-bound provisional or known person root at `assurance=passkey` | IDV-backed humanity or one-person-per-account assurance | Verify signed presentation, site binding, expiry, revocation, and assurance |
-| isHuman-tier credential | IDV-backed human assurance for the credential subject at `assurance=ishuman` | That every later action is manually performed by that person, or that account sharing is impossible | Verify signed presentation, exact assurance policy, site binding, expiry, revocation, and convergence |
+| isHuman-tier credential | IDV-backed human assurance for the credential subject at `assurance=ishuman`, anchored by document-root uniqueness | Absolute unique biological humanity across all government IDs; that every later action is manually performed by that person; that account sharing is impossible | Verify signed presentation, exact assurance policy, site binding, expiry, revocation, and convergence |
 | PPID | Stable opaque account handle for one canonical person root and normalized site hostname | Authentication, permission, legal identity, or a secret | Accept only after extracting it from a verified signed presentation |
 | lemma.id Ed25519 assertion (`wallet_assertion`) | Possession of an already authorized lemma.id device signing key and binding of the declared fields to a server challenge | Passkey user verification, human assurance, site administration, or authority to enroll itself | Verify enrolled non-revoked device key, nonce, lemma.id binding, purpose-bound fields, expiry, and replay state |
 | lemma.id unlock session cookie or unlock token (`wallet_session`) | Server-issued cached unlock state for the lemma.id named in the signed token | Fresh passkey proof, unique humanity, permission, site ownership, or authority to create new lemma.id keys | Verify server signature, expiry, intended audience and purpose; restrict to explicitly permitted low-risk operations |
@@ -43,7 +43,8 @@ security meaning of the proofs used to implement that contract.
 ## Assurance and authorization rules
 
 1. `passkey` and `ishuman` are assurance values, not permission scopes.
-2. `ishuman` is required when policy promises one IDV-backed human per account.
+2. `ishuman` is required when policy promises IDV-backed person assurance
+   (document uniqueness). It does not promise biometric unique-human.
 3. A valid identity proof does not grant site administration. Administrative
    access requires a separately verified permission proof.
 4. A PPID is never accepted as a bearer credential.
@@ -108,6 +109,8 @@ revocations, blocks, or billing restrictions exist.
 - Preventing coercion or voluntary account sharing in every circumstance
 - Proving that every routine action was manually performed by the verified
   person
+- Absolute unique biological humanity across distinct government documents
+  (multi-document residual Sybil); see [`HUMAN_UNIQUENESS_BOUNDS.md`](HUMAN_UNIQUENESS_BOUNDS.md)
 - Exposing legal identity to relying sites
 - Treating email, phone number, device fingerprint, lemma.id id (`wallet_id`), or PPID as
   identity proof by itself

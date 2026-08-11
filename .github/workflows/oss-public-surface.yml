@@ -1,0 +1,78 @@
+name: OSS public surface
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "oss/**"
+      - "packages/proof-verifier-js/**"
+      - "packages/proof-verifier-py/**"
+      - "scripts/build_oss_repo.py"
+      - "static/js/ishuman-verifier.js"
+      - "static/js/lemma-signin.js"
+      - "static/js/lemma-keys.js"
+      - "static/js/wallet-at-rest-crypto.js"
+      - "static/js/lemma-wallet.js"
+      - "docs/product/LEMMA_ID_PRESENTATION_MODEL.md"
+      - "docs/security/HUMAN_AUTH_SECURITY_CONTRACT.md"
+      - "docs/integration/SIGN_IN_TRUST_AND_RECOVERY.md"
+      - "docs/cryptographic/NETWORK_ROOT_PUBKEYS.json"
+      - "tests/test_oss_protocol_fixtures.py"
+      - ".github/workflows/oss-public-surface.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "oss/**"
+      - "packages/proof-verifier-js/**"
+      - "packages/proof-verifier-py/**"
+      - "scripts/build_oss_repo.py"
+      - "static/js/ishuman-verifier.js"
+      - "static/js/lemma-signin.js"
+      - "static/js/lemma-keys.js"
+      - "static/js/wallet-at-rest-crypto.js"
+      - "static/js/lemma-wallet.js"
+      - "docs/product/LEMMA_ID_PRESENTATION_MODEL.md"
+      - "docs/security/HUMAN_AUTH_SECURITY_CONTRACT.md"
+      - "docs/integration/SIGN_IN_TRUST_AND_RECOVERY.md"
+      - "docs/cryptographic/NETWORK_ROOT_PUBKEYS.json"
+      - "tests/test_oss_protocol_fixtures.py"
+      - ".github/workflows/oss-public-surface.yml"
+
+jobs:
+  oss-surface:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Python test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest cryptography
+
+      - name: Verify oss generated tree matches canonical sources
+        run: python scripts/build_oss_repo.py --check
+
+      - name: Run five-minute Python demo
+        run: python oss/demo/five_minute.py
+
+      - name: Run five-minute Node demo
+        run: node oss/demo/five_minute.mjs
+
+      - name: Run oss protocol fixture tests
+        run: pytest oss/tests -q
+
+      - name: Run monorepo oss fixture smoke
+        run: pytest tests/test_oss_protocol_fixtures.py -q
