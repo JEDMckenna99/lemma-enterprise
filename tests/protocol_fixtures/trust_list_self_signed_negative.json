@@ -1,5 +1,6 @@
 {
   "description": "Negative trust-list vector: signer_pubkey not in pinned network-root set.",
   "expected_reason": "trust_list_signer_not_pinned",
-  "note": "Use tests/test_protocol_fixtures_section4.py to mint live vectors from build_signed_trust_list()."
+  "note": "Canonical copy lives in oss/fixtures/protocol/trust_list_unpinned_signer.json",
+  "fixture_path": "oss/fixtures/protocol/trust_list_unpinned_signer.json"
 }

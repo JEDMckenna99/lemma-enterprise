@@ -1,0 +1,9 @@
+{
+  "description": "Assurance policy ladder: passkey accepts passkey+ishuman; ishuman requires ishuman.",
+  "cases": [
+    {"actual": "ishuman", "required": "passkey", "expected": true},
+    {"actual": "passkey", "required": "passkey", "expected": true},
+    {"actual": "passkey", "required": "ishuman", "expected": false},
+    {"actual": "", "required": "ishuman", "expected": false}
+  ]
+}

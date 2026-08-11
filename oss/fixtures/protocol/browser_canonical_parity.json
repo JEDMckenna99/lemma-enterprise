@@ -1,0 +1,15 @@
+{
+  "description": "browserCanonicalMessage v2 parity vector (credential.id included).",
+  "credential": {
+    "id": "ishuman_site_node_pin",
+    "issuer": "did:lemma:issuer:test",
+    "subject": "did:lemma:ppid_abc",
+    "claims": {
+      "assurance": "ishuman",
+      "isHuman": true,
+      "siteId": "example.com",
+      "issuedAt": "1700000000",
+      "expiresAt": "4102444800"
+    }
+  }
+}

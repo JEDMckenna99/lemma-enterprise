@@ -1,0 +1,25 @@
+{
+  "description": "Negative trust-list vector: signer_pubkey not in pinned network-root set.",
+  "expected_reason": "trust_list_signer_not_pinned",
+  "pinned_roots_hex": [
+    "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  ],
+  "trust_list": {
+    "version": 1,
+    "generated_at_unix": 1700000000,
+    "valid_until_unix": 4102444800,
+    "content_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "signer_pubkey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "issuers": [
+      {
+        "did": "did:lemma:issuer:evil",
+        "pubkey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "status": "active",
+        "valid_from_unix": 0,
+        "valid_until_unix": 0,
+        "priority": 0
+      }
+    ]
+  }
+}
