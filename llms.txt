@@ -2,11 +2,12 @@
 
 lemma.id is a **local-first proof layer** for relying sites: verify a signed
 presentation on your backend and get a site-private, stable `ppid` + assurance
-level. Use it for **person continuity under abuse**: one handle per human per
-site, optional **isHuman** step-up (one verified human per account on the same
-PPID), action stamps, and site-block so bans survive new accounts. Users mint
-presentations with a passkey. Passkey continuity is free and is not Sybil
-resistance by itself; require `ishuman` (IDV) when one human per account matters.
+level. Use it for **person continuity under abuse**: one handle per person per
+site, optional **isHuman** step-up (IDV-backed person assurance on the same
+PPID; uniqueness is per verified document, not biometric unique-human), action
+stamps, and site-block so bans survive new accounts. Users mint presentations
+with a passkey. Passkey continuity is free and is not Sybil resistance by
+itself; require `ishuman` (IDV) on Sybil-sensitive actions.
 
 Keep your existing login if you want; gate sensitive actions with lemma proofs.
 
@@ -62,9 +63,11 @@ Drop-in button (same SDK; use on gated actions or optional login):
 
 ## Assurance ladder (same PPID)
 
-- `passkey`: continuity proof (daily unlock). Not Sybil-resistant alone.
-- `ishuman`: IDV-backed one human per account (Sybil-sensitive actions: trials,
-  tickets, payouts, post-ban recovery)
+- `passkey`: continuity proof (daily unlock). Not Sybil resistance alone.
+- `ishuman`: IDV-backed person assurance with document uniqueness
+  (Sybil-sensitive actions: trials, tickets, payouts, post-ban recovery).
+  Distinct government documents can yield distinct persons on fresh enrollments;
+  this is not biometric unique-human.
 
 Request per action on client and backend; PPID does not change when upgrading tiers.
 

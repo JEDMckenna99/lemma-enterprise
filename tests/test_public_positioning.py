@@ -1,8 +1,8 @@
-"""Public marketing pages lead with enforcement (one account per verified human).
+"""Public marketing pages lead with enforcement (IDV-backed / document uniqueness).
 
 Free passkey continuity / local verify is the on-ramp; human proofs are the headline claim.
-Honest-copy invariants (passkey tier is not Sybil resistance, no revocation
-overclaims) must survive any repositioning.
+Honest-copy invariants (passkey tier is not Sybil resistance, document uniqueness
+not biometric unique-human, no revocation overclaims) must survive any repositioning.
 """
 
 from __future__ import annotations
@@ -33,7 +33,8 @@ def test_homepage_leads_with_enforcement(public_client):
     assert resp.status_code == 200
     # Enforcement is the headline; hero leads with the consequence claim.
     assert "they stay banned" in body
-    assert "One account per verified human" in body
+    assert "One account per verified document" in body
+    assert "document uniqueness" in body.lower()
     # Free passkey continuity remains the on-ramp, present via component + code sample.
     assert "lemma.id proof layer" in body
     assert "lemma-signin" in body
@@ -44,6 +45,9 @@ def test_homepage_leads_with_enforcement(public_client):
     assert "anyone can create another lemma.id" in body
     assert "Revoke everywhere" not in body
     assert "Network revocation" not in body
+    # Do not ship absolute unique-human overclaims on the homepage.
+    assert "One account per verified human" not in body
+    assert "one verified human per account" not in body.lower()
 
 
 @pytest.mark.integration
@@ -55,6 +59,9 @@ def test_trust_page_distinguishes_passkey_and_human_proofs(public_client):
     assert "passkey" in body.lower()
     assert "human proofs" in body.lower()
     assert "returning lemma.id" in body.lower() or "lemma.id continuity" in body.lower()
+    assert "document uniqueness" in body.lower()
+    assert "distinct documents can still mint distinct persons" in body.lower()
+    assert "one verified human" not in body.lower()
 
 
 @pytest.mark.integration
@@ -88,6 +95,7 @@ def test_ticketing_page_links_live_presale_demo(public_client):
     assert resp.status_code == 200
     assert "?tour=presale" in body
     assert "/docs/demo/PRESALE_DEMO_SCRIPT.md" in body
+    assert "Multi-document farming" in body
 
 
 @pytest.mark.integration
@@ -109,6 +117,9 @@ def test_docs_split_continuity_first(public_client):
     assert "Human proofs" in sbody
     assert "requiredAssurance: 'ishuman'" in sbody
     assert "Global Bloom revocation" in sbody
+    assert "Uniqueness bound" in sbody
+    assert "per verified government document" in sbody
+    assert "not biometric unique-human" in sbody
 
     legacy = public_client.get("/docs/ishuman", follow_redirects=True)
     assert legacy.status_code == 200
@@ -120,6 +131,9 @@ def test_index_template_ties_rotation_resistance_to_ishuman():
     index = (ROOT / "templates" / "modern" / "index.html").read_text(encoding="utf-8")
     assert "does not stop someone from making another" in index
     assert "anyone can create another lemma.id" in index
+    assert "One account per verified document" in index
+    assert "Distinct documents can still mint distinct persons" in index
+    assert "US or Canadian" in index
 
 
 @pytest.mark.unit
@@ -136,3 +150,39 @@ def test_docs_page_clarifies_human_vs_assurance():
     assert "human</code> vs <code>assurance" in docs
     assert "requiredAssurance: 'ishuman'" in docs or "requiredAssurance: &apos;ishuman&apos;" in docs
     assert "passkey success does not mean IDV-backed humanness" in docs
+    assert "per verified government document" in docs
+
+
+@pytest.mark.unit
+def test_llms_and_public_guides_avoid_absolute_unique_human():
+    llms = (ROOT / "llms.txt").read_text(encoding="utf-8")
+    assert "document uniqueness" in llms.lower() or "per verified document" in llms.lower()
+    assert "not biometric unique-human" in llms
+    assert "one verified human per account" not in llms.lower()
+
+    continuity = (ROOT / "docs" / "integration" / "CONTINUITY_AND_ABUSE.md").read_text(
+        encoding="utf-8"
+    )
+    assert "Uniqueness (honest bound)" in continuity
+    assert "not biometric" in continuity
+    assert "unique-human" in continuity
+
+    bounds = (ROOT / "docs" / "security" / "HUMAN_UNIQUENESS_BOUNDS.md").read_text(
+        encoding="utf-8"
+    )
+    assert "one verified government document attestation" in bounds
+    assert "Claim that is false" in bounds
+
+
+@pytest.mark.unit
+def test_public_source_links_use_lemma_proof_repo():
+    """HN and docs must not 404 on the private enterprise repo."""
+    paths = (
+        ROOT / "docs" / "integration" / "SIGN_IN_TRUST_AND_RECOVERY.md",
+        ROOT / "oss" / "specs" / "SIGN_IN_TRUST_AND_RECOVERY.md",
+        ROOT / "docs" / "launch" / "SHOW_HN_SIGN_IN_WITH_LEMMA.md",
+    )
+    for path in paths:
+        text = path.read_text(encoding="utf-8")
+        assert "lemma-enterprise/tree" not in text, path
+        assert "github.com/JEDMckenna99/lemma-proof" in text, path

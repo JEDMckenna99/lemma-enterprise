@@ -180,9 +180,9 @@ presentation. Do not advertise “lemma.id only works in the US and Canada.”
 ## Verify these claims yourself
 
 - **Verifier source (Apache-2.0):**
-  [`packages/proof-verifier-js`](https://github.com/JEDMckenna99/lemma-enterprise/tree/main/packages/proof-verifier-js)
+  [`packages/proof-verifier-js`](https://github.com/JEDMckenna99/lemma-proof/tree/main/packages/proof-verifier-js)
   and
-  [`packages/proof-verifier-py`](https://github.com/JEDMckenna99/lemma-enterprise/tree/main/packages/proof-verifier-py).
+  [`packages/proof-verifier-py`](https://github.com/JEDMckenna99/lemma-proof/tree/main/packages/proof-verifier-py).
 - **Offline test helpers** (mint and verify presentations with no lemma.id and
   no WebAuthn): see "Testing your integration" in
   [QUICK_START_SIMPLE_LOGIN.md](QUICK_START_SIMPLE_LOGIN.md).

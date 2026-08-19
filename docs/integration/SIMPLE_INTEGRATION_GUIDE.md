@@ -138,7 +138,8 @@ Same integration; stricter assurance:
 requiredAssurance: 'ishuman'
 ```
 
-Use for signup bonuses, trials, tickets, payouts, or one-human-per-account policies. Same PPID across tiers.
+Use for signup bonuses, trials, tickets, payouts, or IDV-backed person policies
+(document uniqueness, not biometric unique-human). Same PPID across tiers.
 
 ---
 

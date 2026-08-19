@@ -3,7 +3,7 @@
 {% set active_page = 'signin' %}
 {% set hero_title = 'Proof continuity for your site' %}
 {% set hero_subtitle = 'Verify signed presentations locally and enforce on a site-private ppid plus assurance. One trial per human and bans that stick need a human proof (IDV) on those actions. Keep your existing login if you want.' %}
-{% set page_description = 'lemma.id proof layer: verify presentations on your backend, enforce one-human policy, site-block abusers. Free local verify. Optional isHuman step-up.' %}
+{% set page_description = 'lemma.id proof layer: verify presentations on your backend, enforce IDV-backed person policy, site-block abusers. Free local verify. Optional isHuman step-up.' %}
 
 {% block docs_content %}
 <div class="docs-section" id="quickstart">
@@ -75,7 +75,7 @@ app.post('/api/claim-trial', async (req, res) =&gt; {
 
 <div class="docs-section" id="step-up">
     <h2>Enforcement: isHuman &amp; site-block</h2>
-    <p><code>passkey</code> assurance = continuity. <code>ishuman</code> = IDV-backed one human per account on the <strong>same PPID</strong>. Use site-block API keys when bans must survive browser clears and new accounts.</p>
+    <p><code>passkey</code> assurance = continuity. <code>ishuman</code> = IDV-backed person assurance (document uniqueness) on the <strong>same PPID</strong>. Use site-block API keys when bans must survive browser clears and new accounts.</p>
     <p><a href="{{ url_for('docs_human_proofs') }}" class="btn btn-primary">Human proofs &amp; abuse controls →</a> · <a href="/docs/integration/CONTINUITY_AND_ABUSE.md">Continuity &amp; abuse doc</a></p>
 </div>
 

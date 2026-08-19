@@ -2,7 +2,7 @@
 
 > **Audience:** AI coding agents (Cursor, Copilot, Claude Code, etc.) helping a developer add **lemma.id proof continuity** to a web platform: verify signed presentations locally, enforce policy on a site-private PPID + assurance, optional action stamps and site-block. Passkey unlock mints presentations. Optional session cookies are secondary.
 >
-> **Goal:** Give the platform a site-private PPID for **person continuity under abuse**, plus **isHuman** assurance for one-human-per-account enforcement when Sybil resistance matters, without building KYC, without customer webhooks, and without storing government ID data.
+> **Goal:** Give the platform a site-private PPID for **person continuity under abuse**, plus **isHuman** assurance (IDV-backed person / document uniqueness) for Sybil-sensitive enforcement, without building KYC, without customer webhooks, and without storing government ID data. isHuman is not biometric unique-human.
 >
 > **Start here:** [Continuity & abuse](https://lemma.id/docs/integration/CONTINUITY_AND_ABUSE.md) for the product framing, then [Quick start](https://lemma.id/docs/integration/QUICK_START_SIMPLE_LOGIN.md) to gate an action. This guide remains the canonical contract.
 
@@ -30,8 +30,8 @@
 
 1. **Browser:** Load `proof-verifier.js` (and optionally `lemma-signin.js`), then call `verifyForBackend({ autoProvision: true, requiredAssurance: 'ishuman' })` before gated actions (or `'passkey'` for continuity-only).
 2. **Backend:** Accept the signed `presentation`, verify it locally with `@lemma.id/proof-verifier` or `lemma-proof-verifier`, and use **`result.ppid`** + **`result.assurance`** from the verified result.
-3. **Enforcement:** Policy on PPID: one-per-human claims, site-block, stamps on mutations.
-4. **Assurance policy:** Default Sybil-sensitive actions to `ishuman`. Use `passkey` for continuity-only gates.
+3. **Enforcement:** Policy on PPID: document-uniqueness / IDV-backed person claims, site-block, stamps on mutations.
+4. **Assurance policy:** Default Sybil-sensitive actions to `ishuman`. Use `passkey` for continuity-only gates. Do not claim absolute unique-human.
 5. **Optional:** Issue your own session cookie from the same verified presentation.
 6. **Optional:** Register a site API key for server-side PPID blocks.
 
@@ -149,10 +149,14 @@ PPID from the **verified server result** (`result.ppid`), never from the paralle
 </script>
 ```
 
-Require `requiredAssurance: 'ishuman'` when Sybil resistance matters (trials, ticketing,
+Require `requiredAssurance: 'ishuman'` when Sybil-sensitive policy matters (trials, ticketing,
 payouts). The PPID stays stable when upgrading from passkey to isHuman on the same lemma.id.
 
-### Sybil-resistant signup (T2: isHuman)
+**Uniqueness bound:** `ishuman` is per verified government document (same document rematches;
+additional docs can attach from an already-bound lemma.id). Distinct documents with different
+extracted numbers can yield distinct persons on fresh enrollments — not biometric unique-human.
+
+### Sybil-hardened signup (T2: isHuman)
 
 ```html
 <script src="https://lemma.id/sdk/proof-verifier.js"></script>
@@ -213,7 +217,7 @@ payouts). The PPID stays stable when upgrading from passkey to isHuman on the sa
 ### `human` vs `assurance`
 
 - `human` is the legacy/general success boolean, `true` when the requested assurance tier passed (including `passkey` or `ishuman`).
-- `assurance` tells you which tier passed (`passkey`, `ishuman`, etc.). For Sybil-resistant signup, require `requiredAssurance: 'ishuman'` and verify the backend sees `assurance: ishuman`.
+- `assurance` tells you which tier passed (`passkey`, `ishuman`, etc.). For Sybil-hardened signup, require `requiredAssurance: 'ishuman'` and verify the backend sees `assurance: ishuman`.
 - Passkey success is useful for continuity; it is **not** IDV-backed humanness.
 
 ---
@@ -253,7 +257,7 @@ curl -O https://lemma.id/sdk/proof-verifier.py
 
 Choose assurance independently from the transport tier: T2 means the backend
 verifies a signed presentation. Set its policy to `passkey` for continuity or
-`ishuman` when the endpoint must enforce one verified human per account.
+`ishuman` when the endpoint must enforce IDV-backed person assurance (document uniqueness).
 
 ### Python backend (T2 + site policy)
 
@@ -565,7 +569,7 @@ One **stable PPID** per site subject; proof strength is **assurance**, not a sec
 | Policy | SDK | Backend verifier |
 |--------|-----|------------------|
 | Low-friction signup | `requiredAssurance: 'passkey'` | `required_assurance='passkey'` |
-| Sybil-resistant signup / post-burn recovery | `requiredAssurance: 'ishuman'` | `required_assurance='ishuman'` |
+| Sybil-hardened signup / post-burn recovery | `requiredAssurance: 'ishuman'` | `required_assurance='ishuman'` |
 
 ```javascript
 const { ok, ppid, assurance, presentation } = await verifier.verifyForBackend({

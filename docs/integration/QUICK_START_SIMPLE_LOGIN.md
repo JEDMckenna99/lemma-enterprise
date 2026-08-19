@@ -216,7 +216,7 @@ Use the same SDK and PPID; change policy only:
 ```javascript
 await verifier.verifyForBackend({
   autoProvision: true,
-  requiredAssurance: 'ishuman', // Sybil-resistant
+  requiredAssurance: 'ishuman', // Sybil-hardened (document uniqueness)
 });
 ```
 

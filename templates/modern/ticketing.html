@@ -2,7 +2,7 @@
 {% set is_public_page = true %}
 
 {% block title %}Ticketing &amp; presale farming | lemma.id{% endblock %}
-{% block description %}Why ticket and presale farming survives CAPTCHA, fingerprinting, and waiting rooms, and how lemma.id attacks the identity supply stage so one verified human cannot become thousands of accounts.{% endblock %}
+{% block description %}Why ticket and presale farming survives CAPTCHA, fingerprinting, and waiting rooms, and how lemma.id attacks the identity supply stage so one verified document cannot become thousands of accounts.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -168,7 +168,7 @@
             </div>
             <div class="card">
                 <h3 class="card-title">Per-human purchase caps</h3>
-                <p>The stable PPID makes "one human = N tickets" enforceable. Your site keys a <code>(site_id, ppid, drop_id)</code> ledger off the verified PPID. lemma.id provides the trustworthy one-human handle; you run the counter.</p>
+                <p>The stable PPID makes "one verified document = N tickets" enforceable. Your site keys a <code>(site_id, ppid, drop_id)</code> ledger off the verified PPID. lemma.id provides the document-unique person handle; you run the counter.</p>
             </div>
             <div class="card">
                 <h3 class="card-title">Purchase-time proof stamps</h3>
@@ -195,7 +195,7 @@
     <div class="container">
         <div style="max-width: 760px; margin: 0 auto; padding: 28px 32px; background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px;">
             <p style="margin: 0 0 12px 0; font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--primary);">Worked example</p>
-            <p style="margin: 0; font-size: var(--font-size-base); color: var(--gray-700); line-height: 1.7;">A drop allows two tickets per person. A farmer registers 500 accounts with 500 emails and 500 proxy IPs. With a human proof required at signup, all 500 accounts that trace to the same verified document resolve to the same PPID. Your cap ledger sees one human, not 500. The operator's cheapest input (accounts and devices) has been converted into their most expensive input (verified humans).</p>
+            <p style="margin: 0; font-size: var(--font-size-base); color: var(--gray-700); line-height: 1.7;">A drop allows two tickets per person. A farmer registers 500 accounts with 500 emails and 500 proxy IPs. With a human proof required at signup, all 500 accounts that trace to the same verified document resolve to the same PPID. Your cap ledger sees one person for that document, not 500. The operator's cheapest input (accounts and devices) has been converted into their most expensive input (IDV-backed documents).</p>
         </div>
     </div>
 </section>
@@ -226,7 +226,7 @@
             </div>
             <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; padding: 32px;">
                 <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>Multi-document farming.</strong> lemma.id enforces one document that passes IDV equals one person. A well-capitalized operator can supply multiple genuine identities: rented IDs, purchased identity packages, or synthetic identities engineered to pass liveness. At that point the defense rests on the IDV provider's document authenticity and injection resistance, not lemma.id's layer alone. Event tickets ($100–$1,000/unit) sit in the band where this countermeasure is strongest.</p>
-                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>Post-purchase transfer.</strong> A per-person purchase cap limits how much one verified human can buy. It does not stop them from reselling a freely transferable ticket to a real attendee. Closing that requires binding the ticket to the identity through to entry. That is a separate product decision with real privacy trade-offs.</p>
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>Post-purchase transfer.</strong> A per-person purchase cap limits how much one IDV-backed person can buy. It does not stop them from reselling a freely transferable ticket to a real attendee. Closing that requires binding the ticket to the identity through to entry. That is a separate product decision with real privacy trade-offs.</p>
                 <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin: 0;"><strong>Credential transfer.</strong> Today's model proves a human enrolled, not that the enrolled human is the one acting at a later moment. A verified human can hand their lemma.id to a buyer. Entry re-verification and device-binding improvements are on the roadmap; they are not shipping claims.</p>
             </div>
         </div>

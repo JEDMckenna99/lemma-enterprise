@@ -26,7 +26,7 @@
     <div class="container" style="position: relative; z-index: 1;">
         <p class="docs-hero-eyebrow">Developer documentation</p>
         <h1>{{ hero_title or 'lemma.id Documentation' }}</h1>
-        <p class="docs-hero-subtitle">{{ hero_subtitle or 'Verify signed presentations locally. Enforce one-human policy on a site-private ppid. Optional sessions, action stamps, and site-block.' }}</p>
+        <p class="docs-hero-subtitle">{{ hero_subtitle or 'Verify signed presentations locally. Enforce IDV-backed person policy on a site-private ppid. Optional sessions, action stamps, and site-block.' }}</p>
         
         <!-- Docs Search -->
         <div class="docs-search-container">
@@ -198,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
             title: 'Proof continuity for your site',
             url: '{{ url_for("docs_overview") }}',
             category: 'integration',
-            keywords: 'lemma.id proof continuity ppid assurance site-block one human per account abuse enforce verify locally',
+            keywords: 'lemma.id proof continuity ppid assurance site-block document uniqueness idv-backed person abuse enforce verify locally',
             excerpt: 'Verify signed presentations locally and enforce policy on a site-private ppid + assurance level.'
         },
         {
@@ -254,8 +254,8 @@ document.addEventListener('DOMContentLoaded', () => {
             title: 'Human proofs & abuse controls',
             url: '{{ url_for("docs_human_proofs") }}',
             category: 'integration',
-            keywords: 'ishuman human proof step-up sybil one verified human per account ban idv site block doubt assurance',
-            excerpt: 'Step-up tier: one verified human per account on the same PPID, plus site blocks and doubt challenges.'
+            keywords: 'ishuman human proof step-up sybil document uniqueness idv-backed person ban idv site block doubt assurance',
+            excerpt: 'Step-up tier: IDV-backed person assurance (document uniqueness) on the same PPID, plus site blocks and doubt challenges.'
         },
         {
             title: 'Backend trust tiers',

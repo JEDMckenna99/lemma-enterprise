@@ -1,10 +1,10 @@
 # Continuity & abuse: site-private person proofs
 
 lemma.id gives your backend a **verified, site-private `ppid` and assurance
-level** so you can enforce one-human policy, stamp sensitive actions, and block
-abusers so bans survive new accounts. Users mint presentations with a passkey;
-you verify locally. **Keep your existing login** if you want. Use lemma on gated
-actions only.
+level** so you can enforce IDV-backed person policy, stamp sensitive actions, and
+block abusers so bans survive new accounts. Users mint presentations with a
+passkey; you verify locally. **Keep your existing login** if you want. Use lemma
+on gated actions only.
 
 Canonical contract: [ISHUMAN Agent Integration Guide](ISHUMAN_AGENT_INTEGRATION.md)
 
@@ -15,14 +15,22 @@ Canonical contract: [ISHUMAN Agent Integration Guide](ISHUMAN_AGENT_INTEGRATION.
 | Primitive | Job |
 |-----------|-----|
 | **PPID** | Stable opaque account handle for one person on your hostname |
-| **Assurance** | `passkey` = continuity; `ishuman` = IDV-backed one human per account |
+| **Assurance** | `passkey` = continuity; `ishuman` = IDV-backed person (document uniqueness) |
 | **Presentation** | Short-lived signed proof you verify on your server |
 | **Action stamp** | Bind a mutation to PPID + assurance + nonce/time (T2+) |
 | **Site-block** | Persistent ban keyed to PPID (survives browser clears) |
 
 Passkey unlock mints presentations. That tier is free and is not Sybil resistance
-by itself. Anyone can create another lemma.id. For one human per account, require
+by itself. Anyone can create another lemma.id. For Sybil-sensitive actions, require
 `ishuman` (document + liveness) on the actions that promise it.
+
+### Uniqueness (honest bound)
+
+`ishuman` uniqueness is **per verified government document**, not biometric
+unique-human. The same document rematches the same person; a second document can
+attach when presented from an already-bound lemma.id. Distinct documents with
+different extracted numbers can yield distinct persons on fresh enrollments.
+isHuman raises Sybil cost; it does not claim absolute one-biological-human.
 
 ---
 
@@ -30,7 +38,7 @@ by itself. Anyone can create another lemma.id. For one human per account, requir
 
 Use lemma when you need **person continuity under abuse**:
 
-- One trial / one code / one payout per human
+- One trial / one code / one payout per IDV-backed person (same document)
 - Post-ban enforcement (same person, new browser session)
 - Fraud-sensitive mutations with auditable proof
 - Pairwise-private account keys (no email from lemma, no cross-site correlation by RPs)
@@ -61,9 +69,14 @@ Your session cookie and lemma proofs are independent layers.
 | Tier | Meaning | Use for |
 |------|---------|---------|
 | `passkey` | Continuity with lemma.id-bound person root | Low-friction gates, returning-user checks |
-| `ishuman` | IDV-backed one verified human | Sybil-sensitive signup, trials, tickets, payouts |
+| `ishuman` | IDV-backed person (document uniqueness) | Sybil-sensitive signup, trials, tickets, payouts |
 
 Request `requiredAssurance` on **both** client and backend. PPID does not change when upgrading tiers.
+
+**Geographic note:** passkey lemma.id works anywhere passkeys work. isHuman step-up
+currently accepts US or Canadian driver’s licenses or ID cards only (server
+allowlist + IDV provider config). Sites still receive only `ppid` + assurance — not
+country or document details.
 
 ---
 

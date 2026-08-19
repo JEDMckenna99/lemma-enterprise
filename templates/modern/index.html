@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 {% set is_public_page = true %}
 
-{% block title %}lemma.id | One account per verified human{% endblock %}
+{% block title %}lemma.id | One account per verified document{% endblock %}
 {% block description %}Bans that survive account rotation, one trial per human, and audit stamps on verified actions. Verify presentations locally on your backend. Passkey continuity is free. Step up to human proofs (IDV) where abuse shows up.{% endblock %}
 
 {% block head %}
@@ -231,7 +231,7 @@
             </svg>
             <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary-light); margin-bottom: 16px;">lemma.id</p>
             <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 20px;">When you ban someone,<br>they stay banned.</h1>
-            <p class="home-hero-lede">Verify a signed presentation on your backend and enforce on a site-private ID. On trials, tickets, payouts, and bans, require one human per account. Passkey unlock mints proofs for free; Sybil resistance needs a human proof (IDV) on those actions.</p>
+            <p class="home-hero-lede">Verify a signed presentation on your backend and enforce on a site-private ID. On trials, tickets, payouts, and bans, require an IDV-backed person (document uniqueness). Passkey unlock mints proofs for free; Sybil-sensitive actions need a human proof (IDV).</p>
             <div class="home-hero-ctas">
                 <a href="/docs" class="btn btn-primary">Add to Your Site</a>
                 <a href="/demo" class="btn btn-secondary">See the Demo</a>
@@ -245,11 +245,11 @@
     <div class="container">
         <p style="text-align: center; font-size: var(--font-size-lg); color: var(--gray-700); max-width: 720px; margin: 0 auto 28px; line-height: 1.65;">
             <strong style="color: var(--gray-900);">Account rotation is the attack every signal misses.</strong>
-            The banned user comes back with a fresh email. The trial abuser rotates accounts. The presale farmer turns 500 inboxes into 500 buyers. Devices, IPs, and email verification are cheap to rotate. The only durable handle is the human.
+            The banned user comes back with a fresh email. The trial abuser rotates accounts. The presale farmer turns 500 inboxes into 500 buyers. Devices, IPs, and email verification are cheap to rotate. The durable handle is an IDV-backed person bound to a verified document.
         </p>
         <div class="home-example">
             <p style="margin: 0 0 10px 0; font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--primary);">What enforcement looks like</p>
-            <p style="margin: 0; font-size: var(--font-size-base); color: var(--gray-700); line-height: 1.65;">A visitor unlocks with a passkey and your backend verifies a signed proof. You get a stable account ID that only your site ever sees. On a ban appeal, presale claim, or payout, you require a human proof on that same ID. The account is then backed by one verified person. Coming back after a ban means passing identity verification again, not opening a new inbox.</p>
+            <p style="margin: 0; font-size: var(--font-size-base); color: var(--gray-700); line-height: 1.65;">A visitor unlocks with a passkey and your backend verifies a signed proof. You get a stable account ID that only your site ever sees. On a ban appeal, presale claim, or payout, you require a human proof on that same ID. The account is then backed by an IDV-backed person (same verified document rematches). Coming back after a ban means passing identity verification again, not opening a new inbox.</p>
         </div>
     </div>
 </section>
@@ -273,7 +273,7 @@
             </div>
             <div class="card" style="border-color: var(--primary);">
                 <h3 class="card-title">Human proof</h3>
-                <p>One account per verified human, same account ID. When you ban someone, coming back means passing identity verification again. Add it per action when abuse shows up; nothing about your login changes.</p>
+                <p>One account per verified document, same account ID. When you ban someone, coming back with that document rematches the same person. Add it per action when abuse shows up; nothing about your login changes. Distinct documents can still mint distinct persons on a fresh lemma.id. isHuman currently accepts a US or Canadian driver’s license or ID card; passkey continuity works anywhere passkeys work.</p>
             </div>
         </div>
     </div>
@@ -284,8 +284,8 @@
     <div class="container">
         <div class="home-section-head">
             <p class="eyebrow">Verifiable audit stamps</p>
-            <h2>Prove a verified human did it, later</h2>
-            <p class="text-gray">Stamp a checkout, post, or moderation call with an offline-verifiable proof. Evidence stays in your systems, re-check years later without calling lemma.id. As agents write more of the internet, "a human did this" becomes the claim worth keeping.</p>
+            <h2>Prove an IDV-backed person did it, later</h2>
+            <p class="text-gray">Stamp a checkout, post, or moderation call with an offline-verifiable proof. Evidence stays in your systems, re-check years later without calling lemma.id. As agents write more of the internet, "an IDV-backed person did this" becomes the claim worth keeping.</p>
         </div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; max-width: 960px; margin: 0 auto;">
             <div class="card">
@@ -396,7 +396,7 @@
                 <tbody>
                     <tr>
                         <td><strong>Ban survives rotation</strong><br><span style="font-weight:400;color:var(--gray-600);">requires human proofs</span></td>
-                        <td class="col-lemma">Step up to one account per verified human</td>
+                        <td class="col-lemma">Step up to one account per verified document</td>
                         <td>Attacker rotates email or OAuth account</td>
                         <td>Attacker rotates emails</td>
                     </tr>
@@ -522,7 +522,7 @@
 <section class="section" style="background: var(--black); color: var(--white); padding: 72px 0;">
     <div class="container" style="text-align: center;">
         <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 16px;">Make the next ban stick</h2>
-        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 36px; max-width: 520px; margin-left: auto; margin-right: auto;">One verified human per account on the actions that matter. Free passkey continuity everywhere else. A backend verify and an enforcement policy.</p>
+        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 36px; max-width: 520px; margin-left: auto; margin-right: auto;">IDV-backed person assurance (document uniqueness) on the actions that matter. Free passkey continuity everywhere else. A backend verify and an enforcement policy.</p>
         <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
             <a href="/docs" class="btn btn-primary" style="font-size: var(--font-size-lg); padding: 16px 32px;">Add to Your Site</a>
             <a href="/demo" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">Watch Demo</a>

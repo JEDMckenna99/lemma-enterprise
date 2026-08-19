@@ -2,8 +2,8 @@
 {% set active_product = 'ishuman' %}
 {% set active_page = 'human-proofs' %}
 {% set hero_title = 'Human proofs & abuse controls' %}
-{% set hero_subtitle = 'The step-up tier on the lemma.id proof layer: one verified human per account, action-bound stamps, site blocks, and doubt challenges. Same integration, same site-private PPID, stronger assurance where your policy needs it.' %}
-{% set page_description = 'isHuman step-up docs: require one verified human per account with requiredAssurance ishuman, verify action-bound stamps, and enforce bans with site blocks and doubt challenges.' %}
+{% set hero_subtitle = 'The step-up tier on the lemma.id proof layer: IDV-backed person assurance (document uniqueness), action-bound stamps, site blocks, and doubt challenges. Same integration, same site-private PPID, stronger assurance where your policy needs it.' %}
+{% set page_description = 'isHuman step-up docs: require IDV-backed person assurance with requiredAssurance ishuman, verify action-bound stamps, and enforce bans with site blocks and doubt challenges.' %}
 
 {% block docs_content %}
 <div class="docs-section" id="quickstart">
@@ -15,13 +15,17 @@
     <p><strong>lemma.id</strong> is the continuous identity object your users hold. Your site gets a stable, site-private PPID bound to your user record, not a legal identity, email, document number, or ID that works anywhere else.</p>
     <p><strong>One integration, three levels of proof:</strong></p>
     <ul style="line-height: 1.8; color: var(--gray-700); padding-left: 24px; margin-bottom: 16px;">
-        <li><strong>lemma.id</strong> (<code>requiredAssurance: 'passkey'</code>), same returning lemma.id / PPID continuity. Low friction; not Sybil-resistant alone.</li>
+        <li><strong>lemma.id</strong> (<code>requiredAssurance: 'passkey'</code>), same returning lemma.id / PPID continuity. Low friction; not Sybil resistance alone.</li>
         <li><strong>Presence proof</strong>, fresh passkey when the presentation is signed, so the holder is at the device. Delivery is still a signed presentation.</li>
-        <li><strong>Human proof</strong> (<code>requiredAssurance: 'ishuman'</code>), one verified human per account. Use for free-trial abuse, ticketing, rewards, voting, recovery after a ban, anywhere the attacker's cheapest move is a new account.</li>
+        <li><strong>Human proof</strong> (<code>requiredAssurance: 'ishuman'</code>), IDV-backed person assurance with document uniqueness. Use for free-trial abuse, ticketing, rewards, voting, recovery after a ban, anywhere the attacker's cheapest move is a new account. Distinct government documents can still yield distinct persons on fresh enrollments.</li>
     </ul>
     <div class="callout callout--info">
         <div class="callout-title">Why this exists</div>
         <p>Login proves control of an account. Bot detection flags suspicious behavior. Neither can tell you the person you banned yesterday just signed up again. lemma.id gives your backend a durable handle on the person, so a new email, SIM, device, or OAuth account doesn't reset the slate.</p>
+    </div>
+    <div class="callout callout--info">
+        <div class="callout-title">Uniqueness bound</div>
+        <p><code>ishuman</code> uniqueness is <strong>per verified government document</strong>, not biometric unique-human. The same document rematches the same person; a second document can attach from an already-bound lemma.id. Distinct documents with different extracted numbers can yield distinct persons on fresh enrollments. Use isHuman to raise Sybil cost, not to claim absolute one-biological-human.</p>
     </div>
 
     <h2>5-minute quickstart</h2>
@@ -60,7 +64,7 @@
 
 <div class="docs-section" id="signup-recipe">
     <h2>End-to-end recipe: low-friction signup continuity</h2>
-    <p>This recipe requests <code>passkey</code> assurance for returning-user continuity. If signup must enforce one verified human per account, change both client and backend policy to <code>ishuman</code>. In either case, verify a signed presentation locally on your backend and do not trust a bare <code>ppid</code> from the browser.</p>
+    <p>This recipe requests <code>passkey</code> assurance for returning-user continuity. If signup must enforce IDV-backed person assurance (document uniqueness), change both client and backend policy to <code>ishuman</code>. In either case, verify a signed presentation locally on your backend and do not trust a bare <code>ppid</code> from the browser.</p>
     <div class="code-block">
         <div class="code-header">
             <span>HTML + JavaScript</span>
@@ -173,8 +177,8 @@ await fetch('/api/waitlist', {
   body: JSON.stringify({ email, ppid: result.ppid }),
 });</code>
     </div>
-    <h3>T2: Sybil-resistant signup (signed presentation)</h3>
-    <p>This example requires <code>ishuman</code> assurance for one verified human per account. For a continuity-only signup, use <code>passkey</code> consistently on both client and backend. Send a signed presentation from <code>verifyForBackend()</code>, then verify it cryptographically before creating the account. Bind the user to <code>result.ppid</code> from the verified server result, not the parallel client <code>ppid</code> field.</p>
+    <h3>T2: Sybil-hardened signup (signed presentation)</h3>
+    <p>This example requires <code>ishuman</code> assurance for IDV-backed person policy (document uniqueness). For a continuity-only signup, use <code>passkey</code> consistently on both client and backend. Send a signed presentation from <code>verifyForBackend()</code>, then verify it cryptographically before creating the account. Bind the user to <code>result.ppid</code> from the verified server result, not the parallel client <code>ppid</code> field.</p>
     <div class="code-block">
         <div class="code-header"><span>Client</span><button class="copy-btn">Copy</button></div>
         <code>const { ok, presentation } = await verifier.verifyForBackend({
@@ -334,7 +338,7 @@ def checkout():
 
 <div class="docs-section">
     <h2>What are lemma.id and human proof?</h2>
-    <p><strong>lemma.id</strong> is the continuous identity object, user-held credentials, site-private PPIDs, and signed presentations. <strong>Human proof</strong> is the IDV-backed level: one verified human per account, without your site learning who that human legally is. Presence proof is the fresh-passkey ceremony at presentation signing. lemma.id continuity handles return visits; human proof handles Sybil resistance.</p>
+    <p><strong>lemma.id</strong> is the continuous identity object, user-held credentials, site-private PPIDs, and signed presentations. <strong>Human proof</strong> is the IDV-backed level: document uniqueness and person continuity, without your site learning who that person legally is. Presence proof is the fresh-passkey ceremony at presentation signing. lemma.id continuity handles return visits; human proof raises Sybil cost (it is not biometric unique-human).</p>
     <div class="callout callout--info">
         <div class="callout-title">Three levels of proof</div>
         <p><strong>lemma.id</strong> (<code>passkey</code>) provides continuity and low-friction signup without claiming Sybil resistance. <strong>Presence proof</strong> is the fresh-passkey ceremony when a presentation is signed. <strong>Human proof</strong> (<code>ishuman</code>) requires live IDV (liveness + document-to-selfie matching). Choose the assurance explicitly per protected action; platform feature configuration is managed by lemma.id, not by the relying site.</p>
@@ -357,7 +361,7 @@ def checkout():
             <tr><th>Step</th><th>Where</th><th>What happens</th></tr>
         </thead>
         <tbody>
-            <tr><td>1</td><td>Your page</td><td>You call <code>verifyForBackend({ autoProvision: true, requiredAssurance })</code> before a protected action. Use <code>passkey</code> for continuity; <code>ishuman</code> when one verified human per account is required.</td></tr>
+            <tr><td>1</td><td>Your page</td><td>You call <code>verifyForBackend({ autoProvision: true, requiredAssurance })</code> before a protected action. Use <code>passkey</code> for continuity; <code>ishuman</code> when IDV-backed person assurance is required.</td></tr>
             <tr><td>2</td><td>Lemma popup</td><td>If no proof exists: lemma.id path unlocks with passkey and issues continuity credentials (no IDV). Human-proof path runs live IDV at Didit after unlock.</td></tr>
             <tr><td>3</td><td>lemma.id</td><td>Issues master + site-bound credential for your <code>siteId</code>. Step-up from lemma.id continuity to human proof on the same lemma.id returns the <strong>same PPID</strong> with a stronger proof level.</td></tr>
             <tr><td>4</td><td>Your page</td><td>SDK validates signature, expiry, and global revocation locally, then returns <code>{ ok, presentation, ppid, assurance }</code> (via <code>verifyForBackend</code>) or <code>{ human, ppid, assurance, reason }</code> (via <code>verify</code>).</td></tr>
@@ -423,7 +427,7 @@ def checkout():
     <p><code>verify()</code> returns <code>{ human: boolean, ppid: string | null, assurance: string | null, reason: string, timeMs: number, error: string | null }</code>.</p>
     <div class="callout callout--info">
         <div class="callout-title"><code>human</code> vs <code>assurance</code></div>
-        <p><code>human</code> is the legacy/general success gate: <code>true</code> when the requested assurance tier passed (including <code>passkey</code> or <code>ishuman</code>). For policy decisions, also inspect <code>assurance</code>, because a passkey success does not mean IDV-backed humanness. Require <code>requiredAssurance: 'ishuman'</code> on signup when one account must map to one verified human.</p>
+        <p><code>human</code> is the legacy/general success gate: <code>true</code> when the requested assurance tier passed (including <code>passkey</code> or <code>ishuman</code>). For policy decisions, also inspect <code>assurance</code>, because a passkey success does not mean IDV-backed humanness. Require <code>requiredAssurance: 'ishuman'</code> on signup when one account must map to one IDV-backed person (same verified document).</p>
     </div>
     <p>Common <code>reason</code> values (grouped):</p>
     <ul style="color: var(--gray-700); line-height: 1.7;">

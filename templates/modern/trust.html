@@ -79,7 +79,7 @@
         <div style="max-width: 860px; margin: 0 auto; text-align: center;">
             <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">Trust &amp; transparency</p>
             <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Enforcement-grade assurance<br>without identity-grade liability.</h1>
-            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">This page is a plain accounting of who holds what. The short version: lemma.id gives your site a private PPID from a verified presentation. At passkey tier that is continuity; if you require isHuman, it is one verified human. Other sites get different PPIDs they can't link to yours. lemma.id never learns who your users are, and nobody in the chain learns a name, document, selfie, or date of birth.</p>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">This page is a plain accounting of who holds what. The short version: lemma.id gives your site a private PPID from a verified presentation. At passkey tier that is continuity; if you require isHuman, it is an IDV-backed person (document uniqueness). Same document rematches; distinct documents can still mint distinct persons on a fresh lemma.id. Other sites get different PPIDs they can't link to yours. lemma.id never learns who your users are, and nobody in the chain learns a name, document, selfie, or date of birth.</p>
             <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 28px;">
                 <a href="/docs" class="btn btn-primary">Integration docs</a>
                 <a href="/privacy" class="btn btn-secondary">Privacy policy</a>
@@ -101,7 +101,7 @@
                 <span class="trust-badge trust-badge--good">Your site</span>
                 <div class="trust-footprint-size">~80 chars</div>
                 <h3>Verdict + site-private PPID</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin: 0;">A proof verdict and an opaque per-site identifier like <code>did:lemma:ppid_…</code>. With lemma.id continuity it means "same lemma.id"; with a human proof, "same verified human." Either way, no ID document, selfie, legal name, or date of birth ever touches your servers.</p>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin: 0;">A proof verdict and an opaque per-site identifier like <code>did:lemma:ppid_…</code>. With lemma.id continuity it means "same lemma.id"; with a human proof, "same IDV-backed person (same verified document)." Either way, no ID document, selfie, legal name, or date of birth ever touches your servers.</p>
             </div>
             <div class="trust-footprint-item" style="border-color: var(--primary);">
                 <span class="trust-badge trust-badge--neutral">lemma.id</span>
@@ -174,8 +174,8 @@
                         <td>Government ID data exposed</td>
                     </tr>
                     <tr>
-                        <td><strong>Enforcement durability</strong><br><span style="font-weight:400;color:var(--gray-600);">lemma.id: same identity · human proof: same human</span></td>
-                        <td class="trust-col-lemma">lemma.id continuity for return visits. Human proof: person-root binding, so bans survive email and SIM rotation</td>
+                        <td><strong>Enforcement durability</strong><br><span style="font-weight:400;color:var(--gray-600);">lemma.id: same identity · human proof: same verified document</span></td>
+                        <td class="trust-col-lemma">lemma.id continuity for return visits. Human proof: document-rooted person binding, so bans survive email and SIM rotation</td>
                         <td>Attacker rotates email or creates new OAuth account</td>
                         <td>Strong if you keep artifacts; expensive to operate</td>
                     </tr>
@@ -326,7 +326,7 @@
             </div>
             <div class="card">
                 <h3 class="card-title">"Is this passkey lock-in?"</h3>
-                <p>Passkeys secure the lemma.id, but the account root is the verified person, not a device or a platform vault. Lose every device and recovery means re-verifying as the same human, which restores the same site-private IDs. You can export what your lemma.id holds, and you can ask us to erase what we hold.</p>
+                <p>Passkeys secure the lemma.id, but the account root is the IDV-backed person (same verified document), not a device or a platform vault. Lose every device and recovery means re-verifying that document, which restores the same site-private IDs. You can export what your lemma.id holds, and you can ask us to erase what we hold.</p>
             </div>
             <div class="card">
                 <h3 class="card-title">"What if lemma.id disappears?"</h3>
@@ -358,7 +358,7 @@
 <section class="section" style="background: var(--gray-900); color: var(--white); padding: 80px 0;">
     <div class="container" style="text-align: center;">
         <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Enforcement you can explain to legal</h2>
-        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 40px; max-width: 640px; margin-left: auto; margin-right: auto;">Require one verified human per account where it matters, and keep your backend out of the identity-honeypot business. Everything on this page is in the docs, in more detail.</p>
+        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 40px; max-width: 640px; margin-left: auto; margin-right: auto;">Require IDV-backed person assurance (document uniqueness) where it matters, and keep your backend out of the identity-honeypot business. Everything on this page is in the docs, in more detail.</p>
         <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
             <a href="/docs" class="btn btn-primary">View integration docs</a>
             <a href="/demo" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">See demo</a>
