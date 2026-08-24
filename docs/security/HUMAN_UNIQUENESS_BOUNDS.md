@@ -2,7 +2,8 @@
 
 **Audience:** platform engineering, security, product, launch copy owners  
 **Status:** Active — claim source of truth for isHuman uniqueness  
-**Related:** [`ASSIGNED_PERSON_ROOT.md`](../architecture/ASSIGNED_PERSON_ROOT.md),
+**Related:** [`IDENTITY_CONSTRUCTION.md`](../architecture/IDENTITY_CONSTRUCTION.md),
+[`ASSIGNED_PERSON_ROOT.md`](../architecture/ASSIGNED_PERSON_ROOT.md),
 [`HUMAN_AUTH_SECURITY_CONTRACT.md`](HUMAN_AUTH_SECURITY_CONTRACT.md),
 [`identity_roots.py`](../../api/identity_roots.py),
 [`identity_person.py`](../../api/identity_person.py)

@@ -41,6 +41,7 @@ def test_homepage_leads_with_enforcement(public_client):
     assert "Passkey for continuity" in body
     assert "local verify" in body.lower()
     assert "requiredAssurance" in body
+    assert "/demo/how-it-works?lane=builder" in body
     # Honest step-up framing stays: passkey tier alone is not Sybil resistance.
     assert "anyone can create another lemma.id" in body
     assert "Revoke everywhere" not in body

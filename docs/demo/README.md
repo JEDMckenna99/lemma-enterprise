@@ -17,9 +17,10 @@ Legacy IDV-first copy remains when `assurance_demo_mode` is false (flags off).
 
 | Surface | URL |
 | ------- | --- |
-| Demo hub | https://lemma.id/demo |
-| Demo hub (alias) | https://lemma.id/demo/ishuman |
-| Staging hub | https://demo.lemma.id/demo |
+| Demo hub (builder / how it works) | https://lemma.id/demo/how-it-works?lane=builder |
+| Dogfood sign-in (opens manager) | https://lemma.id/demo |
+| Demo hub (legacy alias) | https://lemma.id/demo/ishuman |
+| Staging hub | https://demo.lemma.id/demo/how-it-works?lane=builder |
 | Ticketing relying site (Sign in) | https://tickets-demo.lemma.id/ |
 | Ticketing presale tour (Enforce) | https://tickets-demo.lemma.id/?tour=presale |
 | Free-trial relying site | https://trials-demo.lemma.id/ |
@@ -70,7 +71,7 @@ Contact email/phone is optional **after** a successful claim (delivery only, sit
 ## Recording checklist — builder lane (Create · Sign in · Enforce)
 
 1. Open `/demo` → **See how it works** (`?lane=builder`).
-2. **Create**: Create passkey-backed lemma.id (no IDV popup). Note: continuity only, not unique humanness.
+2. **Create**: Create passkey-backed lemma.id (no IDV popup). Note: continuity only, not IDV-backed person assurance.
 3. **Sign in**: Sign in on both sites; show different private IDs. Optional: Developer view for signed presentations.
 4. **Enforce: require human proof**: Require human proof on ticketing → complete Didit IDV (or staging test-verify) → re-sign-in with **same private ID** at human proof tier.
 5. **Enforce: doubt**: Mark ticketing doubtful; resolve with fresh passkey check.

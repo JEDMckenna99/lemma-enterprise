@@ -2,7 +2,8 @@
 
 lemma.id is a **local-first proof layer** for relying sites: verify a signed
 presentation and enforce policy on a site-private `ppid` + assurance level.
-Optional **isHuman** step-up (one verified human per account, same PPID),
+Optional **isHuman** step-up (IDV-backed person assurance on the same PPID;
+document uniqueness, not biometric unique-human),
 action stamps, and site-block for continuity under abuse. Passkey unlock mints
 presentations; optional session cookies are an appendix, not the headline.
 
@@ -43,12 +44,15 @@ Site-private person handle, assurance ladder, stamps, and abuse controls.
 
 ## 2. isHuman step-up (Sybil-sensitive actions)
 
-One verified human per account on the **same PPID**; request per action with `requiredAssurance: 'ishuman'`.
+IDV-backed person assurance on the **same PPID** (document uniqueness); request
+per action with `requiredAssurance: 'ishuman'`. Uniqueness bounds (internal):
+[HUMAN_UNIQUENESS_BOUNDS.md](security/HUMAN_UNIQUENESS_BOUNDS.md).
 
 | Document | Description |
 |----------|-------------|
 | [ISHUMAN Agent Integration Guide](integration/ISHUMAN_AGENT_INTEGRATION.md) | Canonical contract: assurance policy, abuse APIs, stamps |
 | [Assurance tiers + input burn](product/PASSKEY_STAMP_INPUT_BURN.md) | One PPID, `passkey` vs `ishuman`, site-local burn policy |
+| [Human uniqueness bounds](security/HUMAN_UNIQUENESS_BOUNDS.md) | Internal: document uniqueness vs unique-human claims |
 
 ## 3. Optional: sessions & sign-in UX
 
@@ -110,6 +114,7 @@ Internal product proposals, **not shipped**. Do not link from integrator-facing 
 
 | Document | Description |
 |----------|-------------|
+| [Identity construction](architecture/IDENTITY_CONSTRUCTION.md) | Internal: IDV → document root → assigned person → PPID → human proof |
 | [lemma.id-first architecture (historical doc name)](architecture/ARCHITECTURE_WALLET_FIRST.md) | How local-credential auth differs from OAuth; see doc banner for terminology |
 | [lemma.id Presentation Model](product/LEMMA_ID_PRESENTATION_MODEL.md) | Platform identity + permission contract |
 | [Browser storage contract](security/LEMMA_ID_BROWSER_STORAGE_CONTRACT.md) | Canonical IndexedDB / localStorage / cookie inventory + encryption rules |

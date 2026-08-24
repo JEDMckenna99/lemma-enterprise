@@ -1,5 +1,8 @@
 # Assigned person root (`assigned_v1`)
 
+High-level pipeline (IDV → document root → person → PPID → proof):
+[`IDENTITY_CONSTRUCTION.md`](IDENTITY_CONSTRUCTION.md).
+
 ## Invariant
 
 The assigned person root is the permanent human anchor. A relying-site PPID is
@@ -14,6 +17,14 @@ PPID(site)    = HMAC(person_root, domain separator + canonical hostname)
 
 Document roots are renewable identity attestations, not the source of the
 person root after assignment.
+
+### Uniqueness bound (read this)
+
+Assigned person roots enforce **document uniqueness**, not absolute biological
+uniqueness. Distinct government documents with different extracted numbers can
+yield distinct persons when enrolled on separate fresh lemma.id instances.
+See [`HUMAN_UNIQUENESS_BOUNDS.md`](../security/HUMAN_UNIQUENESS_BOUNDS.md) for
+claim language and residual Sybil channel.
 
 ## Resolution rules
 
