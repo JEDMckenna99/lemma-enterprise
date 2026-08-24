@@ -1,154 +1,200 @@
 {% extends "modern/layout.html" %}
+{% set is_public_page = true %}
 
 {% block title %}Privacy Policy - lemma.id{% endblock %}
-{% block description %}Privacy Policy for Lemma IAM - How we protect your data{% endblock %}
+{% block description %}What lemma.id collects, what we do not keep, who we share with, and how to exercise your rights.{% endblock %}
 
 {% block content %}
 <div class="container" style="max-width: 900px; padding: 60px 20px;">
     <div style="background: var(--white); padding: 48px; border-radius: 12px; box-shadow: var(--shadow-lg);">
         <h1 style="color: var(--gray-900); margin-bottom: 8px;">Privacy Policy</h1>
-        <p style="color: var(--gray-500); font-size: 14px; margin-bottom: 40px;">Last Updated: June 11, 2026</p>
+        <p style="color: var(--gray-500); font-size: 14px; margin-bottom: 40px;">Last Updated: August 24, 2026</p>
 
         <h2 style="margin-top: 40px;">1. Introduction</h2>
-        <p>Lemma.id ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our cryptographic credential verification service.</p>
+        <p>Lemma.id ("we," "our," or "us") operates lemma.id, a proof-continuity service. We help a relying site verify a signed presentation locally and enforce policy on a site-private identifier (PPID) plus an assurance level. Daily continuity uses a passkey-protected lemma.id. A human proof is an optional step-up: identity-verification (IDV) backed person assurance on the same PPID, rooted in the verified document, not biometric unique-human identification.</p>
+        <p>This policy explains how we collect, use, disclose, and safeguard information. Pseudonymous identifiers are still personal data under GDPR if someone holding the keys can re-identify them. We are not claiming to be outside privacy law. The claim is narrower: we hold the minimum derived identifiers that issuance, recovery, billing, and enforcement require.</p>
+        <p>For a comparative overview of what each party stores, see <a href="/trust">Trust &amp; Personal Data Minimization</a>.</p>
 
-        <h2>2. Information We Collect</h2>
-        
-        <h3 style="font-size: var(--font-size-lg); margin-top: 24px; color: var(--gray-800);">2.1 Information You Provide</h3>
+        <h2>2. Who this policy covers</h2>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
-            <li><strong>Account Information:</strong> Email address, company name, site domain</li>
-            <li><strong>Payment Information:</strong> Processed by Stripe (we do not store credit card numbers)</li>
-            <li><strong>API Keys:</strong> Generated for your account to access our services</li>
+            <li><strong>Developer and site accounts.</strong> If you register a site or pay for the Service, Lemma.id is the controller of that account, billing, and admin data.</li>
+            <li><strong>End users of a relying site.</strong> When a site integrates lemma.id, that site is typically the controller of how it uses your site-private PPID. Lemma.id processes issuance, recovery, and enforcement data to provide the Service.</li>
+            <li><strong>People who create a lemma.id.</strong> We are the controller of the minimum issuance, recovery, and revocation data needed to operate that identity object.</li>
+        </ul>
+        <p>Integrator sites remain responsible for their own privacy notices. This policy describes only data Lemma.id controls or processes.</p>
+
+        <h2>3. Information We Collect</h2>
+
+        <h3 style="font-size: var(--font-size-lg); margin-top: 24px; color: var(--gray-800);">3.1 Developer and site accounts</h3>
+        <ul style="margin-left: 20px; margin-bottom: 20px;">
+            <li><strong>Account information:</strong> email address, company name, site domain / hostname</li>
+            <li><strong>Payment information:</strong> processed by Stripe. We store a Stripe customer identifier. We do not store credit card numbers.</li>
+            <li><strong>API keys:</strong> we store a hash of issued keys, not the raw secret after you receive it</li>
+            <li><strong>Billing meters:</strong> site scope, month, event type, and unit counts. Stripe payloads do not include PPID, lemma.id identifier, person ID, or credential ID.</li>
         </ul>
 
-        <h3 style="font-size: var(--font-size-lg); margin-top: 24px; color: var(--gray-800);">2.2 Information Automatically Collected</h3>
+        <h3 style="font-size: var(--font-size-lg); margin-top: 24px; color: var(--gray-800);">3.2 lemma.id and end-user data</h3>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
-            <li><strong>Usage Data:</strong> API calls, verification requests, monthly active users</li>
-            <li><strong>Log Data:</strong> IP addresses, user agents, timestamps, request paths</li>
-            <li><strong>Performance Data:</strong> Response times, error rates, system metrics</li>
-            <li><strong>Security Events:</strong> Authentication attempts, permission grants, access verifications</li>
+            <li><strong>Passkeys:</strong> WebAuthn public-key material and authenticator metadata bound to lemma.id. We never receive the passkey private key.</li>
+            <li><strong>Device bindings:</strong> the minimum lemma.id / device linkage needed for unlock, recovery, and revocation</li>
+            <li><strong>Credentials:</strong> the primary copy lives in the user's lemma.id. We issue signed credentials and may observe a PPID and credential ID at issuance time.</li>
+            <li><strong>After issuance:</strong> billing tables store a keyed HMAC of the already site-private PPID, plus first/last issuance times. They do not keep a persistent person-to-site graph of raw PPIDs or site credential IDs.</li>
+            <li><strong>Enforcement data:</strong> we do persist the site-private PPID when a relying site blocks, doubts, or revokes that identifier, and in site-scoped user or audit records the site asks us to keep</li>
+            <li><strong>Assigned person roots:</strong> stored only as AWS KMS ciphertext used to rematch the same document to the same person and to derive the same per-site PPID</li>
         </ul>
 
-        <h3 style="font-size: var(--font-size-lg); margin-top: 24px; color: var(--gray-800);">2.3 Cryptographic Data</h3>
+        <h3 style="font-size: var(--font-size-lg); margin-top: 24px; color: var(--gray-800);">3.3 Identity verification (IDV)</h3>
+        <p>When a site requires a human proof, or you recover a lemma.id, you complete IDV with <strong>Didit</strong>, our identity-verification provider. Didit hosts the document and liveness check and processes government-document images and selfie / liveness images under Didit's terms.</p>
+        <p>We receive a verification outcome. We transiently use document number, issuing jurisdiction, and date of birth to derive a keyed document root, then discard those inputs. We do not retain raw identity documents, face images, or legal name in the isHuman path.</p>
+        <p>A human proof is document-rooted person assurance: the same verified document rematches the same person. Distinct documents presented on a fresh lemma.id can still mint distinct persons. We do not claim biometric unique-human identification.</p>
+
+        <h3 style="font-size: var(--font-size-lg); margin-top: 24px; color: var(--gray-800);">3.4 Information automatically collected</h3>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
-            <li><strong>Credentials:</strong> Primary copy stored in the user's lemma.id; lemma.id issues credentials and retains issuance linkage metadata (PPID, credential ID, device bindings) but not raw IDV documents</li>
-            <li><strong>Public Keys:</strong> Ed25519 public keys for verification (site-specific, stored on your servers)</li>
-            <li><strong>Revocation Data:</strong> Bloom filter hashes of credential IDs (designed to avoid disclosing original credential IDs directly)</li>
-            <li><strong>PPIDs:</strong> Pairwise Pseudonymous Identifiers unique per user per site (unlinkable across sites)</li>
+            <li><strong>Security and request metadata:</strong> IP address, user agent, timestamps, and request path, used for rate limiting, abuse prevention, and audit logs</li>
+            <li><strong>Usage data:</strong> issuance, API calls you make to Lemma.id, and monthly active-user meters. Local return-visit checks performed on a relying site without calling us are not observed by us</li>
+            <li><strong>Performance and errors:</strong> response times, error rates, and Sentry error events (stack traces and request metadata, configured to reduce identifiers)</li>
         </ul>
 
-        <h2>3. How We Use Your Information</h2>
+        <h3 style="font-size: var(--font-size-lg); margin-top: 24px; color: var(--gray-800);">3.5 Browser storage on your device</h3>
+        <p>lemma.id keeps credentials and unlock state on the device you use. This is required to operate the Service and is not used for advertising.</p>
+        <ul style="margin-left: 20px; margin-bottom: 20px;">
+            <li><strong>IndexedDB:</strong> encrypted lemma.id credential store</li>
+            <li><strong>localStorage / sessionStorage:</strong> daily unlock bundle, preferences, and short-lived enrollment state</li>
+            <li><strong>Cookies:</strong> essential session and CSRF cookies (including <code>lemma_wallet_session</code> and CSRF tokens). These are not advertising cookies.</li>
+        </ul>
+        <p>Relying sites may set their own cookies and store their own session after they verify a presentation. Their practices are not covered by this policy.</p>
+
+        <h2>4. How We Use Your Information</h2>
         <p>We use collected information to:</p>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
-            <li>Provide and maintain the Service</li>
-            <li>Process payments and billing</li>
-            <li>Send service notifications and updates</li>
-            <li>Monitor usage for billing purposes (MAU tracking)</li>
+            <li>Provide issuance, recovery, revocation, and site enforcement (block / doubt)</li>
+            <li>Support local verification (issuer keys, revocation snapshots, optional server-side verify when a site calls us)</li>
+            <li>Process payments and usage-based billing</li>
+            <li>Send service, security, and billing notices to developer accounts</li>
             <li>Detect and prevent fraud, abuse, and security incidents</li>
             <li>Comply with legal obligations</li>
-            <li>Improve the Service through product analytics and security monitoring (not used for advertising to end users)</li>
+            <li>Improve reliability and security through product analytics and error monitoring (not used for advertising to end users)</li>
         </ul>
 
-        <h3 style="font-size: var(--font-size-lg); margin-top: 24px; color: var(--gray-800);">3.1 No Advertising to End Users</h3>
-        <p>We do not use identity verification outcomes, credentials, lemma.id data, PPIDs, or verification metadata to deliver advertising, retargeting, or behavioral marketing to people who use Lemma-powered services on third-party sites. This commitment applies to end users of integrated sites, not to developer or business accounts that sign up for Lemma.id directly, those accounts may receive product and service communications, which you can opt out of as described in Section 8.</p>
+        <h3 style="font-size: var(--font-size-lg); margin-top: 24px; color: var(--gray-800);">4.1 No advertising to end users</h3>
+        <p>We do not use identity verification outcomes, credentials, lemma.id data, PPIDs, or verification metadata to deliver advertising, retargeting, or behavioral marketing to people who use Lemma-powered services on third-party sites. This commitment applies to end users of integrated sites. Developer or business accounts that sign up for Lemma.id directly may receive product and service communications, which you can opt out of as described in Section 10.</p>
         <p>Integrator sites remain responsible for their own privacy practices on their properties. This section describes only how Lemma.id uses data within its control.</p>
 
-        <h2>4. Privacy-Preserving Features</h2>
-        <p>Lemma.id is designed with privacy as a core principle. For a comparative overview of what each party stores and what being a personal data minimizer means in practice, see our <a href="/trust">Trust &amp; Personal Data Minimization</a> page.</p>
+        <h2>5. Privacy-Preserving Features</h2>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
-            <li><strong>Local Verification:</strong> Credentials can be verified locally using Ed25519 signatures, reducing server dependency for many return-visit checks</li>
-            <li><strong>Bloom Filter Revocation:</strong> Revocation lists use probabilistic Bloom filters designed to reduce direct disclosure of specific revoked credential IDs</li>
-            <li><strong>Pairwise Identifiers (PPIDs):</strong> Each user gets a unique identifier per site, which helps limit cross-site linkability</li>
-            <li><strong>Client-Side Storage:</strong> Credentials are stored in the user's lemma.id for normal sign-in flows; server systems may retain minimal issuance/audit metadata.</li>
-            <li><strong>Local Return-Visit Verification:</strong> For routine sign-in checks, your server verifies credentials locally using Ed25519 signatures without contacting Lemma.id, so we do not observe those individual verification events. Initial identity verification (IDV) does involve our servers: we receive the verification outcome from the IDV provider and derive minimal, encrypted identifiers from it (we do not retain raw identity documents, face images, or your legal name).</li>
-            <li><strong>No Advertising Monetization:</strong> We do not sell, share, or use end-user identity data for advertising or behavioral targeting, on Lemma.id or elsewhere</li>
+            <li><strong>Local Return-Visit Verification:</strong> For routine sign-in checks, the relying site verifies credentials locally using Ed25519 signatures without contacting Lemma.id, so we do not observe those individual verification events. Initial identity verification (IDV) and credential issuance do involve our servers.</li>
+            <li><strong>Pairwise identifiers (PPIDs):</strong> Each site receives a different PPID for the same person. Other relying sites cannot join those identifiers to each other. Lemma.id observes hostname and PPID when issuing or enforcing, and can re-derive a site PPID from the assigned person root. We do not sell that capability or use it to advertise or to build a cross-site activity graph for marketing.</li>
+            <li><strong>Minimized billing records:</strong> monthly usage is stored as keyed subject tokens and site/month totals, not raw credential IDs</li>
+            <li><strong>Bloom-filter revocation:</strong> revocation lists use probabilistic Bloom filters designed to reduce direct disclosure of specific revoked credential IDs</li>
+            <li><strong>Client-side storage:</strong> credentials are stored in the user's lemma.id for normal sign-in flows; server systems retain the minimum issuance, billing, recovery, and enforcement metadata described above</li>
+            <li><strong>No advertising monetization:</strong> we do not sell, share, or use end-user identity data for advertising or behavioral targeting, on Lemma.id or elsewhere</li>
         </ul>
 
-        <h2>5. Data Sharing and Disclosure</h2>
-        <p>We do not sell your personal information. We may share data with:</p>
-        
-        <h3 style="font-size: var(--font-size-lg); margin-top: 24px; color: var(--gray-800);">5.1 Service Providers</h3>
+        <h2>6. Data Sharing and Disclosure</h2>
+        <p>We do not sell your personal information. We may share data with the providers below, with relying sites as needed to provide the Service, and when the law requires it.</p>
+
+        <h3 style="font-size: var(--font-size-lg); margin-top: 24px; color: var(--gray-800);">6.1 Service providers</h3>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
-            <li><strong>Stripe:</strong> Payment processing (PCI DSS compliant)</li>
-            <li><strong>Heroku/AWS:</strong> Hosting infrastructure</li>
-            <li><strong>Sentry:</strong> Error monitoring (anonymized error data)</li>
-            <li><strong>Email Service:</strong> Mailgun or SendGrid for transactional emails</li>
+            <li><strong>Stripe:</strong> payment processing and usage meters (PCI DSS handled by Stripe)</li>
+            <li><strong>Heroku / Amazon Web Services:</strong> application hosting, database, and Redis</li>
+            <li><strong>Amazon Web Services (KMS):</strong> encryption of assigned person roots and certain secrets</li>
+            <li><strong>Didit:</strong> identity verification. Document and liveness images are processed on Didit's systems. We receive the verification outcome, not a document vault.</li>
+            <li><strong>Sentry:</strong> error monitoring</li>
+            <li><strong>Mailgun or SendGrid:</strong> transactional email, whichever is configured</li>
+            <li><strong>UptimeRobot:</strong> public status-page monitoring of availability. It does not receive end-user identity data.</li>
         </ul>
 
-        <h3 style="font-size: var(--font-size-lg); margin-top: 24px; color: var(--gray-800);">5.2 Legal Requirements</h3>
+        <h3 style="font-size: var(--font-size-lg); margin-top: 24px; color: var(--gray-800);">6.2 Relying sites</h3>
+        <p>A relying site receives only its site-private PPID and a signed presentation or credential. It does not receive your legal name, government document, selfie, date of birth, or PPIDs issued to other hostnames.</p>
+
+        <h3 style="font-size: var(--font-size-lg); margin-top: 24px; color: var(--gray-800);">6.3 Legal requirements</h3>
         <p>We may disclose information if required by law, court order, or government request, or to protect our rights and safety.</p>
 
-        <h2>6. Data Security</h2>
-        <p>We implement industry-standard security measures including:</p>
+        <h2>7. International transfers</h2>
+        <p>Lemma.id is based in the United States. Hosting and several providers process data in the United States and in other regions those providers operate in. If you are in the European Economic Area, the United Kingdom, or Switzerland, using the Service involves a transfer of personal data to the United States.</p>
+        <p>Enterprise customers may request a Data Processing Agreement. Contact privacy@lemma.id for transfer or residency questions. This policy is not itself a DPA or a claim that standard contractual clauses are already in place for every customer.</p>
+
+        <h2>8. Data Security</h2>
+        <p>We implement technical and organizational measures including:</p>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
-            <li><strong>Ed25519 Signatures:</strong> Cryptographic signatures for credential verification (same algorithm used by SSH)</li>
-            <li><strong>Bloom Filter Revocation:</strong> Efficient, privacy-preserving revocation checking</li>
-            <li><strong>Encrypted Browser Wallet:</strong> Credentials encrypted at rest in user's browser</li>
-            <li><strong>Passkey Authentication:</strong> WebAuthn/FIDO2 passkeys for developer account security</li>
-            <li><strong>Rate Limiting:</strong> Protection against brute-force and abuse</li>
-            <li><strong>Audit Logging:</strong> Comprehensive logging of all security events</li>
+            <li><strong>Passkey authentication:</strong> WebAuthn / FIDO2 to unlock lemma.id, including developer sign-in</li>
+            <li><strong>Ed25519 signatures:</strong> cryptographic signatures for credential verification</li>
+            <li><strong>KMS encryption:</strong> assigned person roots stored as AWS KMS ciphertext</li>
+            <li><strong>Hash-only API keys:</strong> raw site API keys are not stored after issuance</li>
+            <li><strong>Encrypted lemma.id store:</strong> credentials encrypted at rest in the user's browser</li>
+            <li><strong>Bloom-filter revocation:</strong> compact revocation snapshots for verifiers</li>
+            <li><strong>Rate limiting and audit logging:</strong> protection against abuse, with security-event logs</li>
         </ul>
 
-        <h2>7. Data Retention</h2>
+        <h2>9. Data Retention</h2>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
-            <li><strong>Account Data:</strong> Retained while your account is active</li>
-            <li><strong>Audit Logs:</strong> 
-                <ul style="margin-left: 20px; margin-top: 8px;">
-                    <li>Free Tier: 30 days</li>
-                    <li>Starter: 90 days</li>
-                    <li>Professional: 1 year</li>
-                    <li>Enterprise: 7 years (compliance requirement)</li>
-                </ul>
-            </li>
-            <li><strong>After Account Deletion:</strong> Data deleted within 30 days, except where legally required to retain</li>
+            <li><strong>Developer / site account data:</strong> retained while the account is active</li>
+            <li><strong>Issued site credentials:</strong> 30-day expiry by default; the primary copy is in the user's lemma.id</li>
+            <li><strong>Monthly billing subject tokens:</strong> 90 days, then purged. Site/month totals may be kept for billing and accounting.</li>
+            <li><strong>Lifetime billing-subject token:</strong> until the site or customer is deleted, so a returning person is not charged a second initial-binding fee</li>
+            <li><strong>Assigned person roots (KMS ciphertext):</strong> until erasure or account deletion</li>
+            <li><strong>Site blocks:</strong> until the authenticated site unblocks the PPID</li>
+            <li><strong>Site doubts:</strong> until explicitly cleared or a matching successful fresh IDV</li>
+            <li><strong>Audit and security logs:</strong> retained as needed for security, fraud investigation, and legal obligations</li>
+            <li><strong>Didit artifacts:</strong> retained under Didit's policy, not in Lemma.id's isHuman store</li>
         </ul>
+        <p>After account deletion or a verified erasure request, we target removal within 30 days, except where we must keep aggregated billing records, legal holds, or security logs.</p>
 
-        <h2>8. Your Rights</h2>
+        <h2>10. Your Rights</h2>
         <p>You have the right to:</p>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
-            <li><strong>Access:</strong> Request a copy of your personal data</li>
-            <li><strong>Correction:</strong> Update inaccurate or incomplete information</li>
-            <li><strong>Deletion:</strong> Request deletion of your data (subject to legal retention requirements)</li>
-            <li><strong>Export:</strong> Download your audit logs in CSV or JSON format</li>
-            <li><strong>Opt-Out:</strong> Unsubscribe from marketing emails (service emails may still be sent)</li>
+            <li><strong>Access:</strong> request a copy of your personal data</li>
+            <li><strong>Correction:</strong> update inaccurate or incomplete information</li>
+            <li><strong>Deletion:</strong> request deletion of your data (subject to legal retention, site blocks the relying site still requires, and billing records we must keep)</li>
+            <li><strong>Export:</strong> receive account, billing, or site-scoped audit data in a machine-readable format (CSV or JSON where those exports exist)</li>
+            <li><strong>Opt-out:</strong> unsubscribe from marketing emails. Service, security, and billing emails may still be sent.</li>
         </ul>
-        <p>To exercise these rights, contact us at privacy@lemma.id</p>
+        <p>To exercise these rights, contact privacy@lemma.id. Include the request type, account email or site domain, and, for end-user requests routed through a relying site, that site's name. We may need the site's cooperation because PPIDs are site-private.</p>
+        <p>End users of a relying site should also contact that site. Deleting Lemma.id data does not automatically delete the account the site created from your PPID.</p>
+        <p>We aim to acknowledge requests within 5 business days and fulfill them within 30 days unless a legal hold applies.</p>
 
-        <h2>9. GDPR Compliance (EU Users)</h2>
-        <p>If you are in the European Economic Area (EEA), you have additional rights under GDPR:</p>
+        <h2>11. GDPR (EEA, UK, and similar laws)</h2>
+        <p>If you are in the European Economic Area, the United Kingdom, or another jurisdiction with similar rules, we process personal data on these bases:</p>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
-            <li><strong>Legal Basis:</strong> We process data based on contractual necessity and legitimate business interests</li>
-            <li><strong>Data Protection Officer:</strong> Contact dpo@lemma.id</li>
-            <li><strong>Right to Lodge Complaint:</strong> You may file a complaint with your local data protection authority</li>
-            <li><strong>Data Portability:</strong> Export your data in machine-readable format</li>
+            <li><strong>Contract:</strong> developer accounts, and issuance or recovery you or the relying site request so we can provide the Service</li>
+            <li><strong>Legitimate interests:</strong> security, fraud prevention, service integrity, and reliability monitoring, balanced against your rights</li>
+            <li><strong>Legal obligation:</strong> tax, accounting, and lawful requests</li>
         </ul>
-
-        <h2>10. CCPA Compliance (California Users)</h2>
-        <p>If you are a California resident, you have rights under the California Consumer Privacy Act (CCPA):</p>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
-            <li><strong>Right to Know:</strong> What personal information we collect</li>
-            <li><strong>Right to Delete:</strong> Request deletion of your personal information</li>
-            <li><strong>Right to Opt-Out:</strong> We do not sell personal information</li>
-            <li><strong>Non-Discrimination:</strong> We will not discriminate against you for exercising your rights</li>
+            <li><strong>Privacy contact:</strong> privacy@lemma.id</li>
+            <li><strong>Data-protection inquiries:</strong> dpo@lemma.id</li>
+            <li><strong>Right to lodge a complaint:</strong> you may file a complaint with your local supervisory authority</li>
+            <li><strong>Data portability:</strong> export of the personal data you provided, in a machine-readable format, where technically feasible</li>
         </ul>
 
-        <h2>11. Children's Privacy</h2>
-        <p>Our Service is not intended for users under 18 years of age. We do not knowingly collect information from children. If we learn we have collected information from a child, we will delete it immediately.</p>
+        <h2>12. CCPA / CPRA (California)</h2>
+        <p>If you are a California resident, you have rights under the California Consumer Privacy Act, as amended, including:</p>
+        <ul style="margin-left: 20px; margin-bottom: 20px;">
+            <li><strong>Right to know:</strong> what personal information we collect</li>
+            <li><strong>Right to delete:</strong> request deletion of your personal information, subject to exceptions</li>
+            <li><strong>Right to opt out of sale or sharing:</strong> we do not sell personal information and we do not share it for cross-context behavioral advertising</li>
+            <li><strong>Non-discrimination:</strong> we will not discriminate against you for exercising your rights</li>
+        </ul>
 
-        <h2>12. Data Breach Notification</h2>
-        <p>In the event of a data breach that may compromise your personal information, we will notify you within 72 hours via email and post a notice on our website.</p>
+        <h2>13. Children's Privacy</h2>
+        <p>The Service is not intended for anyone under 18 years of age. We do not knowingly collect information from children. If we learn we have collected information from a child, we will delete it.</p>
 
-        <h2>13. Contact Us</h2>
+        <h2>14. Data Breach Notification</h2>
+        <p>If a breach may compromise personal information, we will notify affected individuals without undue delay and, where we have a usable email and notification is feasible, within 72 hours, and we will post a notice on lemma.id when appropriate. Relying-site controllers will be notified without undue delay.</p>
+        <p>Where GDPR or similar law applies, we will also notify the competent supervisory authority as required. That statutory clock (often 72 hours) runs to the authority, not automatically to every individual.</p>
+
+        <h2>15. Contact Us</h2>
         <p>For privacy-related questions or to exercise your rights:</p>
         <p>
             Email: privacy@lemma.id<br>
-            Data Protection Officer: dpo@lemma.id<br>
+            Data-protection inquiries: dpo@lemma.id<br>
             Website: https://lemma.id/privacy
         </p>
 
         <div style="text-align: center; margin-top: 60px; padding-top: 30px; border-top: 1px solid var(--gray-200);">
             <a href="/" class="btn-secondary" style="margin: 0 8px;">Back to Home</a>
             <a href="/terms" class="btn-secondary" style="margin: 0 8px;">Terms of Service</a>
+            <a href="/trust" class="btn-secondary" style="margin: 0 8px;">Trust</a>
         </div>
     </div>
 </div>

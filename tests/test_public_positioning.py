@@ -142,6 +142,25 @@ def test_terms_page_avoids_absolute_zero_knowledge_claim():
     assert "Zero-Knowledge Verification" not in terms
     assert "Local Return-Visit Verification" in terms
     assert "without per-request calls to Lemma" in terms
+    assert "Browser Wallet" not in terms
+    assert "99.5% uptime" not in terms
+    assert "Professional:" not in terms
+    assert "Didit" in terms
+    assert "not biometric unique-human" in terms
+
+
+@pytest.mark.unit
+def test_privacy_page_matches_current_data_model():
+    privacy = (ROOT / "templates" / "legal" / "privacy.html").read_text(encoding="utf-8")
+    assert "Didit" in privacy
+    assert "IndexedDB" in privacy
+    assert "lemma_wallet_session" in privacy
+    assert "unlinkable across sites" not in privacy
+    assert "Professional:" not in privacy
+    assert "7 years (compliance requirement)" not in privacy
+    assert "we do not sell personal information" in privacy.lower()
+    assert "not biometric unique-human" in privacy
+    assert "Zero-Knowledge" not in privacy
 
 
 @pytest.mark.unit

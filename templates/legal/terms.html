@@ -1,73 +1,75 @@
 {% extends "modern/layout.html" %}
+{% set is_public_page = true %}
 
-{% block title %}Terms of Service - Lemma.id{% endblock %}
-{% block description %}Terms of Service for Lemma.id - Cryptographic Credential Verification Platform{% endblock %}
+{% block title %}Terms of Service - lemma.id{% endblock %}
+{% block description %}Terms of Service for lemma.id — proof continuity, site-private PPIDs, and optional human proofs.{% endblock %}
 
 {% block content %}
 <div class="container" style="max-width: 900px; padding: 60px 20px;">
     <div style="background: var(--white); padding: 48px; border-radius: 12px; box-shadow: var(--shadow-lg);">
         <h1 style="color: var(--gray-900); margin-bottom: 8px;">Terms of Service</h1>
-        <p style="color: var(--gray-500); font-size: 14px; margin-bottom: 40px;">Last Updated: January 31, 2026</p>
+        <p style="color: var(--gray-500); font-size: 14px; margin-bottom: 40px;">Last Updated: August 24, 2026</p>
 
         <h2 style="margin-top: 40px;">1. Agreement to Terms</h2>
         <p>By accessing or using Lemma.id ("Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the Service.</p>
 
         <h2>2. Description of Service</h2>
-        <p>Lemma.id provides cryptographic credential verification services including:</p>
+        <p>Lemma.id provides proof continuity for web applications. The Service includes:</p>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
-            <li><strong>Credential Issuance:</strong> Ed25519-signed digital lemmas for identity verification</li>
-            <li><strong>Local Verification:</strong> Sub-millisecond credential verification without API calls</li>
-            <li><strong>Revocation System:</strong> Privacy-preserving Bloom filter revocation lists</li>
-            <li><strong>Browser Wallet:</strong> Encrypted credential storage in user's browser</li>
-            <li><strong>Developer SDK:</strong> JavaScript SDK for credential verification integration</li>
-            <li><strong>Permission Management:</strong> Role-based access control (RBAC) with cryptographic proofs</li>
-            <li><strong>Audit Logging:</strong> Compliance reporting and security event tracking</li>
+            <li><strong>lemma.id:</strong> a passkey-protected local identity store the user holds. Credentials are stored on the user's device; we issue and sign them.</li>
+            <li><strong>Site-private PPIDs:</strong> a stable opaque identifier for one person on one canonical hostname. Other sites receive different PPIDs they cannot join to each other.</li>
+            <li><strong>Local Return-Visit Verification:</strong> For routine sign-in checks, your servers can verify credentials locally using Ed25519 signatures without per-request calls to Lemma (initial IDV and optional server verification paths do contact Lemma).</li>
+            <li><strong>Optional human proofs (isHuman):</strong> IDV-backed person assurance on the same PPID, rooted in the verified document. This is not biometric unique-human identification. Distinct documents on a fresh lemma.id can still mint distinct persons.</li>
+            <li><strong>Revocation and enforcement:</strong> Bloom-filter revocation snapshots, plus site-block and site-doubt APIs the relying site controls for its own PPIDs</li>
+            <li><strong>Developer SDK:</strong> browser and server verifiers for signed presentations</li>
+            <li><strong>Usage metering:</strong> billing for human-proof binding, monthly renewals, and doubt re-entry as described on the Pricing page</li>
         </ul>
+        <p>The Service is a proof layer. Unless you choose to replace your login stack, it does not become your sole identity provider, and a valid proof does not grant site administration unless a separate permission proof says so.</p>
 
         <h2>3. Account Registration</h2>
-        <p>To use the Service, you must:</p>
+        <p>To use paid or registered parts of the Service, you must:</p>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
             <li>Provide accurate and complete registration information</li>
-            <li>Maintain the security of your API keys and credentials</li>
+            <li>Maintain the security of your API keys, admin access, and lemma.id</li>
             <li>Be at least 18 years of age</li>
             <li>Not use the Service for any illegal purpose</li>
         </ul>
+        <p>Passkey continuity and local verification may be used without a paid account. Human proofs, issuance at scale, and enforcement APIs may require registration and billing as described on the <a href="/pricing" style="color: var(--primary);">Pricing page</a>.</p>
 
         <h2>4. Acceptable Use</h2>
         <p>You agree not to:</p>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
             <li>Attempt to gain unauthorized access to the Service or other users' data</li>
             <li>Use the Service to transmit malware, spam, or malicious code</li>
-            <li>Reverse engineer, decompile, or disassemble the Service</li>
+            <li>Reverse engineer, decompile, or disassemble the Service, except to the extent applicable law allows</li>
             <li>Use the Service to violate any applicable laws or regulations</li>
+            <li>Submit fraudulent identity documents or liveness data, or use IDV to impersonate another person</li>
             <li>Exceed rate limits or attempt to overwhelm our infrastructure</li>
             <li>Share your API keys with unauthorized parties</li>
+            <li>Use the Service to circumvent a relying site's lawful block or abuse controls</li>
         </ul>
+        <p>Relying sites are responsible for their own user terms, how they bind a PPID to an account, and how they apply blocks and doubts.</p>
 
         <h2>5. Pricing</h2>
-        <p>Lemma.id uses metered pricing as described on our <a href="/pricing" style="color: var(--primary);">Pricing page</a>. Current rates include a one-time proof binding fee (identity verification included when required), monthly active user renewals, and doubt re-entry charges. We will provide at least 30 days notice before material pricing changes.</p>
+        <p>Lemma.id uses metered pricing as described on our <a href="/pricing" style="color: var(--primary);">Pricing page</a>. Passkey continuity and local verification are not metered. Current human-proof rates include a one-time proof binding fee (identity verification included when required), monthly active user renewals, and doubt re-entry charges. We will provide at least 30 days notice before material pricing changes.</p>
+        <p>You remain responsible for charges incurred before termination. Published prices are the offer of sale; a written enterprise order can replace them for that customer.</p>
 
         <h2>6. Data and Privacy</h2>
-        <p>We collect and process data as described in our <a href="/privacy" style="color: var(--primary);">Privacy Policy</a>. You retain ownership of your data. We use your data only to provide the Service.</p>
+        <p>We collect and process data as described in our <a href="/privacy" style="color: var(--primary);">Privacy Policy</a>. You retain ownership of your data. We use your data to provide the Service, to bill, to prevent fraud and abuse, to meet legal obligations, and to operate and secure the platform, as that policy describes.</p>
         <p>We implement industry-standard security measures including:</p>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
-            <li><strong>Ed25519 Signatures:</strong> Cryptographic signatures for credential authenticity</li>
-            <li><strong>Bloom Filter Revocation:</strong> Privacy-preserving credential revocation</li>
-            <li><strong>Encrypted Browser Wallet:</strong> Client-side credential storage</li>
-            <li><strong>Passkey Authentication:</strong> WebAuthn/FIDO2 for developer accounts</li>
-            <li><strong>Local Return-Visit Verification:</strong> For routine sign-in checks, your servers can verify credentials locally using Ed25519 signatures without per-request calls to Lemma.id (initial IDV and optional server verification paths do contact Lemma)</li>
-            <li><strong>Audit Logging:</strong> Comprehensive security event tracking</li>
+            <li><strong>Ed25519 Signatures:</strong> cryptographic signatures for credential authenticity</li>
+            <li><strong>Bloom Filter Revocation:</strong> compact, privacy-preserving credential revocation snapshots</li>
+            <li><strong>Encrypted lemma.id store:</strong> client-side credential storage, encrypted at rest in the browser</li>
+            <li><strong>Passkey Authentication:</strong> WebAuthn / FIDO2 to unlock lemma.id, including developer accounts</li>
+            <li><strong>Local Return-Visit Verification:</strong> For routine sign-in checks, your servers can verify credentials locally using Ed25519 signatures without per-request calls to Lemma (initial IDV and optional server verification paths do contact Lemma)</li>
+            <li><strong>Audit Logging:</strong> security-event logging for abuse investigation and site-scoped exports where those APIs exist</li>
         </ul>
+        <p>Identity verification is performed by Didit. Didit's processing of document and liveness images is subject to Didit's terms. We receive a verification outcome and do not retain raw identity documents, face images, or legal name.</p>
 
         <h2>7. Service Availability</h2>
-        <p><strong>Service Level Agreement (SLA):</strong></p>
-        <ul style="margin-left: 20px; margin-bottom: 20px;">
-            <li>Free Tier: Best effort, no SLA</li>
-            <li>Starter: 99.5% uptime</li>
-            <li>Professional: 99.9% uptime</li>
-            <li>Enterprise: 99.95% uptime (custom SLA available)</li>
-        </ul>
-        <p>We may perform scheduled maintenance with 24 hours notice. Emergency maintenance may be performed without notice.</p>
+        <p>Unless a written enterprise agreement states otherwise, the Service is provided on a best-effort basis and these Terms do not create an uptime SLA or service-credit policy. Operational status is published at <a href="https://status.lemma.id" style="color: var(--primary);">status.lemma.id</a> when available; that page is informational.</p>
+        <p>We may perform scheduled maintenance with 24 hours notice when practicable. Emergency maintenance may be performed without notice.</p>
 
         <h2>8. Intellectual Property</h2>
         <p>The Service, including all software, algorithms, and documentation, is owned by Lemma and protected by copyright and other intellectual property laws. You receive a limited license to use the Service, which does not transfer any ownership rights.</p>
@@ -77,8 +79,9 @@
         <p>Upon termination:</p>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
             <li>Your access to the Service will cease immediately</li>
-            <li>We will delete your data within 30 days unless legally required to retain it</li>
+            <li>We will delete your data within 30 days unless legally required to retain it, as described in the Privacy Policy</li>
             <li>You remain responsible for any charges incurred before termination</li>
+            <li>Relying-site accounts created from a PPID are the site's responsibility and are not automatically deleted</li>
         </ul>
 
         <h2>10. Limitation of Liability</h2>
@@ -105,15 +108,17 @@
         <p>For questions about these Terms, contact us at:</p>
         <p>
             Email: support@lemma.id<br>
+            Privacy: privacy@lemma.id<br>
             Website: https://lemma.id
         </p>
 
         <h2>15. Entire Agreement</h2>
-        <p>These Terms, together with our Privacy Policy, constitute the entire agreement between you and Lemma regarding the Service.</p>
+        <p>These Terms, together with our Privacy Policy, constitute the entire agreement between you and Lemma regarding the Service. A signed enterprise order or Data Processing Agreement controls if it conflicts with these Terms for that customer.</p>
 
         <div style="text-align: center; margin-top: 60px; padding-top: 30px; border-top: 1px solid var(--gray-200);">
             <a href="/" class="btn-secondary" style="margin: 0 8px;">Back to Home</a>
             <a href="/privacy" class="btn-secondary" style="margin: 0 8px;">Privacy Policy</a>
+            <a href="/trust" class="btn-secondary" style="margin: 0 8px;">Trust</a>
         </div>
     </div>
 </div>
