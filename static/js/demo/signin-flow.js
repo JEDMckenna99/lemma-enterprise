@@ -248,6 +248,14 @@
     },
   };
 
+  function isLemmaRedirectReturn() {
+    try {
+      return new URLSearchParams(window.location.search).get('lemma_ishuman_return') === '1';
+    } catch (_) {
+      return false;
+    }
+  }
+
   /** Returning from relying-site demos / builder deep-links must not bounce to /app. */
   function wantsBuilderHub() {
     try {
@@ -307,7 +315,12 @@
 
   function handleSignIn(btn, statusId, onSuccess) {
     setBusy(btn, true);
-    setStatus(statusId, 'Follow your device prompt\u2026');
+    setStatus(
+      statusId,
+      isLemmaRedirectReturn()
+        ? 'Finishing sign-in\u2026'
+        : 'Follow your device prompt\u2026'
+    );
     driver.signIn().then(function (result) {
       setBusy(btn, false);
       if (result && result.ok) {
@@ -372,6 +385,21 @@
   var params = new URLSearchParams(window.location.search);
   var queryScreen = MOCK ? params.get('screen') : null;
   var initial = queryScreen || forced;
+
+  // Mobile/same-tab return: the SDK deposited a site proof under request_nonce
+  // and sent the user back here. Claim it, mint the session, open /app.
+  // Must run before the forced-gate early return — /app without a session
+  // always sets data-screen="gate", which would otherwise skip this.
+  if (!MOCK && isLemmaRedirectReturn()) {
+    var returnScreen = (forced === 'gate' && SCREENS.gate) ? 'gate' : 'signin';
+    show(returnScreen);
+    handleSignIn(
+      returnScreen === 'gate' ? gateBtn : signinBtn,
+      returnScreen === 'gate' ? 'sf-gate-status' : 'sf-signin-status',
+      function () { driver.openManager(); }
+    );
+    return;
+  }
 
   if (initial && SCREENS[initial]) {
     if (MOCK && initial === 'manager') fillMockPanels();

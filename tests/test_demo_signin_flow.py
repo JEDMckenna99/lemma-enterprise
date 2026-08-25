@@ -142,6 +142,9 @@ def test_signin_flow_js_uses_sdk_and_session_endpoint():
     assert "postSession" in js
     assert "signedIn" in js
     assert "openManager()" in js
+    # Mobile/same-tab redirect return must finish the session and open /app.
+    assert "lemma_ishuman_return" in js
+    assert "isLemmaRedirectReturn" in js
     # The signed presentation is sent; a bare ppid never is.
     assert "presentation: presentation" in js
     assert "JSON.stringify({ ppid" not in js
