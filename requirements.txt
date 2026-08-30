@@ -4,9 +4,9 @@ gevent>=24.2.1
 Werkzeug>=2.3.7
 requests>=2.31.0
 stripe>=8.0.0
-python-dotenv>=1.2.2
-maturin==1.4.0
-setuptools-rust==1.7.0
+python-dotenv>=1.2.3
+maturin==1.15.0
+setuptools-rust==1.13.0
 PyJWT>=2.8.0
 Flask-CORS>=4.0.0
 SQLAlchemy>=2.0.0
