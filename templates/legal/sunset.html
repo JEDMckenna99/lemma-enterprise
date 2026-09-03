@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>lemma.id has shut down</title>
+    <meta name="description" content="lemma.id is no longer operating. Contact privacy@lemma.id for data requests.">
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <style nonce="{{ csp_nonce }}">
+        :root { color-scheme: light; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 20px;
+            font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+            color: #454554;
+            background: #f6f6f9;
+        }
+        main {
+            max-width: 36rem;
+            background: #fff;
+            border: 1px solid #e8e8ee;
+            border-radius: 12px;
+            padding: 40px 36px;
+        }
+        h1 {
+            margin: 0 0 12px;
+            font-size: 1.75rem;
+            font-weight: 600;
+            color: #1a1a24;
+        }
+        p { margin: 0 0 16px; line-height: 1.6; }
+        a { color: #4e3d8f; }
+        .links { margin-top: 24px; font-size: 0.95rem; }
+        .links a { margin-right: 16px; }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>lemma.id has shut down</h1>
+        <p>The service is no longer issuing credentials, verifying presentations, or accepting new accounts.</p>
+        <p>If you have a privacy or data request, email <a href="mailto:privacy@lemma.id">privacy@lemma.id</a>.</p>
+        <p class="links">
+            <a href="/privacy">Privacy</a>
+            <a href="/terms">Terms</a>
+        </p>
+    </main>
+</body>
+</html>

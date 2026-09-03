@@ -137,6 +137,13 @@ def create_app():
         g.csp_profile = resolve_csp_profile(request.path or '/')
 
     @app.before_request
+    def enforce_product_sunset():
+        """When LEMMA_SUNSET is on, serve the tombstone and close product APIs."""
+        from api.sunset import maybe_sunset_response
+
+        return maybe_sunset_response()
+
+    @app.before_request
     def redirect_loopback_ip_to_localhost():
         """Chrome WebAuthn works on http://localhost, not http://127.0.0.1.
 
